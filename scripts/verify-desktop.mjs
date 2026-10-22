@@ -1,7 +1,7 @@
 import { _electron } from 'playwright-core';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { developmentPaths } from './workspace-paths.mjs';
@@ -9,8 +9,11 @@ import { developmentPaths } from './workspace-paths.mjs';
 const executable = process.argv[2] && resolve(process.argv[2]);
 if (!executable || !existsSync(executable)) throw new Error('请提供要验证的 Windows 免安装包 SlowTune.exe 绝对路径。');
 const output = join(developmentPaths().testRuntime, 'desktop-package-verification'); mkdirSync(output, { recursive: true });
-const directory = mkdtempSync(join(output, 'run-')), data = join(directory, 'profile');
+const portableData = process.argv.includes('--portable-data');
+const directory = mkdtempSync(join(output, 'run-')), data = portableData ? join(dirname(executable), 'data') : join(directory, 'profile');
+if (portableData && existsSync(data)) throw new Error('默认资料验收只允许在新解压且没有 data 的程序副本中执行。');
 const env = { ...process.env, MUSIC_APP_DESKTOP_DATA: data };
+if (portableData) delete env.MUSIC_APP_DESKTOP_DATA;
 for (const key of Object.keys(env)) if (key.toLowerCase() === 'path') delete env[key];
 env.PATH = `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`;
 for (const name of ['MUSIC_APP_CONFIG', 'MUSIC_APP_NODE', 'MUSIC_APP_DESKTOP_ROOT', 'ELECTRON_RUN_AS_NODE', 'NODE_OPTIONS']) delete env[name];
@@ -144,7 +147,7 @@ try {
   assert.notEqual(JSON.parse(readFileSync(join(data, 'runtime/service.json'), 'utf8')).pid, firstPID);
   assert.equal(await application.evaluate(({ app }) => app.isPackaged), true);
   assert.equal(await reopened.getByLabel('服务访问码', { exact: true }).count(), 0);
-  report = { status: 'passed', packaged: true, nodeOnPath: false, controlledAudioPlayback: true, createdIndependentProfile: true, automaticFirstLaunch: true, accessCodePrompt: false, automaticSessionRestore: true, browserAccessProtected: true, authenticated: true, dataSurvivesReopen: true, duplicateLaunchSingleWindow: true, closeStopsService: true, serviceRestartsOnReopen: true, executable };
+  report = { status: 'passed', packaged: true, portableDefaultData: portableData, nodeOnPath: false, controlledAudioPlayback: true, createdIndependentProfile: true, automaticFirstLaunch: true, accessCodePrompt: false, automaticSessionRestore: true, browserAccessProtected: true, authenticated: true, dataSurvivesReopen: true, duplicateLaunchSingleWindow: true, closeStopsService: true, serviceRestartsOnReopen: true, executable };
 } finally {
   let cleanupError;
   if (application) await closeApplication(application).catch(error => { cleanupError = error; });

@@ -5,6 +5,10 @@ import { createServer } from 'node:net';
 
 export const localProfilePath = userData => join(userData, 'instance', 'config.local.json');
 
+export function requiresLegacyProfileAdoption({ packaged, dataOverride, data, legacyData }) {
+  return !packaged && !dataOverride && !existsSync(localProfilePath(data)) && existsSync(join(legacyData, 'desktop-state.json'));
+}
+
 export async function availablePort(port = 0) {
   const listener = createServer();
   try { await new Promise((done, reject) => { listener.once('error', reject); listener.listen(port, '127.0.0.1', done); }); }

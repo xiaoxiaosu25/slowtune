@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { ensureLocalProfile, localProfilePath } from '../desktop/profile.mjs';
+import { join } from 'node:path';
+import { ensureLocalProfile, localProfilePath, requiresLegacyProfileAdoption } from '../desktop/profile.mjs';
+import { developmentPaths } from '../scripts/workspace-paths.mjs';
 
 test('desktop automatically creates an isolated loopback profile and preserves existing configuration and data', async () => {
-  const output = resolve('local/desktop-profile-tests'); mkdirSync(output, { recursive: true });
+  const output = join(developmentPaths().testRuntime, 'desktop-profile-tests'); mkdirSync(output, { recursive: true });
   const data = mkdtempSync(join(output, 'profile with spaces-'));
   const file = await ensureLocalProfile(data), initial = readFileSync(file, 'utf8'), config = JSON.parse(initial);
   assert.equal(file, localProfilePath(data));
@@ -23,4 +24,18 @@ test('desktop automatically creates an isolated loopback profile and preserves e
   assert.equal(readFileSync(saved, 'utf8'), 'existing data');
   const other = await ensureLocalProfile(mkdtempSync(join(output, 'other-')));
   assert.notEqual(JSON.parse(readFileSync(other, 'utf8')).accessKey, config.accessKey);
+});
+
+test('legacy development data never blocks a new portable package profile', async () => {
+  const output = join(developmentPaths().testRuntime, 'desktop-profile-tests'); mkdirSync(output, { recursive: true });
+  const work = mkdtempSync(join(output, 'legacy-')), data = join(work, 'portable-data'), legacyData = join(work, 'legacy-data');
+  mkdirSync(legacyData); writeFileSync(join(legacyData, 'desktop-state.json'), '{}');
+  const settings = { packaged: false, dataOverride: false, data, legacyData };
+  assert.equal(requiresLegacyProfileAdoption(settings), true, 'source development still protects unadopted data');
+  assert.equal(requiresLegacyProfileAdoption({ ...settings, packaged: true }), false);
+  assert.equal(requiresLegacyProfileAdoption({ ...settings, dataOverride: true }), false);
+  assert.equal(requiresLegacyProfileAdoption({ ...settings, legacyData: join(work, 'absent') }), false);
+  await ensureLocalProfile(data);
+  assert.equal(requiresLegacyProfileAdoption(settings), false, 'an existing local profile can reopen');
+  assert.equal(readFileSync(join(legacyData, 'desktop-state.json'), 'utf8'), '{}');
 });

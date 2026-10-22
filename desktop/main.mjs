@@ -8,7 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { preferences, restoreLyricsPreferences, windowAppearance, fitBounds, lyricDocument, lyricClock, hasDisplayableLyrics, playbackCommands } from './model.mjs';
 import { iconPng } from './icon.mjs';
 import { serveDesktopLifecycle, desktopDataDirectory } from './lifecycle.mjs';
-import { prepareLocalProfile, localProfilePath } from './profile.mjs';
+import { prepareLocalProfile, localProfilePath, requiresLegacyProfileAdoption } from './profile.mjs';
 import { DesktopStorage, DesktopState, DesktopFile } from './storage.mjs';
 
 const run = promisify(execFile), here = dirname(fileURLToPath(import.meta.url));
@@ -298,7 +298,7 @@ async function start() {
     try {
       await stopCurrentService();
       mkdirSync(join(dataDirectory, 'logs'), { recursive: true });
-      if (!process.env.MUSIC_APP_DESKTOP_DATA && !existsSync(localProfilePath(dataDirectory)) && existsSync(join(app.getPath('appData'), 'SlowTune/desktop-state.json'))) throw new Error('原桌面资料尚未接入，未创建空资料。开发环境请先执行 npm run desktop:adopt。');
+      if (requiresLegacyProfileAdoption({ packaged: app.isPackaged, dataOverride: !!process.env.MUSIC_APP_DESKTOP_DATA, data: dataDirectory, legacyData: join(app.getPath('appData'), 'SlowTune') })) throw new Error('原桌面资料尚未接入，未创建空资料。开发环境请先执行 npm run desktop:adopt。');
       pendingConfig = await prepareLocalProfile(dataDirectory);
       if (storage) await storage.flush();
       storage = new DesktopStorage(dataDirectory, { onState: () => send(player, 'desktop:preference-state', preferenceState()) });
