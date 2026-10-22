@@ -12,13 +12,13 @@ test('corresponding-source bundle includes build inputs and excludes instance cr
   const root = mkdtempSync(join(tmpdir(), 'slowtune-source-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const path of ['src', 'server', 'scripts', 'tests', 'docs/开发', 'vendor', 'legal', 'public/assets', 'public/fonts', 'local', 'runtime', 'data', 'desktop']) mkdirSync(join(root, path), { recursive: true });
-  for (const path of ['README.md', 'LICENSE', 'NOTICE', 'package.json', 'src/app.ts', 'server/index.ts', 'scripts/build.mjs', 'tests/app.test.mjs', 'desktop/main.mjs', 'docs/开发/开发约定.md', 'docs/内部记录.md', 'AGENTS.md', '项目说明.md', 'legal/LICENSE.txt', 'vendor/public.tgz', 'public/fonts/font.woff2', '一键启动.cmd', 'private.cmd', 'config.local.json', 'runtime/account.json', 'data/library.sqlite', 'local/private.txt']) writeFileSync(join(root, path), path);
+  for (const path of ['README.md', 'CONTRIBUTING.md', 'LICENSE', 'NOTICE', 'package.json', 'src/app.ts', 'server/index.ts', 'scripts/build.mjs', 'tests/app.test.mjs', 'desktop/main.mjs', 'docs/开发/开发约定.md', 'docs/内部记录.md', 'AGENTS.md', '项目说明.md', 'legal/LICENSE.txt', 'vendor/public.tgz', 'public/fonts/font.woff2', '一键启动.cmd', 'private.cmd', 'config.local.json', 'runtime/account.json', 'data/library.sqlite', 'local/private.txt']) writeFileSync(join(root, path), path);
   writeFileSync(join(root, 'workspace.paths.json'), JSON.stringify({ schemaVersion: 1, project: 'slowtune', paths: { studio: '../..', build: '../../local/build/slowtune', artifacts: '../../local/artifacts/slowtune', testRuntime: '../../local/runtime/slowtune' } }));
   writeFileSync(join(root, 'tests/stage5-compatibility.test.mjs'), 'private baseline comparison');
   const files = generateLyricSource(root);
   assert(files.includes('src/app.ts')); assert(files.includes('一键启动.cmd')); assert(files.includes('tests/app.test.mjs')); assert(files.includes('desktop/main.mjs'));
   assert(!files.some(path => ['workspace.paths.json', 'AGENTS.md', '项目说明.md', 'docs/内部记录.md', 'private.cmd', 'tests/stage5-compatibility.test.mjs'].includes(path)), 'author workspace inputs must not enter public source');
-  for (const file of ['README.md', 'LICENSE', 'NOTICE']) assert(files.includes(file));
+  for (const file of ['README.md', 'CONTRIBUTING.md', 'LICENSE', 'NOTICE']) assert(files.includes(file));
   assert(!files.some(path => /config\.local|runtime\/|data\/|local\//.test(path)));
   const extracted = join(root, 'extracted'); mkdirSync(extracted);
   execFileSync('tar', ['-xzf', join(root, 'public/legal/desktop-lyrics-source.tar.gz'), '-C', extracted], { windowsHide: true });

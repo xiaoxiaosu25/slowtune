@@ -16,9 +16,11 @@
 
 ## 源码启动
 
-准备 Windows 和 Node.js `>=24.15.0`（需要内置 `node:sqlite` 及 npm），在仓库根目录操作。
+准备 Windows、Git 和 Node.js `>=24.15.0`（需要内置 `node:sqlite` 及 npm）。
 
 ```powershell
+git clone https://github.com/xiaoxiaosu25/slowtune.git
+cd slowtune
 npm ci
 npm run desktop:build
 npm run desktop
@@ -52,4 +54,4 @@ npm run desktop
 
 通过 [GitHub Issues](https://github.com/xiaoxiaosu25/slowtune/issues)反馈问题时，请提供应用版本、Windows 版本、复现步骤，以及应用内“运行信息 → 复制诊断信息”的脱敏内容。请勿上传完整 `data/`、Cookie、配置文件、账号二维码或未脱敏日志。
 
-开发规则见[开发约定](docs/开发/开发约定.md)，完整文档从[文档导航](docs/文档导航.md)进入。
+本地开发、代码目录和 Pull Request 提交方式见[贡献指南](CONTRIBUTING.md)，开发规则见[开发约定](docs/开发/开发约定.md)，完整文档从[文档导航](docs/文档导航.md)进入。
