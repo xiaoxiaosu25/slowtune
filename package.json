@@ -31,7 +31,8 @@
     "update": "node scripts/update.mjs",
     "diagnose": "node scripts/control.mjs diagnose",
     "reset-access": "node scripts/reset-access.mjs",
-    "test": "node --import ./tests/helpers/isolated-build.mjs --test tests/*.test.mjs"
+    "pretest": "npm run build && npm run desktop:build",
+    "test": "node --import ./tests/helpers/isolated-build.mjs --test --test-concurrency=1 tests/*.test.mjs"
   },
   "dependencies": {
     "@applemusic-like-lyrics/core": "0.6.0",

@@ -3,6 +3,7 @@ name: Source checks
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,9 +25,27 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=high
       - run: npm run source:check
       - run: npm run build
       - name: Source, documentation and service regression
         run: node --test tests/documentation.test.mjs tests/desktop-lyric-source.test.mjs tests/desktop-profile.test.mjs tests/browser-config.test.mjs tests/workspace-paths.test.mjs tests/lyric-timing.test.mjs tests/audio-quality.test.mjs tests/song-library.test.mjs tests/song-library-sync.test.mjs tests/recommendation.test.mjs
-      - name: Browser smoke test
-        run: node --test tests/song-targets-desktop-ui.test.mjs
+      - name: Browser playback regression
+        run: node --test --test-concurrency=1 tests/song-targets-desktop-ui.test.mjs tests/playback.test.mjs tests/playback-retry.test.mjs tests/song-version-switch.test.mjs
+
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Prepare ordinary and desktop test builds
+        run: npm run pretest
+      - name: Desktop lifecycle, persistence and IPC regression
+        run: node --import ./tests/helpers/isolated-build.mjs --test --test-concurrency=1 tests/desktop-profile.test.mjs tests/desktop-storage.test.mjs tests/desktop-state.test.mjs tests/desktop-host.test.mjs tests/desktop-lifecycle.test.mjs tests/desktop-state-recovery.test.mjs tests/desktop-restart.test.mjs
