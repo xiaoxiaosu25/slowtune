@@ -19,8 +19,9 @@ const launch = () => _electron.launch({ executablePath: executable, env, timeout
 const step = message => console.log('桌面包验证：' + message);
 async function verifyPlayback(page) {
   // Keep upstream accounts and content outside the deterministic package check.
+  const calls = [];
   const ref = { provider: 'bilibili', kind: 'video', id: 'BV0000000001', part: '1' };
-  const entry = { ref, resourceId: 'desktop-verification', title: '桌面包合成音频', durationSeconds: 15 };
+  const entry = { ref, resourceId: 'desktop-verification', title: '桌面包合成音频', durationSeconds: 15, url: 'https://www.bilibili.com/video/' + ref.id };
   const format = { id: 'wav', codec: 'pcm', mimeType: 'audio/wav', container: 'wav' };
   const audio = Buffer.alloc(44 + 8000 * 15 * 2);
   audio.write('RIFF'); audio.writeUInt32LE(audio.length - 8, 4); audio.write('WAVEfmt ', 8);
@@ -28,10 +29,11 @@ async function verifyPlayback(page) {
   audio.writeUInt32LE(8000, 24); audio.writeUInt32LE(16000, 28); audio.writeUInt16LE(2, 32); audio.writeUInt16LE(16, 34);
   audio.write('data', 36); audio.writeUInt32LE(audio.length - 44, 40);
   for (let n = 0; n < 8000 * 15; n++) audio.writeInt16LE(Math.round(Math.sin(2 * Math.PI * 440 * n / 8000) * 1000), 44 + n * 2);
-  await page.route('**/__desktop-verification.wav', route => route.fulfill({ contentType: 'audio/wav', body: audio }));
+  await page.route('**/__desktop-verification.wav', route => { calls.push('audio'); return route.fulfill({ contentType: 'audio/wav', body: audio }); });
   await page.route('**/api/search', route => route.fulfill({ json: { items: [entry] } }));
   await page.route('**/v1/call/*', route => {
     const request = route.request().postDataJSON();
+    calls.push(new URL(route.request().url()).pathname);
     if ((request?.ref ?? request?.request?.ref)?.id !== ref.id) return route.continue();
     const operation = new URL(route.request().url()).pathname.split('/').at(-1);
     if (operation === 'formats') return route.fulfill({ json: { protocol: 2, result: [format] } });
@@ -46,7 +48,12 @@ async function verifyPlayback(page) {
   await page.locator('audio').evaluate(element => { element.muted = true; });
   await search.getByRole('button', { name: '播放 ' + entry.title, exact: true }).click();
   await search.getByRole('button', { name: '关闭', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .2, undefined, { timeout: 20000 });
+  await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .2, undefined, { timeout: 20000 }).catch(async error => {
+    const state = await page.locator('audio').evaluate(element => ({ readyState: element.readyState, currentTime: element.currentTime, paused: element.paused, error: element.error?.message }));
+    const alerts = await page.getByRole('alert').allTextContents();
+    throw new Error('合成播放未就绪：' + JSON.stringify({ calls, state, alerts }), { cause: error });
+  });
+  await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   const toggle = page.locator('.listening-transport .play-toggle');
   await toggle.click();
   await page.waitForFunction(() => document.querySelector('audio')?.paused === true);
