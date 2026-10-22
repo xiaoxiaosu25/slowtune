@@ -2,7 +2,13 @@
 
 慢听是一款面向 Windows 的个人音乐播放器，支持 B站音乐搜索、在线播放、歌单管理和桌面歌词。
 
-**当前为开发预览版。** 可按下方步骤从源码运行，部分真实设备场景仍在验证。
+**当前为开发预览版。** 部分真实设备场景仍在验证。
+
+## 下载 Windows 版
+
+在 [Releases](https://github.com/xiaoxiaosu25/slowtune/releases) 下载标记为 **Pre-release** 的 Windows 免安装 ZIP，完整解压到当前用户可写的目录，再双击 `SlowTune.exe`。无需另装 Node.js。
+
+请选择发行附件中的程序 ZIP；GitHub 自动生成的 `Source code.zip` 是源码。更新前退出程序并备份、保留原目录中的 `data/`。当前程序未签名，没有安装器或自动更新；支持范围见[当前限制](docs/产品/当前限制.md)。
 
 ## 功能
 
