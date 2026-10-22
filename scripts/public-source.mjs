@@ -18,7 +18,7 @@ export function publicSourceFiles(root) {
   // Historical comparison against an author's private build, not a portable test.
   const localOnlyFiles = new Set(['tests/stage5-compatibility.test.mjs']);
   const files = [
-    'README.md', 'LICENSE', 'NOTICE', 'package.json', 'package-lock.json',
+    'README.md', 'CONTRIBUTING.md', 'LICENSE', 'NOTICE', 'package.json', 'package-lock.json',
     'index.html', 'vite.config.ts', 'tsconfig.json', 'tsconfig.server.json',
     'config.example.json', '.gitignore', '.gitattributes', '第三方声明.md',
     '一键启动.cmd', 'public/theme-init.js', ...publicDocuments,
