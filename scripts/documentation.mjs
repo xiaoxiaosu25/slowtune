@@ -192,7 +192,9 @@ export function parseMarkdown(source) {
 
 export function checkLocalLinks(root, { delivery = false } = {}) {
   const publicEntries = ['README.md', 'vendor/README.md'].filter(file => existsSync(join(root, file)));
-  const documents = [...publicEntries, '项目说明.md', '第三方声明.md', ...filesBelow(root, 'docs')], parsed = new Map(), errors = [];
+  // A Studio checkout keeps private agent navigation beside its path declaration;
+  // an independently published AGENTS.md, if present, must pass link checks.
+  const documents = [...publicEntries, ...['项目说明.md', 'AGENTS.md', '第三方声明.md'].filter(file => existsSync(join(root, file)) && (file !== 'AGENTS.md' || !existsSync(join(root, 'workspace.paths.json')))), ...filesBelow(root, 'docs')], parsed = new Map(), errors = [];
   for (const file of documents) parsed.set(file, parseMarkdown(read(root, file)));
   const navigation = new Set(['docs/文档导航.md']);
   for (const [file, data] of parsed) for (const { target, line } of data.links) {

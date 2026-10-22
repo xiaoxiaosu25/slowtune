@@ -17,7 +17,7 @@ cpSync(join(root, 'desktop'), application, { recursive: true });
 writeFileSync(join(application, 'package.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(application, 'package.json'), 'utf8')), version: app.version }, null, 2) + '\n');
 mkdirSync(service); cpSync(join(locations.desktopBuild, 'dist'), join(service, 'dist'), { recursive: true });
 cpSync(join(root, 'desktop/service.mjs'), join(service, 'desktop-service.mjs'));
-for (const name of ['vendor', 'docs', 'README.md', 'LICENSE', 'NOTICE', 'package.json', 'package-lock.json', 'config.example.json', '项目说明.md', '第三方声明.md']) cpSync(join(root, name), join(service, name), { recursive: true });
+for (const name of ['vendor', 'docs', 'README.md', 'LICENSE', 'NOTICE', 'package.json', 'package-lock.json', 'config.example.json', '第三方声明.md']) cpSync(join(root, name), join(service, name), { recursive: true });
 mkdirSync(join(service, 'scripts'));
 for (const name of ['start.mjs', 'launch.mjs', 'control.mjs', 'reset-access.mjs', 'instance-path.mjs']) cpSync(join(root, 'scripts', name), join(service, 'scripts', name));
 const npm = join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');

@@ -111,6 +111,8 @@ test('Markdown checks resolve reference links, Chinese/repeated anchors and igno
   put(root, 'docs/产品/遗漏.md', '# 遗漏\n');
   assert(checkDocumentation(root).some(error => error.includes('未列入 docs/文档导航.md')));
   assert.deepEqual([...parseMarkdown('# 相同\n\n# 相同\n').anchors], ['相同', '相同-1']);
+  put(root, 'AGENTS.md', '# Rules\n\n[Outside](../../platform/README.md)\n');
+  assert(checkLocalLinks(root).some(error => error.includes('AGENTS.md') && error.includes('越出项目')));
 });
 
 test('Release packages final docs and rejects broken navigation before creating output', t => {

@@ -16,6 +16,10 @@ test-results/
 # Generated verification workspaces and release artifacts stay local.
 local/
 artifacts/
+# Author workspace navigation and path declarations are not public source inputs.
+/AGENTS.md
+/项目说明.md
+/workspace.paths.json
 # Generated corresponding source is built alongside legal notices.
 public/legal/desktop-lyrics-source.tar.gz
 public/legal/source-files.txt

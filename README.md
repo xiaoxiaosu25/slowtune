@@ -18,16 +18,13 @@
 
 准备 Windows 和 Node.js `>=24.15.0`（需要内置 `node:sqlite` 及 npm），在仓库根目录操作。
 
-`workspace.paths.json` 是作者 Studio 工作区的开发路径声明。普通独立克隆请先将它另存为被 Git 忽略的本地文件，使现有路径解析使用仓库内的 `local/`：
-
 ```powershell
-Move-Item -LiteralPath workspace.paths.json -Destination workspace.paths.local.json
 npm ci
 npm run desktop:build
 npm run desktop
 ```
 
-在作者 Studio 工作区内维护时保留原路径声明，直接执行后三条命令。公共依赖已固定在仓库的 `vendor/`，安装慢听不需要另行取得整个 platform。公共包源码及其重建说明见 [vendor/README.md](vendor/README.md)。
+独立克隆的桌面构建输出为仓库内的 `local/desktop-build/`，应用资料保存在 `data/`。公共依赖已固定在仓库的 `vendor/`，无需取得作者的其他工程。公共包源码及重建说明见 [vendor/README.md](vendor/README.md)。
 
 构建后也可双击根目录的 `一键启动.cmd`。源码改动后执行 `npm run desktop:restart` 重建并打开；该命令不会自动安装依赖。
 
@@ -51,7 +48,7 @@ npm run desktop
 
 本项目原创代码按 **AGPL-3.0-only** 发布，见 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。随仓库提供的三个自有公共包及对应源码快照采用同一许可；第三方软件、字体和平台内容保留各自权利与许可，见[第三方声明](第三方声明.md)。
 
-公共能力在作者的 Studio platform 维护，慢听显式消费固定版本。源码快照是对应版本的交付材料，修改及版本更新方式见[开源与协作](docs/开发/开源与协作.md)。
+自有公共包由维护者单独维护，慢听显式消费固定版本，并随附源码归档。修改及版本更新方式见[开源与协作](docs/开发/开源与协作.md)。
 
 通过 [GitHub Issues](https://github.com/xiaoxiaosu25/slowtune/issues)反馈问题时，请提供应用版本、Windows 版本、复现步骤，以及应用内“运行信息 → 复制诊断信息”的脱敏内容。请勿上传完整 `data/`、Cookie、配置文件、账号二维码或未脱敏日志。
 

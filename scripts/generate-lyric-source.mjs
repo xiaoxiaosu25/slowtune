@@ -1,6 +1,7 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { publicSourceFiles } from './public-source.mjs';
 
 function header(name, size, type = '0') {
   const block = Buffer.alloc(512);
@@ -21,19 +22,9 @@ function paxPath(path) {
 
 // Explicit source inputs only. Never package local configs, credentials, databases or runtime files.
 export function generateLyricSource(root = resolve('.')) {
-  const entries = ['README.md', 'LICENSE', 'NOTICE', 'package.json', 'package-lock.json', 'workspace.paths.json', 'index.html', 'vite.config.ts', 'tsconfig.json', 'tsconfig.server.json', 'config.example.json', '.gitignore', '.gitattributes', 'AGENTS.md', '项目说明.md', '第三方声明.md', 'public/theme-init.js'];
-  const walk = path => {
-    for (const entry of readdirSync(join(root, path), { withFileTypes: true })) {
-      const child = path + '/' + entry.name;
-      if (entry.isSymbolicLink()) throw new Error('Source bundle refuses links: ' + child);
-      if (entry.isDirectory()) walk(child); else if (entry.isFile()) entries.push(child);
-    }
-  };
-  for (const path of ['src', 'server', 'scripts', 'tests', 'docs', 'vendor', 'legal', 'public/assets', 'public/fonts', 'desktop']) if (existsSync(join(root, path))) walk(path);
-  for (const entry of readdirSync(root, { withFileTypes: true })) if (entry.isFile() && entry.name.endsWith('.cmd')) entries.push(entry.name);
+  const files = publicSourceFiles(root);
   const output = join(root, 'public/legal'); mkdirSync(output, { recursive: true });
   const list = join(output, 'source-files.txt');
-  const files = [...new Set(entries)].filter(path => existsSync(join(root, path))).sort();
   writeFileSync(list, files.join('\n') + '\n');
   // PAX paths preserve Chinese filenames on Windows without shell/codepage dependencies.
   const blocks = [];
