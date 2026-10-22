@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {createPlayingArtworkFixture} from './helpers/playing-artwork-fixture.mjs';
 import {queueRecord} from './helpers/song-fixture.mjs';
 test('measured large-library background writes wait during playback and resume after pause', {timeout:30000},async t=>{

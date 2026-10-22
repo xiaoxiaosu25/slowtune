@@ -25,6 +25,7 @@
     "desktop:verify": "node scripts/verify-desktop.mjs",
     "docs:generate": "node scripts/generate-docs.mjs",
     "docs:check": "node scripts/check-docs.mjs",
+    "source:check": "node scripts/check-public-repository.mjs",
     "start": "node scripts/start.mjs",
     "stop": "node scripts/control.mjs stop",
     "update": "node scripts/update.mjs",

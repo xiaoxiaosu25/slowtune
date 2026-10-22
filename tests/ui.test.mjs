@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { fromMusicRef,queueRecord,installSongFixture } from './helpers/song-fixture.mjs';
 import { DEFAULT_CONFIG, execute } from '@studio/recommendation';
 import { navigate, createPlaylist, selectPlaylist, openTrackMenu, queueTrackMenu, verifyDefaultDiscovery, selectRate } from '../scripts/browser-ui.mjs';
@@ -113,7 +113,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
   const libraryFixture=installSongFixture(server,{seed:snapshot});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => { server.closeAllConnections(); return new Promise(resolve => server.close(resolve)); });
-  const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(() => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync, truncateSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { createSettingsFixture } from './helpers/settings-fixture.mjs';
 import { openSettingsPage } from '../scripts/browser-ui.mjs';
 import {queueRecord,seedSongs} from './helpers/song-fixture.mjs';
@@ -10,7 +10,7 @@ import {queueRecord,seedSongs} from './helpers/song-fixture.mjs';
 test('Settings: offline notices, honest diagnostic states and reviewed backup recovery',{timeout:120000},async t=>{
   const fixture=await createSettingsFixture(),{state,base}=fixture;
   const artifacts=resolve('local/verification/settings-about');mkdirSync(artifacts,{recursive:true});
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});
   const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],remoteRequests=[];
   await page.addInitScript(record=>localStorage.setItem('slow-listening:playback:v3',JSON.stringify(record)),queueRecord([fixture.track],{volume:.4}));

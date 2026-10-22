@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 
 test('product manual recovery uses the failed source, position and newest transport intent', { timeout: 180000 }, async t => {
   const artifact = await build({ configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': '"production"' }, build: { target: 'esnext', write: false, minify: false,
@@ -51,7 +51,7 @@ test('product manual recovery uses the failed source, position and newest transp
     res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><div id="root"></div><script type="module" src="/probe.js"></script>');
   });
   await new Promise(r => server.listen(0, '127.0.0.1', r)); const origin = 'http://127.0.0.1:' + server.address().port;
-  const browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  const browser = await chromium.launch({ headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   t.after(async () => { gate?.release(); await browser.close(); server.closeAllConnections(); await new Promise(r => server.close(r)); const out = resolve('local/playback-retry'); mkdirSync(out, { recursive: true }); writeFileSync(out + '/regression.json', JSON.stringify({ records, leases, released: [...released], requests, errors, external }, null, 2)); });
   const page = await browser.newPage(); page.setDefaultTimeout(10000); page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(()=>{window.resumeCallbacks=[];window.slowTuneDesktop={readPreferences:async()=>Object.fromEntries(Object.keys(localStorage).filter(key=>key.startsWith('slow-listening:')).map(key=>[key,localStorage.getItem(key)])),writePreference:async(key,value)=>{if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value);},onCommand:callback=>{window.resumeCallbacks.push(callback);return ()=>{};}};});

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {resolve,join,extname} from 'node:path';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {installSearchFixture} from './helpers/search-fixture.mjs';
 
 test('chart playback: direct first results, lazy whole charts, failures, cancellation and silent restoration',async t=>{
@@ -60,7 +60,7 @@ test('chart playback: direct first results, lazy whole charts, failures, cancell
   });
   const searchFixture=installSearchFixture(server);
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));});
   const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
   await page.route('https://example.com/cover.jpg',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#558b7c"/></svg>'}));

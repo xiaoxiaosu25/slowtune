@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {resolve,join,extname} from 'node:path';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {fromMusicRef} from './helpers/song-fixture.mjs';
 import {DEFAULT_CONFIG} from '@studio/recommendation';
 import {resourceId} from '@studio/music-sources';
@@ -70,7 +70,7 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
   });
   const {libraryFixture}=installSearchFixture(server,{librarySeed:library.snapshot});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
   const dialog=page.getByRole('dialog',{name:'搜索音乐',exact:true}),nav=async name=>{if(await dialog.count())await dialog.getByRole('button',{name:'关闭',exact:true}).click();await page.locator('nav:visible').getByRole('button',{name,exact:true}).click();};

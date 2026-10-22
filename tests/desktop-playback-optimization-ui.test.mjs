@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {Readable} from 'node:stream';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {createMusicService,MediaDelivery} from '@studio/music-sources/service';
 import {createPlayingArtworkFixture} from './helpers/playing-artwork-fixture.mjs';
 const {DesktopPlayback}=await import(pathToFileURL(resolve(process.env.MUSIC_APP_TEST_BUILD??'.','dist/server/desktop-playback.js')));
@@ -39,7 +39,7 @@ async function setup(t){
     response.writeHead(result.status,Object.fromEntries(result.headers));
     if(result.body)Readable.fromWeb(result.body).pipe(response);else response.end();return true;
   }});
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();work.dispose();await delivery.dispose();await fixture.close();});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(8000);
   await page.addInitScript(()=>{const original=HTMLMediaElement.prototype.canPlayType;HTMLMediaElement.prototype.canPlayType=function(type){return original.call(this,type==='audio/wav; codecs="pcm"'?'audio/wav':type);};});

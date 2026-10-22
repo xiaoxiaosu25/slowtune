@@ -5,30 +5,26 @@ import { join } from 'node:path';
 // must not become public merely because they live beside the product sources.
 export const publicDocuments = [
   'docs/文档导航.md',
-  'docs/产品/产品功能.md', 'docs/产品/启动与访问.md',
+  'docs/产品/产品功能.md', 'docs/产品/启动与访问.md', 'docs/产品/当前限制.md',
   'docs/开发/开发约定.md', 'docs/开发/开源与协作.md',
   'docs/开发/接口说明.md', 'docs/开发/架构与数据.md',
   'docs/开发/界面规范.md', 'docs/开发/验证规范.md',
   'docs/运维/运行维护.md',
-  'docs/计划/执行总览.md', 'docs/计划/桌面应用方案.md', 'docs/计划/歌曲资料库方案.md',
-  'docs/参考/依赖清单.md', 'docs/参考/参考项目.md', 'docs/参考/素材与来源.md',
+  'docs/参考/依赖清单.md', 'docs/参考/素材与来源.md',
 ];
 
 export function publicSourceFiles(root) {
-  // Historical comparison against an author's private build, not a portable test.
-  const localOnlyFiles = new Set(['tests/stage5-compatibility.test.mjs']);
   const files = [
     'README.md', 'CONTRIBUTING.md', 'LICENSE', 'NOTICE', 'package.json', 'package-lock.json',
     'index.html', 'vite.config.ts', 'tsconfig.json', 'tsconfig.server.json',
     'config.example.json', '.gitignore', '.gitattributes', '第三方声明.md',
     '一键启动.cmd', 'public/theme-init.js', ...publicDocuments,
   ].filter(path => existsSync(join(root, path)));
-  const privateName = /^(?:\.git|node_modules|data|runtime|local|artifacts|dist|test-results)$|^\.env(?:\.|$)|\.local\.|\.(?:log|pem|key|sqlite(?:-wal|-shm)?)$/i;
+  const privateName = /^(?:\.git|node_modules|maintainer|data|runtime|local|artifacts|dist|test-results|coverage|playwright-report)$|^\.env(?:\.|$)|\.local\.|\.(?:log|pem|key|sqlite(?:-wal|-shm)?)$/i;
   function walk(path) {
     if (!lstatSync(join(root, path)).isDirectory()) throw new Error('Public source directory is not a regular directory: ' + path);
     for (const entry of readdirSync(join(root, path), { withFileTypes: true })) {
       const child = path + '/' + entry.name;
-      if (localOnlyFiles.has(child)) continue;
       if (privateName.test(entry.name)) throw new Error('Private or generated file in public source directory: ' + child);
       if (entry.isSymbolicLink()) throw new Error('Public source refuses links: ' + child);
       if (entry.isDirectory()) walk(child);
@@ -36,7 +32,7 @@ export function publicSourceFiles(root) {
       else throw new Error('Public source requires regular files: ' + child);
     }
   }
-  for (const path of ['src', 'server', 'scripts', 'tests', 'vendor', 'legal', 'public/assets', 'public/fonts', 'desktop']) {
+  for (const path of ['.github', 'src', 'server', 'scripts', 'tests', 'vendor', 'legal', 'public/assets', 'public/fonts', 'desktop']) {
     if (existsSync(join(root, path))) walk(path);
   }
   for (const path of files) if (!lstatSync(join(root, path)).isFile()) throw new Error('Public source requires regular files: ' + path);

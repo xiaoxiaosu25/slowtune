@@ -28,6 +28,9 @@ function fixture(t) {
   put(root, 'src/fixture.ts', 'export const fixture = true;');
   put(root, '项目说明.md', '# 项目\n\n[文档](docs/文档导航.md)\n');
   put(root, '第三方声明.md', '# 第三方\n');
+  put(root, 'CONTRIBUTING.md', '# 参与贡献\n\n[开发文档](docs/文档导航.md)\n');
+  put(root, 'LICENSE', 'fixture license');
+  put(root, 'NOTICE', 'fixture notice');
   put(root, 'docs/文档导航.md', '# 文档导航\n\n[接口](开发/接口说明.md)\n\n[运行](运维/运行维护.md)\n\n[依赖](参考/依赖清单.md)\n\n源码链接仅适用于源码工作区。\n');
   put(root, 'docs/开发/接口说明.md', '# 接口说明\n\n人工说明保持。\n\n[源码](../../src/fixture.ts)\n\n[源码目录](../../src)\n\n<!-- generated:routes:start -->\n<!-- generated:routes:end -->\n\n| 方法 | 路径 | 请求 | 响应 |\n| --- | --- | --- | --- |\n| GET | `/api/a` | 无 | 对象 |\n| GET | `/v1/handshake` | 无 | 对象 |\n| GET | `/v1/media/:id` | ID | 字节 |\n| HEAD | `/v1/media/:id` | ID | 响应头 |\n| GET | `/api/song-library` | 无 | 对象 |\n');
   put(root, 'docs/运维/运行维护.md', '# 运行维护\n\n<!-- generated:commands:start -->\n<!-- generated:commands:end -->\n');
@@ -112,7 +115,11 @@ test('Markdown checks resolve reference links, Chinese/repeated anchors and igno
   assert(checkDocumentation(root).some(error => error.includes('未列入 docs/文档导航.md')));
   assert.deepEqual([...parseMarkdown('# 相同\n\n# 相同\n').anchors], ['相同', '相同-1']);
   put(root, 'AGENTS.md', '# Rules\n\n[Outside](../../platform/README.md)\n');
-  assert(checkLocalLinks(root).some(error => error.includes('AGENTS.md') && error.includes('越出项目')));
+  assert(!checkLocalLinks(root).some(error => error.includes('AGENTS.md')), 'private workspace entry is outside public documentation checks');
+  edit(root, 'docs/运维/运行维护.md', source => source + '\n[本地入口](../../AGENTS.md)\n');
+  assert(checkLocalLinks(root).some(error => error.includes('公开文档引用本地维护资料')));
+  put(root, 'CONTRIBUTING.md', '# 参与贡献\n\n[丢失](missing.md)\n');
+  assert(checkLocalLinks(root).some(error => error.includes('CONTRIBUTING.md') && error.includes('链接目标不存在')));
 });
 
 test('Release packages final docs and rejects broken navigation before creating output', t => {
@@ -123,20 +130,26 @@ test('Release packages final docs and rejects broken navigation before creating 
   putJSON(root, 'config.local.json', { private: 'must-not-ship' });
   putJSON(root, 'workspace.paths.json', { schemaVersion: 1, project: 'slowtune' });
   put(root, 'AGENTS.md', '# 项目协作准则\n');
-  edit(root, 'docs/运维/运行维护.md', source => source + '\n[开发路径](../../workspace.paths.json)\n\n[协作规则](../../AGENTS.md)\n');
+  put(root, 'maintainer/计划.md', 'private execution plan');
+  edit(root, 'docs/运维/运行维护.md', source => source + '\n[接口](../开发/接口说明.md)\n');
   assert.deepEqual(checkDocumentation(root), []);
   const target = join(root, 'release');
   const run = output => spawnSync(process.execPath, [join(project, 'scripts/package-release.mjs')], { env: { ...process.env, MUSIC_APP_RELEASE_SOURCE: root, MUSIC_APP_RELEASE_DIRECTORY: output }, encoding: 'utf8', windowsHide: true });
   const result = run(target);
   assert.equal(result.status, 0, result.stderr);
   assert(existsSync(join(target, 'docs/文档导航.md')));
+  assert(!existsSync(join(target, 'CONTRIBUTING.md')));
+  assert(!existsSync(join(target, 'maintainer')));
+  assert(!existsSync(join(target, 'docs/开发')));
+  assert.match(get(target, 'docs/运维/运行维护.md'), /https:\/\/github\.com\/xiaoxiaosu25\/slowtune\/blob\/main\/docs\//);
   assert(!existsSync(join(target, 'config.local.json')));
   assert(!existsSync(join(target, 'node_modules')));
   assert(!existsSync(join(target, 'workspace.paths.json')), 'standalone runtime deliveries omit development-only paths');
   assert.equal(existsSync(join(target, 'start.cmd')), false, 'internal service deliveries do not add public CMD entries');
   assert.deepEqual(checkLocalLinks(target, { delivery: true }), []);
   const manifest = JSON.parse(get(target, 'delivery.json'));
-  assert(manifest.files.some(file => file.path === 'docs/开发/接口说明.md'));
+  assert(manifest.files.some(file => file.path === 'docs/运维/运行维护.md'));
+  assert(!manifest.files.some(file => file.path.startsWith('docs/开发/')));
   edit(root, 'docs/文档导航.md', source => source + '\n[失效](不存在.md)\n');
   const rejected = join(root, 'rejected');
   const failure = run(rejected);

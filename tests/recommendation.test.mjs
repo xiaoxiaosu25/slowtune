@@ -16,7 +16,7 @@ test('independent revision streams, complete CAS, legacy process editing, restar
  const saved=store.update(id,state,{overrides},signal());assert.equal(saved.legacyRevision,state.legacyRevision);assert.notEqual(saved.sharedRevision,state.sharedRevision);
  assert.throws(()=>store.update(id,state,{entry:0},signal()),{code:'conflict'});
  const old=store.update(id,saved,{entry:0},signal());
- const reader=spawnSync(process.execPath,[resolve('scripts/recommendation-legacy-reader.mjs'),file,'isolated',id,JSON.stringify(old),JSON.stringify({include:['Music 2'],exclude:['never'],mode:'any',order:'upstream'})],{encoding:'utf8',windowsHide:true});assert.equal(reader.status,0,reader.stderr);
+ const reader=spawnSync(process.execPath,[resolve('tests/helpers/recommendation-legacy-reader.mjs'),file,'isolated',id,JSON.stringify(old),JSON.stringify({include:['Music 2'],exclude:['never'],mode:'any',order:'upstream'})],{encoding:'utf8',windowsHide:true});assert.equal(reader.status,0,reader.stderr);
  const edited=store.read(id);assert.notEqual(edited.legacyRevision,old.legacyRevision);assert.equal(edited.sharedRevision,saved.sharedRevision);assert.deepEqual(edited.document.overrides,overrides);
  store.close();store=new RecommendationStore(file,'isolated');assert.deepEqual(store.read(id),edited);
  const returned=store.update(id,edited,{entry:1},signal());assert.deepEqual(returned.document.overrides,overrides);assert.deepEqual(returned.legacy,edited.legacy);

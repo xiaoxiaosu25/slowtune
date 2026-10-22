@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'vite';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 
@@ -25,7 +25,7 @@ test('new backup panel reads files, previews and restores only the new format wi
   app.get('/fixture.js', c => c.body(script, 200, { 'Content-Type': 'text/javascript' })); app.get('/fixture.css', c => c.body(css, 200, { 'Content-Type': 'text/css' }));
   app.get('/', c => c.html('<!doctype html><html><head><link rel="stylesheet" href="/fixture.css"></head><body><div id="root"></div><script type="module" src="/fixture.js"></script></body></html>'));
   const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 }); await new Promise(resolve => server.once('listening', resolve)); t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
-  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ headless: true });
   t.after(() => browser.close()); const context = await browser.newContext(); await context.addCookies([{ name: 'session', value: 'fixture', url: origin }]);
   const page = await context.newPage(), errors = [], external = []; page.setDefaultTimeout(10000); page.on('pageerror', e => errors.push(e.message));
   await page.route('**/*', route => { if (new URL(route.request().url()).origin !== origin) { external.push(route.request().url()); return route.abort(); } return route.continue(); });

@@ -1,4 +1,4 @@
-// Frozen-format fallback reader: it never reads or rewrites shared rule documents.
+// Test-only frozen-format reader; never imported by the running application.
 import {DatabaseSync} from 'node:sqlite';
 import {randomUUID} from 'node:crypto';
 const [file,user,column,expectedJson,rulesJson]=process.argv.slice(2),expected=JSON.parse(expectedJson),rules=JSON.parse(rulesJson);

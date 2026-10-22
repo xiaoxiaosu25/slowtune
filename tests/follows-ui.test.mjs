@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, extname } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { DEFAULT_CONFIG } from '@studio/recommendation';
 const build=resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
 test('follow UI: song entry, creator collections, recent updates, retry and responsive navigation',async t=>{
@@ -78,7 +78,7 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
     try{const path=join(build,'dist/client',url.pathname==='/'?'index.html':url.pathname);response.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2'})[extname(path)] ?? 'application/octet-stream');response.end(readFileSync(path));}catch{response.writeHead(404);response.end();}
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(10000);
   const avatarRequests=[];await page.route(/https:\/\/(?:i0\.hdslb\.com|yt3\.googleusercontent\.com)\//,route=>{avatarRequests.push(route.request().url());return route.request().url().includes('unavailable')?route.abort():route.fulfill({contentType:'image/gif',body:Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64')});});

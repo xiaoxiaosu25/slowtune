@@ -17,6 +17,47 @@ for (const name of ['MUSIC_APP_CONFIG', 'MUSIC_APP_NODE', 'MUSIC_APP_DESKTOP_ROO
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const launch = () => _electron.launch({ executablePath: executable, env, timeout: 30000 });
 const step = message => console.log('桌面包验证：' + message);
+async function verifyPlayback(page) {
+  // Keep upstream accounts and content outside the deterministic package check.
+  const ref = { provider: 'bilibili', kind: 'video', id: 'BV0000000001', part: '1' };
+  const entry = { ref, resourceId: 'desktop-verification', title: '桌面包合成音频', durationSeconds: 15 };
+  const format = { id: 'wav', codec: 'pcm', mimeType: 'audio/wav', container: 'wav' };
+  const audio = Buffer.alloc(44 + 8000 * 15 * 2);
+  audio.write('RIFF'); audio.writeUInt32LE(audio.length - 8, 4); audio.write('WAVEfmt ', 8);
+  audio.writeUInt32LE(16, 16); audio.writeUInt16LE(1, 20); audio.writeUInt16LE(1, 22);
+  audio.writeUInt32LE(8000, 24); audio.writeUInt32LE(16000, 28); audio.writeUInt16LE(2, 32); audio.writeUInt16LE(16, 34);
+  audio.write('data', 36); audio.writeUInt32LE(audio.length - 44, 40);
+  for (let n = 0; n < 8000 * 15; n++) audio.writeInt16LE(Math.round(Math.sin(2 * Math.PI * 440 * n / 8000) * 1000), 44 + n * 2);
+  await page.route('**/__desktop-verification.wav', route => route.fulfill({ contentType: 'audio/wav', body: audio }));
+  await page.route('**/api/search', route => route.fulfill({ json: { items: [entry] } }));
+  await page.route('**/v1/call/*', route => {
+    const request = route.request().postDataJSON();
+    if ((request?.ref ?? request?.request?.ref)?.id !== ref.id) return route.continue();
+    const operation = new URL(route.request().url()).pathname.split('/').at(-1);
+    if (operation === 'formats') return route.fulfill({ json: { protocol: 2, result: [format] } });
+    if (operation === 'metadata') return route.fulfill({ json: { protocol: 2, result: entry } });
+    if (operation === 'prepare') return route.fulfill({ json: { protocol: 2, result: { entry, resourceId: entry.resourceId, format, delivery: { url: new URL('/__desktop-verification.wav', page.url()).href, requiresHost: false } } } });
+    return route.continue();
+  });
+  await page.getByRole('button', { name: '开始搜索', exact: true }).click();
+  const search = page.getByRole('dialog', { name: '搜索音乐', exact: true });
+  await search.getByLabel('弹窗搜索关键词').fill(entry.title);
+  await search.getByRole('button', { name: '搜索', exact: true }).click();
+  await page.locator('audio').evaluate(element => { element.muted = true; });
+  await search.getByRole('button', { name: '播放 ' + entry.title, exact: true }).click();
+  await search.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .2, undefined, { timeout: 20000 });
+  const toggle = page.locator('.listening-transport .play-toggle');
+  await toggle.click();
+  await page.waitForFunction(() => document.querySelector('audio')?.paused === true);
+  await page.locator('audio').evaluate(element => { element.currentTime = 3; });
+  await toggle.click();
+  await page.waitForFunction(() => document.querySelector('audio')?.currentTime > 3.2 && !document.querySelector('audio').paused);
+  await toggle.click();
+  const result = await page.locator('audio').evaluate(element => ({ duration: element.duration, error: element.error?.code ?? null, paused: element.paused }));
+  assert.equal(result.error, null); assert.equal(result.paused, true); assert(Math.abs(result.duration - 15) < .1);
+  step('合成音频经搜索和播放入口完成解码、暂停、跳转与继续播放');
+}
 async function closeApplication(value) {
   let wrapper;
   try { wrapper = value.process(); } catch { return; }
@@ -70,6 +111,7 @@ try {
   await page.getByRole('button', { name: '打开正在播放', exact: true }).waitFor({ timeout: 20000 });
   assert.equal(await page.getByLabel('服务访问码', { exact: true }).count(), 0);
   step('会话失效后自动恢复，浏览器访问码变更不影响本机启动');
+  await verifyPlayback(page);
   const created = await page.evaluate(async () => {
     const current = await fetch('/api/song-library').then(response => response.json());
     const response = await fetch('/api/song-library/edits', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Music-App': '1' }, body: JSON.stringify({ revision: current.revision, edits: [{ type: 'create-playlist', name: '独立桌面交付验收' }] }) });
@@ -95,7 +137,7 @@ try {
   assert.notEqual(JSON.parse(readFileSync(join(data, 'runtime/service.json'), 'utf8')).pid, firstPID);
   assert.equal(await application.evaluate(({ app }) => app.isPackaged), true);
   assert.equal(await reopened.getByLabel('服务访问码', { exact: true }).count(), 0);
-  report = { status: 'passed', packaged: true, nodeOnPath: false, createdIndependentProfile: true, automaticFirstLaunch: true, accessCodePrompt: false, automaticSessionRestore: true, browserAccessProtected: true, authenticated: true, dataSurvivesReopen: true, duplicateLaunchSingleWindow: true, closeStopsService: true, serviceRestartsOnReopen: true, executable };
+  report = { status: 'passed', packaged: true, nodeOnPath: false, controlledAudioPlayback: true, createdIndependentProfile: true, automaticFirstLaunch: true, accessCodePrompt: false, automaticSessionRestore: true, browserAccessProtected: true, authenticated: true, dataSurvivesReopen: true, duplicateLaunchSingleWindow: true, closeStopsService: true, serviceRestartsOnReopen: true, executable };
 } finally {
   let cleanupError;
   if (application) await closeApplication(application).catch(error => { cleanupError = error; });

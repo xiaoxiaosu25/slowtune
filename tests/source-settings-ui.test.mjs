@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFileSync,mkdirSync} from 'node:fs';
 import {join,resolve,extname} from 'node:path';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {fromMusicRef,queueRecord} from './helpers/song-fixture.mjs';
 import {navigate,openSettingsPage,closeSettingsPage} from '../scripts/browser-ui.mjs';
 import {installSearchFixture} from './helpers/search-fixture.mjs';
@@ -57,7 +57,7 @@ test('YouTube switch: live shared state, preserved library/queue, three displays
   });
   const {libraryFixture}=installSearchFixture(server,{youtubeAvailable:()=>sources.youtube.available,librarySeed:snapshot});
   await new Promise(done=>server.listen(0,'127.0.0.1',done));base='http://127.0.0.1:'+server.address().port;
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(done=>server.close(done));});
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
   await context.addInitScript(record=>{if(!localStorage.getItem('slow-listening:playback:v3'))localStorage.setItem('slow-listening:playback:v3',JSON.stringify(record));},queueRecord(tracks,{current:'first',volume:.4}));

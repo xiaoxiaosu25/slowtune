@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { loadSongModule } from './helpers/song-services.mjs';
 import { startupFixture } from './helpers/startup-fixture.mjs';
 const { SongLibraryStore } = await loadSongModule('song-library-store'), { SongLibraryService } = await loadSongModule('song-library-service'), { createSongLibraryRouter } = await loadSongModule('song-library-http');
@@ -57,7 +57,7 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
   app.get('/fixture.wav', c => c.body(audio, 200, { 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes' }));
   app.all('/api/*', c => c.json({ error: { code: 'not-found' } }, 404)); app.use('/*', serveStatic({ root: join(root, 'dist/client') }));
   const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 }); await new Promise(resolve => server.once('listening', resolve));
-  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ headless: true });
   let release;
   t.after(async () => { release?.(); await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); providers.dispose(); lyrics.close(); store.close(); });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });

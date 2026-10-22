@@ -7,7 +7,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { startupFixture } from './helpers/startup-fixture.mjs';
 const root = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
 const load = name => import(pathToFileURL(join(root, 'dist/server', name + '.js')));
@@ -50,7 +50,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   app.all('/api/*', c => c.json({ error: { code: 'not-found' } }, 404));
   app.use('/*', serveStatic({ root: join(root, 'dist/client') }));
   const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 }); await new Promise(resolve => server.once('listening', resolve));
-  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   t.after(async () => { release?.(); await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); store.close(); });
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } }), errors = [], external = []; page.setDefaultTimeout(10000);
   const editSong=async title=>{
