@@ -1,0 +1,32 @@
+name: Source checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run source:check
+      - run: npm run build
+      - name: Source, documentation and service regression
+        run: node --test tests/documentation.test.mjs tests/desktop-lyric-source.test.mjs tests/browser-config.test.mjs tests/workspace-paths.test.mjs tests/lyric-timing.test.mjs tests/audio-quality.test.mjs tests/song-library.test.mjs tests/song-library-sync.test.mjs tests/recommendation.test.mjs
+      - name: Browser smoke test
+        run: node --test tests/song-targets-desktop-ui.test.mjs

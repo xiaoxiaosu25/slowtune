@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
 import { navigate, selectPlaylist } from '../scripts/browser-ui.mjs';
 

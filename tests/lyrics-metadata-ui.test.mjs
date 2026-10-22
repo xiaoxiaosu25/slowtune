@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { loadSongModule } from './helpers/song-services.mjs';
 
 const { LyricsStore } = await loadSongModule('lyrics-store');
@@ -31,7 +31,7 @@ test('saved-version lyrics wait for metadata while saved choices and manual acti
   const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 0 });
   await new Promise(resolve => server.once('listening', resolve));
   const origin = 'http://127.0.0.1:' + server.address().port;
-  const browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); providers.dispose(); store.close(); });
   const errors = [];
   const ref = part => ({ provider: 'bilibili', kind: 'video', id: 'BV1tX4y1W7Xm', part });

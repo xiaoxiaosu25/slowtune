@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {resolve,join,extname} from 'node:path';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {resourceId} from '@studio/music-sources';
 
 test('multipart UI: shared actions, uninterrupted expansion, saved scopes and cover interactions',async t=>{
@@ -61,7 +61,7 @@ test('multipart UI: shared actions, uninterrupted expansion, saved scopes and co
   }});
   const library=libraryFixture.library;
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(8000);page.on('pageerror',error=>errors.push(error.message));
   const artwork=readFileSync(join(build,'dist/client/assets/coast.png'));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, extname } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {queueRecord} from './helpers/song-fixture.mjs';
 
 test('single-screen player and read-only comments: sort, pagination, replies, failures and mobile drawers', async t => {
@@ -36,7 +36,7 @@ test('single-screen player and read-only comments: sort, pagination, replies, fa
     catch { res.writeHead(404); res.end(); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
   const page = await browser.newPage({ viewport: { width: 1920, height: 880 } }); page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));

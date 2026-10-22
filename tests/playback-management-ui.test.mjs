@@ -2,10 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
 import { navigate } from '../scripts/browser-ui.mjs';
 import { queueRecord } from './helpers/song-fixture.mjs';
+import { developmentPaths } from '../scripts/workspace-paths.mjs';
 
 async function openVersions(page, surface = page) {
   assert.equal(await surface.locator('.playing-artist button').count(), 0, 'the artist line only shows the singer');
@@ -96,7 +97,7 @@ test('desktop versions, source facts, in-place audition and per-source lyric man
   await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000001'));
   await panel.getByRole('tab', { name: '歌词管理', exact: true }).click();
   assert.equal(await panel.getByLabel('歌词延后秒数', { exact: true }).inputValue(), '0');
-  const artifacts = resolve('../../local/artifacts/slowtune/playback-management'); await mkdir(artifacts, { recursive: true });
+  const artifacts = join(developmentPaths().testRuntime, 'playback-management'); await mkdir(artifacts, { recursive: true });
   await panel.getByRole('tab', { name: '播放版本', exact: true }).click();
   await panel.locator('.playback-version-card').filter({ hasText: '晴天 · 2026音乐会' }).getByRole('button', { name: '播放此版本', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000006'));

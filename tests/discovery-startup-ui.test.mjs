@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {join,resolve,extname} from 'node:path';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {navigate} from '../scripts/browser-ui.mjs';
 
 test('fixed cover slots, container columns, artwork fit and shared follow views retain full pagination',async t=>{
@@ -36,7 +36,7 @@ test('fixed cover slots, container columns, artwork fit and shared follow views 
     try{const file=join(root,'dist/client',u.pathname==='/'?'index.html':u.pathname);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.woff2':'font/woff2'})[extname(file)]??'application/octet-stream');res.end(readFileSync(file));}catch{res.writeHead(404);res.end();}
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const page=await browser.newPage({viewport:{width:1920,height:1000}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.route('https://artwork.fixture.invalid/**',route=>route.request().url().endsWith('.png')?route.fulfill({status:404}):route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${route.request().url().endsWith('wide.svg')?640:360}" height="360"><rect width="100%" height="100%" fill="#315763"/><circle cx="180" cy="180" r="110" fill="#eec08e"/></svg>`}));

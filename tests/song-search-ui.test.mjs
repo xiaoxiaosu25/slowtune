@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {createSettingsFixture} from './helpers/settings-fixture.mjs';
 import {navigate} from '../scripts/browser-ui.mjs';
 import {resolve} from 'node:path';
@@ -15,7 +15,7 @@ test('desktop song search includes artists while manual text and mobile requests
   const library=fixture.libraryFixture.library;
   const saved=library.execute(library.read().revision,[{type:'create-song',id:'lover',...song},{type:'favorite',songId:'lover'}],new AbortController().signal);
   fixture.state.snapshot=saved.snapshot;
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});
   for(const width of [1440,390]){
     const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),requests=[],errors=[];
@@ -63,7 +63,7 @@ test('desktop chart single and full playback reuse the readable rendition instea
     const id=new URL(url).pathname.slice(1);reads.push(id);return fixture.state.rejectedAudioFormats.includes(id)?new Response(null,{status:403}):new Response(mp4Prefix(),{status:206,headers:{'Content-Range':'bytes 0-1023/2048'}});
   }},candidate.ref,{signal},support)});
   Object.assign(fixture.state,{searchItems:[entry],chartItems:[{rank:1,...song}],audioFormats:[aac,flac],rejectedAudioFormats:[aac.id]});
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(10000);
   await page.goto(fixture.base);await page.locator('.app').waitFor();await navigate(page,'音乐榜单');
@@ -96,7 +96,7 @@ test('desktop chart single and full playback pass a rejected CDN candidate and p
     const id=new URL(url).pathname.slice(1);reads.push(id);return id===blocked.ref.id?new Response(null,{status:403}):new Response(mp4Prefix(),{status:206,headers:{'Content-Range':'bytes 0-1023/2048','Content-Length':'1024'}});
   }},entry.ref,{signal})});
   Object.assign(fixture.state,{searchItems:[blocked,good],chartItems:[{rank:20,...song}]});
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(12000);
   await page.goto(fixture.base);await page.locator('.app').waitFor();await navigate(page,'音乐榜单');

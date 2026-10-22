@@ -3,8 +3,7 @@
   "allowedHosts": ["localhost", "127.0.0.1"],
   "accessKey": "REPLACE_WITH_A_RANDOM_PRIVATE_ACCESS_CODE",
   "userSpace": "personal",
-  "database": "../../local/runtime/music-app/library.sqlite",
-  "runtimeDirectory": "../../local/runtime/music-app",
-  "ytDlp": {"executable": "../../local/tools/music-sources/yt-dlp-env/Scripts/python.exe", "prefixArgs": ["-m", "yt_dlp"], "nodeRuntime": "C:/Program Files/nodejs/node.exe"},
+  "database": "./data/library.sqlite",
+  "runtimeDirectory": "./runtime",
   "mediaLeaseTtlMs": 300000
 }

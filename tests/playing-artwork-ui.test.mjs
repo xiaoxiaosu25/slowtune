@@ -2,12 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {queueRecord} from './helpers/song-fixture.mjs';
 import { createPlayingArtworkFixture } from './helpers/playing-artwork-fixture.mjs';
 
 const preference = 'slow-listening:playing-visual:v1';
-const executablePath = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
+const executablePath = process.env.MUSIC_APP_BROWSER;
 const mode = page => page.locator('.playing-art-switch');
 const media = page => page.locator('audio[data-product-media]');
 async function selectMode(page, target) {

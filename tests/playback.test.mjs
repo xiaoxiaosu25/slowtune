@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { fromMusicRef,queueRecord } from './helpers/song-fixture.mjs';
 import { navigate, selectRate, selectPlaylist } from '../scripts/browser-ui.mjs';
 import {installSearchFixture} from './helpers/search-fixture.mjs';
@@ -98,7 +98,7 @@ test('Song playback: fresh selections, live pause/resume and silent queue restor
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   base = 'http://127.0.0.1:' + server.address().port;
   t.after(async () => { await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
-  browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));

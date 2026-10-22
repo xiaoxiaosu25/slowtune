@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
 import {resolve,join,extname} from 'node:path';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 
 test('chart browsing reuses daily/weekly caches across navigation, editions and reloads, then refreshes on expiry',async t=>{
   const root=resolve(process.env.MUSIC_APP_TEST_BUILD??'.'),day=86400000,calls=[],errors=[];
@@ -28,7 +28,7 @@ test('chart browsing reuses daily/weekly caches across navigation, editions and 
     try{const file=join(root,'dist/client',url.pathname==='/'?'index.html':url.pathname);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2'})[extname(file)]??'application/octet-stream');res.end(readFileSync(file));}catch{res.writeHead(404);res.end();}
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});
   const page=await browser.newPage();page.setDefaultTimeout(10000);page.on('pageerror',error=>errors.push(error.message));
   await page.clock.setFixedTime(new Date(now));

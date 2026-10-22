@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { createPlayingArtworkFixture } from './helpers/playing-artwork-fixture.mjs';
 import { queueRecord } from './helpers/song-fixture.mjs';
 
@@ -29,7 +29,7 @@ async function geometry(page) {
 test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, themes, fallback and normal/mobile preservation', { timeout: 180000 }, async t => {
   mkdirSync(artifactDir, { recursive: true });
   const fixture = await createPlayingArtworkFixture();
-  const browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await context.addInitScript(record => {
@@ -180,7 +180,7 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
 
 test('timed word masks follow the media clock at fast and slow rates and during paused seeks', { timeout: 30000 }, async t => {
   const fixture = await createPlayingArtworkFixture();
-  const browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: 'no-preference' });
   await context.addInitScript(record => localStorage.setItem('slow-listening:playback:v3', JSON.stringify(record)), queueRecord(fixture.tracks));
@@ -212,7 +212,7 @@ test('timed word masks follow the media clock at fast and slow rates and during 
 
 test('immersive playback follows the media clock across rate changes, buffering, track changes and missing lyrics', { timeout: 60000 }, async t => {
   const fixture = await createPlayingArtworkFixture();
-  const browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   await context.addInitScript(record => localStorage.setItem('slow-listening:playback:v3', JSON.stringify(record)), queueRecord(fixture.tracks));
@@ -262,7 +262,7 @@ test('immersive playback follows the media clock across rate changes, buffering,
 test('split lyric artwork shares the live audio graph and handles long titles and missing covers', { timeout: 45000 }, async t => {
   const fixture = await createPlayingArtworkFixture();
   fixture.tracks[0].title = '很长的歌曲标题与现场版本说明 '.repeat(10);
-  const browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, reducedMotion: 'reduce' });
   await context.addInitScript(record => {

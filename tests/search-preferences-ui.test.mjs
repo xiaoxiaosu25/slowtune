@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdirSync} from 'node:fs';
 import {resolve,join} from 'node:path';
-import {chromium} from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import {createSettingsFixture} from './helpers/settings-fixture.mjs';
 import {openSettingsPage,closeSettingsPage,openTrackMenu,navigate} from '../scripts/browser-ui.mjs';
 
@@ -13,7 +13,7 @@ test('search preferences: reversible filtering in platform order, stable pins, s
   const ids=new Map(entries.concat(more).map((entry,index)=>[entry.ref.id,[2025,2024,2017,2018,2024,2026][index]]));
   const fixture=await createSettingsFixture(undefined,{strictMatch:true,partition:async ref=>({tid:130,tid_v2:ids.get(ref.id)})});
   Object.assign(fixture.state,{searchItems:entries,searchPage2:more,chartItems:[{rank:1,title:'两难',artists:['加木']},{rank:2,title:'两难',artists:['加木']}]});
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});
   const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
   page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(10000);
@@ -77,7 +77,7 @@ test('manually playing a search result keeps the selected version when its chart
   const a=make(1,'歌手 测试歌曲 A版本'),b=make(2,'歌手 测试歌曲 B版本'),song={title:'测试歌曲',artists:['歌手']};
   const fixture=await createSettingsFixture(undefined,{strictMatch:true});
   Object.assign(fixture.state,{searchItems:[a,b],chartItems:[{rank:1,...song},{rank:2,title:'待解析后继',artists:['歌手']}]});
-  const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+  const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(8000);
   await page.goto(fixture.base);await page.locator('.app').waitFor();await navigate(page,'音乐榜单');

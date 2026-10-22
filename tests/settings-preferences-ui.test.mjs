@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { createSettingsFixture } from './helpers/settings-fixture.mjs';
 import { openSettingsPage } from '../scripts/browser-ui.mjs';
 
@@ -13,7 +13,7 @@ const { StartupSettingsStore } = await import(pathToFileURL(join(buildRoot, 'dis
 test('settings automatically darken at night and access-policy edits can be saved', { timeout: 60000 }, async t => {
   const fixture = await createSettingsFixture();
   const store = new StartupSettingsStore(':memory:', 'settings-ui', 'fixture-current-code');
-  const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); store.close(); await fixture.close(); });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, timezoneId: 'Asia/Hong_Kong', colorScheme: 'light' });
   const errors = [], writes = [];

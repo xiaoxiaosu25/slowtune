@@ -5,7 +5,7 @@ import { mkdirSync } from 'node:fs';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { songServices, ref, entry, loadSongModule } from './helpers/song-services.mjs';
 import { startupFixture } from './helpers/startup-fixture.mjs';
 import { navigate, openSettingsPage, closeSettingsPage } from '../scripts/browser-ui.mjs';

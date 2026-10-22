@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 
 function wav(seconds = 30) {
   const rate = 8000, samples = seconds * rate, bytes = Buffer.alloc(44 + samples * 2);
@@ -37,7 +37,7 @@ test('stage-0 version switch proof with the fixed player, real queue, sleep time
   t.after(async () => { await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
-  browser = await chromium.launch({ executablePath: process.env.MUSIC_APP_BROWSER ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  browser = await chromium.launch({ headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage(); page.setDefaultTimeout(10000);
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => { if (route.request().url().startsWith(base + '/')) return route.continue(); external.push(route.request().url()); return route.abort(); });

@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright-core';
+import { chromium } from './helpers/browser.mjs';
 import { createPlayingArtworkFixture } from './helpers/playing-artwork-fixture.mjs';
 
 async function setup(t) {
   const fixture = await createPlayingArtworkFixture({ librarySeed: tracks => ({ favorites: tracks }) });
-  const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+  const browser = await chromium.launch({ headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } }); page.setDefaultTimeout(8000);
   await page.route('**/*', route => new URL(route.request().url()).origin === fixture.base ? route.continue() : route.abort());

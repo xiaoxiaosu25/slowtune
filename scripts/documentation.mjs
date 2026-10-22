@@ -4,6 +4,7 @@ import ts from 'typescript';
 import MarkdownIt from 'markdown-it';
 import GithubSlugger from 'github-slugger';
 import { mergePath } from 'hono/utils/url';
+import { publicDocuments } from './public-source.mjs';
 
 const markdown = new MarkdownIt({ html: true });
 const methods = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'all']);
@@ -191,10 +192,8 @@ export function parseMarkdown(source) {
 }
 
 export function checkLocalLinks(root, { delivery = false } = {}) {
-  const publicEntries = ['README.md', 'vendor/README.md'].filter(file => existsSync(join(root, file)));
-  // A Studio checkout keeps private agent navigation beside its path declaration;
-  // an independently published AGENTS.md, if present, must pass link checks.
-  const documents = [...publicEntries, ...['项目说明.md', 'AGENTS.md', '第三方声明.md'].filter(file => existsSync(join(root, file)) && (file !== 'AGENTS.md' || !existsSync(join(root, 'workspace.paths.json')))), ...filesBelow(root, 'docs')], parsed = new Map(), errors = [];
+  const publicEntries = ['README.md', 'CONTRIBUTING.md', '第三方声明.md', 'vendor/README.md'].filter(file => existsSync(join(root, file)));
+  const documents = [...publicEntries, ...filesBelow(root, 'docs')], parsed = new Map(), errors = [];
   for (const file of documents) parsed.set(file, parseMarkdown(read(root, file)));
   const navigation = new Set(['docs/文档导航.md']);
   for (const [file, data] of parsed) for (const { target, line } of data.links) {
@@ -204,6 +203,7 @@ export function checkLocalLinks(root, { delivery = false } = {}) {
       const destination = pathname ? resolve(root, dirname(file), pathname) : join(root, file);
       const destinationName = slash(relative(root, destination));
       if (destinationName.startsWith('../') || pathname.startsWith('/') || /^[A-Za-z]:/.test(pathname)) { errors.push(`${file}:${line} 本地链接越出项目：${target}`); continue; }
+      if (/^(maintainer|local|data|runtime)(\/|$)/.test(destinationName) || /^(AGENTS\.md|项目说明\.md|workspace\.paths\.json)$/.test(destinationName)) { errors.push(`${file}:${line} 公开文档引用本地维护资料：${target}`); continue; }
       if (!existsSync(destination)) {
         const repositorySource = /^(src|server|tests|scripts|public|legal)(\/|$)/.test(destinationName) || /^(AGENTS\.md|workspace\.paths\.json|tsconfig[^/]*\.json|vite\.config\.ts)$/.test(destinationName);
         if (!(delivery && repositorySource)) errors.push(`${file}:${line} 链接目标不存在：${target}`);
@@ -218,7 +218,8 @@ export function checkLocalLinks(root, { delivery = false } = {}) {
   }
   for (const file of documents.filter(file => file.startsWith('docs/'))) {
     if (!navigation.has(file)) errors.push(`${file} 未列入 docs/文档导航.md`);
-    if (file !== 'docs/文档导航.md' && !/^docs\/(产品|开发|运维|计划|参考)\/[^/]+\.md$/.test(file)) errors.push(`${file} 不符合最终文档目录结构`);
+    if (file !== 'docs/文档导航.md' && !/^docs\/(产品|开发|运维|参考)\/[^/]+\.md$/.test(file)) errors.push(`${file} 不符合公开文档目录结构`);
+    if (!publicDocuments.includes(file)) errors.push(`${file} 未列入公开文档清单`);
   }
   if (delivery && !read(root, 'docs/文档导航.md').includes('源码链接仅适用于源码工作区')) errors.push('交付文档缺少源码链接适用范围说明');
   return errors;
