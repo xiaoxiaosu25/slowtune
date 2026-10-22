@@ -1,0 +1,10 @@
+{
+  "name": "slowtune-desktop",
+  "version": "0.1.30",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "description": "慢听 Windows 桌面播放器",
+  "author": "SlowTune"
+}

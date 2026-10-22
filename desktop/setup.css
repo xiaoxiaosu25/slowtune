@@ -1,0 +1,63 @@
+.desktop-startup {
+  --startup-bg: #f3f0e9;
+  --startup-text: #30382f;
+  --startup-muted: #686c60;
+  --startup-line: #3e534729;
+  --startup-accent: #66775e;
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  overflow: auto;
+  margin: 0;
+  background: var(--startup-bg);
+  color: var(--startup-text);
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+:root[data-theme="dark"] .desktop-startup {
+  --startup-bg: #1b1916;
+  --startup-text: #f2ece1;
+  --startup-muted: #b9aea0;
+  --startup-line: #f8e6c429;
+  --startup-accent: #ddc9a5;
+}
+.desktop-startup[data-artwork="true"] {
+  --startup-text: #fff8eb;
+  --startup-muted: #f5ecdbde;
+  --startup-line: #fff3d938;
+  --startup-accent: #f0dbb4;
+}
+.desktop-startup * { box-sizing: border-box; }
+.startup-background, .startup-shade, .startup-vignette { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
+.startup-background { object-fit: cover; }
+.startup-shade { background: #000; }
+.startup-vignette { background: radial-gradient(ellipse at 50% 44%, transparent 10%, #0000000c 100%); }
+[data-artwork="true"] > .startup-vignette { background: radial-gradient(ellipse 420px 280px at 50% 45%, #07121b66, #07121b33 55%, transparent 100%), linear-gradient(180deg, #101c221a, #101c2208 28%, #0a17254d 100%); }
+.startup-main { display: flex; justify-content: center; align-items: center; min-height: 100%; padding: 72px 48px calc(72px + 10vh); }
+.startup-stack { width: 440px; max-width: 100%; text-align: center; }
+.startup-mark { display: block; width: 64px; height: 64px; margin: 0 auto 20px; filter: drop-shadow(0 6px 16px #0002); }
+.startup-brand h1 { margin: 0; padding-left: .2em; color: inherit; font-size: 64px; line-height: 1.25; font-weight: 350; letter-spacing: .2em; }
+.startup-tagline { margin: 18px 0 0; color: var(--startup-muted); font-size: 16px; line-height: 1.8; letter-spacing: .12em; }
+.startup-footer { display: flex; flex-direction: column; align-items: center; margin-top: 44px; }
+.startup-loader { width: 96px; height: 2px; margin-bottom: 16px; overflow: hidden; background: var(--startup-line); border-radius: 2px; }
+.startup-loader span { display: block; width: 32px; height: 100%; background: var(--startup-accent); border-radius: inherit; animation: startup-loading 1.8s ease-in-out infinite; }
+.startup-status { max-width: 100%; color: var(--startup-muted); font-size: 14px; line-height: 1.8; letter-spacing: .06em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.startup-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.startup-actions button { app-region: no-drag; min-width: 76px; border: 1px solid transparent; border-radius: 9px; padding: 10px 18px; background: #3e5347; color: #fff8eb; font: inherit; font-size: 13px; cursor: pointer; }
+.startup-actions .secondary, .startup-actions .quiet { background: var(--startup-bg); color: var(--startup-text); border-color: var(--startup-line); }
+[data-artwork="true"] .startup-actions .secondary, [data-artwork="true"] .startup-actions .quiet { background: #18231de0; }
+.startup-actions button:hover { filter: brightness(1.12); }
+.startup-actions button:focus-visible { outline: 2px solid var(--startup-accent); outline-offset: 4px; }
+.desktop-startup [hidden] { display: none !important; }
+.desktop-startup[data-phase="error"] .startup-loader { display: none; }
+.desktop-startup[data-phase="error"] .startup-mark { width: 56px; height: 56px; }
+.desktop-startup[data-phase="error"] h1 { font-size: 52px; }
+.desktop-startup[data-phase="error"] .startup-footer { margin-top: 36px; }
+.desktop-startup[data-phase="error"] .startup-status { color: #a04432; max-height: 128px; overflow: auto; }
+:root[data-theme="dark"] .desktop-startup[data-phase="error"] .startup-status, .desktop-startup[data-artwork="true"][data-phase="error"] .startup-status { color: #ffc5b5; }
+.desktop-startup[data-entering="true"] .startup-stack { animation: startup-arrive 600ms ease-out both; }
+@keyframes startup-loading { 0% { transform: translateX(-32px); } 100% { transform: translateX(96px); } }
+@keyframes startup-arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .desktop-startup[data-entering="true"] .startup-stack { animation: none; }
+  .startup-loader span { animation: none; margin: auto; }
+}

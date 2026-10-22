@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; form-action 'none'; base-uri 'none'"><title>慢听 · 桌面歌词</title><link rel="stylesheet" href="lyrics.css"></head>
+<body data-has-lyrics="false">
+  <main aria-label="桌面悬浮歌词">
+    <div id="controls">
+    <nav id="toolbar" aria-label="歌词工具">
+      <button id="show-player" aria-label="打开慢听" title="打开慢听"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2.5"/><ellipse cx="17" cy="16" rx="3" ry="2.5"/></svg></button><span class="separator"></span>
+      <button id="previous" aria-label="上一首" title="上一首"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M19 5 8 12l11 7Z"/></svg></button>
+      <button id="toggle" aria-label="播放或暂停" title="播放"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="play-icon" d="m8 5 11 7-11 7Z"/><path id="pause-icon" d="M8 5v14M16 5v14" hidden/></svg></button>
+      <button id="next" aria-label="下一首" title="下一首"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5v14M5 5l11 7-11 7Z"/></svg></button><span class="separator"></span>
+      <button id="lock" aria-label="锁定" title="锁定歌词（鼠标穿透）"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></button>
+      <button id="options" aria-label="歌词显示选项" title="快捷设置" popovertarget="display-options" aria-expanded="false" aria-controls="display-options"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6"/></svg></button>
+      <button id="hide" aria-label="关闭桌面歌词" title="关闭桌面歌词"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+    </nav>
+    <button id="unlock" aria-label="解锁歌词" title="解锁歌词" aria-hidden="true" tabindex="-1" inert><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></button>
+    <p id="lock-notice" role="status"></p>
+    </div>
+    <div id="lyrics" class="drag" role="status" aria-label="当前歌词"><div id="current" class="line"></div><div id="secondary" class="line secondary"></div></div>
+  </main>
+  <div id="display-options" popover="auto" aria-label="歌词显示选项">
+    <h2>快捷设置</h2>
+    <label class="size-heading" for="font-size">字号 <output id="font-size-value">32 px</output></label>
+    <div class="size-control"><button id="font-smaller" aria-label="减小字号" title="减小字号">A−</button><input id="font-size" type="range" aria-label="桌面歌词字号" min="18" max="64" step="1"><button id="font-larger" aria-label="增大字号" title="增大字号">A+</button></div>
+    <div class="color-row"><label for="lyric-color">文字颜色</label><input id="lyric-color" type="color" aria-label="桌面歌词文字颜色"></div>
+    <div class="color-row"><label for="highlight-color">高亮颜色</label><div class="swatches" role="group" aria-label="高亮预设"><button data-color="#f4cd87" aria-label="暖金" title="暖金" style="--swatch:#f4cd87"></button><button data-color="#a6e9c5" aria-label="薄荷" title="薄荷" style="--swatch:#a6e9c5"></button><button data-color="#a7d8ff" aria-label="晴蓝" title="晴蓝" style="--swatch:#a7d8ff"></button><button data-color="#ffffff" aria-label="纯白" title="纯白" style="--swatch:#ffffff"></button></div><input id="highlight-color" type="color" aria-label="桌面歌词高亮颜色"></div>
+    <div class="check-row"><label><input id="double-lines" type="checkbox">双行歌词</label><label><input id="translations" type="checkbox">显示翻译</label></div>
+    <div class="panel-actions"><button id="reset-position">重置位置</button><button id="lyric-settings">歌词设置…</button></div>
+    <p id="feedback" role="status"></p>
+  </div>
+  <script type="module" src="lyrics.js"></script>
+</body></html>

@@ -1,0 +1,26 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdir,mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
+import {resolve,join,dirname} from 'node:path';
+import {setTimeout as delay} from 'node:timers/promises';
+import {YoutubeProvider} from '@studio/music-sources/youtube';
+import {resourceId} from '@studio/music-sources';
+import {loadSongModule} from './helpers/song-services.mjs';
+const {YoutubeRuntime}=await loadSongModule('youtube-runtime');
+test('desktop tool reuse stays inside one source API, preserves legacy extraction, generation and combined capacity',async t=>{
+  const parent=resolve('local/precision-lyrics-performance-20261020');await mkdir(parent,{recursive:true});
+  const directory=await mkdtemp(join(parent,'yt-')),script=join(directory,'tool.mjs'),log=join(directory,'calls');
+  t.after(async()=>{assert.equal(dirname(directory),parent);assert(directory.startsWith(join(parent,'yt-')));await rm(directory,{recursive:true,force:true});});
+  await writeFile(log,'');await writeFile(script,`import{appendFileSync}from'node:fs';if(process.argv.includes('--version'))console.log('2026.10.20');else{appendFileSync(${JSON.stringify(log)},'call\\n');await new Promise(r=>setTimeout(r,100));console.log(JSON.stringify({formats:[{format_id:'140',acodec:'mp4a.40.2',vcodec:'none',ext:'m4a',url:'https://x.googlevideo.com/a?expire='+Math.ceil(Date.now()/1000+60),protocol:'https'}]}));}`);
+  const metadata=YoutubeProvider.prototype.metadata;YoutubeProvider.prototype.metadata=async ref=>({ref,resourceId:resourceId(ref),title:'fixture',url:'https://www.youtube.com/watch?v='+ref.id});t.after(()=>YoutubeProvider.prototype.metadata=metadata);
+  let desktop=false;const runtime=new YoutubeRuntime({executable:process.execPath,prefixArgs:[script],nodeRuntime:process.execPath},{now:Date.now,fetch:async()=>assert.fail('no real network')},()=>{},()=>desktop);t.after(()=>runtime.dispose());
+  const available=async()=>{for(let n=0;n<100&&!runtime.status().available;n++)await delay(20);assert.equal(runtime.status().available,true);};
+  const count=async()=>(await readFile(log,'utf8')).trim().split('\n').filter(Boolean).length,ref={provider:'youtube',kind:'video',id:'abcdefghijk'};
+  runtime.setEnabled(true);await available();await runtime.api.formats(ref);await runtime.api.prepare({ref});assert.equal(await count(),2,'legacy callers still extract per operation');
+  desktop=true;const sharedApi=runtime.api;await sharedApi.formats(ref);await sharedApi.prepare({ref});assert.equal(await count(),3,'desktop formats/prepare share one completed extraction');assert.equal(runtime.api,sharedApi);
+  const stop=new AbortController();stop.abort();await assert.rejects(sharedApi.formats({...ref,id:'cancelled01'},{signal:stop.signal}));assert.equal(await count(),3);
+  desktop=false;const first=sharedApi.formats({...ref,id:'firstabcdef'});for(let n=0;n<50&&(await count())<4;n++)await delay(2);
+  desktop=true;const second=sharedApi.formats({...ref,id:'secondabcde'});for(let n=0;n<50&&runtime.diagnostics().active<2;n++)await delay(2);
+  await assert.rejects(sharedApi.formats({...ref,id:'thirdabcdef'}),{code:'busy'});await Promise.all([first,second]);assert.equal(runtime.diagnostics().active,0);
+  const before=await count();runtime.setEnabled(false);runtime.setEnabled(true);await available();await runtime.api.formats(ref);assert.equal(await count(),before+1,'new enable generation cannot reuse old extraction');await runtime.dispose();assert.equal(runtime.diagnostics().active,0);
+});

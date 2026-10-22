@@ -1,0 +1,62 @@
+{
+  "name": "slowtune",
+  "version": "0.1.30",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiaoxiaosu25/slowtune.git"
+  },
+  "homepage": "https://github.com/xiaoxiaosu25/slowtune#readme",
+  "bugs": {
+    "url": "https://github.com/xiaoxiaosu25/slowtune/issues"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "build": "npm run docs:check && node scripts/generate-notices.mjs && tsc --noEmit && vite build && tsc -p tsconfig.server.json",
+    "desktop": "node scripts/desktop.mjs",
+    "desktop:restart": "node scripts/desktop.mjs --restart",
+    "desktop:adopt": "node scripts/adopt-desktop-data.mjs",
+    "desktop:build": "node scripts/build-desktop.mjs",
+    "desktop:package": "npm run desktop:build && node scripts/package-desktop.mjs",
+    "desktop:verify": "node scripts/verify-desktop.mjs",
+    "docs:generate": "node scripts/generate-docs.mjs",
+    "docs:check": "node scripts/check-docs.mjs",
+    "start": "node scripts/start.mjs",
+    "stop": "node scripts/control.mjs stop",
+    "update": "node scripts/update.mjs",
+    "diagnose": "node scripts/control.mjs diagnose",
+    "reset-access": "node scripts/reset-access.mjs",
+    "test": "node --import ./tests/helpers/isolated-build.mjs --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@applemusic-like-lyrics/core": "0.6.0",
+    "@hono/node-server": "2.1.3",
+    "@phosphor-icons/react": "2.1.10",
+    "@studio/music-sources": "file:vendor/studio-music-sources-0.2.8.tgz",
+    "@studio/player": "file:vendor/studio-player-0.12.5.tgz",
+    "@studio/recommendation": "file:vendor/studio-recommendation-0.3.3.tgz",
+    "hono": "4.13.12",
+    "qrcode": "1.5.4",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "youtubei.js": "18.1.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@types/node": "24.10.1",
+    "@types/qrcode": "1.5.6",
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "@vitejs/plugin-react": "5.0.4",
+    "electron": "44.9.0",
+    "github-slugger": "2.0.0",
+    "markdown-it": "15.0.3",
+    "playwright-core": "1.58.2",
+    "typescript": "5.8.3",
+    "vite": "6.4.3"
+  }
+}

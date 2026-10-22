@@ -1,0 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { resolveConfigFile } from './instance-path.mjs';
+const file=resolveConfigFile();
+const c=JSON.parse(readFileSync(file,'utf8'));
+const state=JSON.parse(readFileSync(resolve(dirname(file),c.runtimeDirectory,'service.json'),'utf8'));
+const action=process.argv[2];
+if(!['stop','diagnose'].includes(action))throw new Error('使用 stop 或 diagnose');
+const r=await fetch(`http://127.0.0.1:${state.port}/internal/${action}`,{method:action==='stop'?'POST':'GET',headers:{'X-Control-Key':state.key},signal:AbortSignal.timeout(15000)});
+if(!r.ok)throw new Error(`控制请求失败 ${r.status}`);
+console.log(await r.json());

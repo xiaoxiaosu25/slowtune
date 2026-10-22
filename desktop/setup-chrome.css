@@ -1,0 +1,3 @@
+:root { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+body::before { content: ""; position: fixed; top: 0; left: 0; right: calc(100vw - env(titlebar-area-width, calc(100vw - 138px))); height: 40px; app-region: drag; }

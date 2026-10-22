@@ -1,0 +1,8 @@
+{
+  "package": "stackback",
+  "version": "0.0.2",
+  "declaration": "https://github.com/defunctzombie/node-stackback/blob/master/package.json",
+  "sources": {
+    "LICENSE-MIT.txt": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/MIT.txt"
+  }
+}

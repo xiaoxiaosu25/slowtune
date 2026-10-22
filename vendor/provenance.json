@@ -1,0 +1,36 @@
+{
+  "format": 2,
+  "entries": [
+    {
+      "file": "studio-player-0.12.5.tgz",
+      "name": "@studio/player",
+      "version": "0.12.5",
+      "license": "AGPL-3.0-only",
+      "sha256": "43eb128902f489d4e426e11e7d75ddd7c5d048813e9413622f05b0a765bb9228",
+      "origin": "Studio platform: packages/audio-video/player; fixed 0.12.5 artifact",
+      "source": "sources/studio-player-0.12.5.tar.gz",
+      "sourceBasis": "Original src from this fixed artifact; standalone build configuration and dependency lock supplied with this source distribution",
+      "documentation": "README.md"
+    },
+    {
+      "file": "studio-music-sources-0.2.8.tgz",
+      "name": "@studio/music-sources",
+      "version": "0.2.8",
+      "license": "AGPL-3.0-only",
+      "origin": "Studio platform: packages/audio-video/music-sources; desktop read/reuse 0.2.8 delivery",
+      "source": "sources/studio-music-sources-0.2.8.tar.gz",
+      "sourceBasis": "Platform 0.2.8 source with the recorded desktop read policy and tool reuse changes",
+      "documentation": "README.md"
+    },
+    {
+      "file": "studio-recommendation-0.3.3.tgz",
+      "name": "@studio/recommendation",
+      "version": "0.3.3",
+      "license": "AGPL-3.0-only",
+      "origin": "Studio platform: packages/audio-video/recommendation; review fixes 0.3.3 delivery",
+      "source": "sources/studio-recommendation-0.3.3.tar.gz",
+      "sourceBasis": "Source snapshot retained with the fixed 0.3.3 delivery",
+      "documentation": "README.md"
+    }
+  ]
+}

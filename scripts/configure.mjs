@@ -1,0 +1,11 @@
+import { existsSync, writeFileSync } from 'node:fs';
+import { resolveConfigFile, workspaceRoot } from './instance-path.mjs';
+import { dirname, relative, resolve } from 'node:path';
+import { networkInterfaces } from 'node:os';
+import { randomBytes } from 'node:crypto';
+const path=resolveConfigFile();
+if(existsSync(path))throw new Error('配置已经存在；请直接编辑，不会覆盖。');
+const ips=Object.values(networkInterfaces()).flat().filter(a=>a && a.family==='IPv4'&&!a.internal).map(a=>a.address);
+const localPath = value => relative(dirname(path), resolve(workspaceRoot, 'local', value));
+const c={host:'0.0.0.0',port:4187,allowedHosts:['localhost','127.0.0.1',...ips],accessKey:randomBytes(24).toString('base64url'),userSpace:'personal',database:localPath('runtime/music-app/library.sqlite'),runtimeDirectory:localPath('runtime/music-app'),ytDlp:{executable:localPath('tools/music-sources/yt-dlp-env/Scripts/python.exe'),prefixArgs:['-m','yt_dlp'],nodeRuntime:process.execPath},mediaLeaseTtlMs:300000};
+writeFileSync(path,JSON.stringify(c,null,2)+'\n',{flag:'wx',mode:0o600});console.log('已创建 config.local.json，私人访问码在 accessKey 字段。手机访问地址：',ips.map(ip=>`http://${ip}:4187`).join(' / '));

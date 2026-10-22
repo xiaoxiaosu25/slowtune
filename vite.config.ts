@@ -1,0 +1,16 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
+
+// An emitted module URL lets a failed network import be retried with a fresh URL,
+// without reloading the application or its audio element.
+export default defineConfig(({ command }) => ({ plugins: [react(), {
+  name: 'desktop-lyric-engine-url',
+  resolveId(id) { if (id === 'virtual:desktop-lyric-engine-url') return '\0desktop-lyric-engine-url'; },
+  load(id) {
+    if (id !== '\0desktop-lyric-engine-url') return;
+    if (command === 'serve') return 'export default "/src/desktop-lyric-engine.ts";';
+    const ref = this.emitFile({ type: 'chunk', id: fileURLToPath(new URL('./src/desktop-lyric-engine.ts', import.meta.url)), name: 'desktop-lyric-engine', preserveSignature: 'strict' });
+    return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
+  },
+}], build: { outDir: 'dist/client' } }));

@@ -1,0 +1,7 @@
+{
+  "package": "@pixi/colord",
+  "version": "2.9.6",
+  "sources": {
+    "LICENSE-MIT.txt": "https://raw.githubusercontent.com/pixijs/colord/5344fbf77b736f81cd33c21050021bc09bc9dd1d/LICENSE.md"
+  }
+}

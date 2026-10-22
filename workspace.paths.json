@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "project": "slowtune",
+  "paths": {
+    "studio": "../..",
+    "platform": "../../platform",
+    "build": "../../local/build/slowtune",
+    "artifacts": "../../local/artifacts/slowtune",
+    "testRuntime": "../../local/runtime/slowtune",
+    "cache": "../../local/cache/slowtune",
+    "instance": "../../../instances/slowtune"
+  },
+  "consumers": [
+    "scripts/build-desktop.mjs",
+    "scripts/desktop.mjs",
+    "scripts/package-desktop.mjs",
+    "scripts/verify-desktop.mjs"
+  ]
+}

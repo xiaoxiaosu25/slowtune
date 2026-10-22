@@ -1,0 +1,7 @@
+{
+  "package": "@rollup/rollup-win32-x64-msvc",
+  "version": "4.64.0",
+  "sources": {
+    "LICENSE-MIT.txt": "https://raw.githubusercontent.com/rollup/rollup/v4.64.0/LICENSE.md"
+  }
+}

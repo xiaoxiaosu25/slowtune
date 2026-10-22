@@ -1,0 +1,37 @@
+import { useEffect, useRef, useState } from 'react';
+import type { SongLibraryState } from '../server/song-library-types';
+import type { SongMaintenanceAction, SongMaintenanceImpact } from '../server/song-library-maintenance';
+import { request, errorText, cancelled } from './api';
+import { Modal } from './Modal';
+
+export function SongMaintenancePanel({ library, onChange, onClose }: { library: SongLibraryState; onChange: (state: SongLibraryState) => void; onClose: () => void }) {
+  const [songId, setSong] = useState(library.snapshot.songs[0]?.id ?? ''), [type, setType] = useState<SongMaintenanceAction['type']>('merge-songs'), [targetId, setTarget] = useState(''), [versionId, setVersion] = useState('');
+  const [selected, setSelected] = useState<string[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
+  const [preview, setPreview] = useState<{ token: string; revision: string | null; expiresAt: number; impact: SongMaintenanceImpact }>();
+  const work = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => work.current?.abort(), []);
+  const song = library.snapshot.songs.find(song => song.id === songId), versions = library.snapshot.versions.filter(version => version.songId === songId);
+  const run = async (task: (signal: AbortSignal) => Promise<void>) => {
+    work.current?.abort(); const controller = new AbortController(); work.current = controller; setBusy(true); setError(''); setMessage('');
+    try { await task(controller.signal); } catch (issue) { if (!cancelled(issue)) { setError(errorText(issue)); if ((issue as { code?: string }).code === 'conflict') onChange(await request<SongLibraryState>('/api/song-library')); } }
+    finally { if (work.current === controller) setBusy(false); }
+  };
+  const prepare = () => run(async signal => {
+    const action: SongMaintenanceAction = type === 'merge-songs' ? { type, sourceId: songId, targetId } : type === 'move-version' ? { type, versionId, targetId } : type === 'delete-song' ? { type, songId } : type === 'clean-unavailable' ? { type, versionIds: selected } : { type: 'delete-version', versionId };
+    setPreview(await request('/api/song-library/maintenance/preview', { revision: library.revision, action }, signal));
+  });
+  return <Modal title="资料库维护" className="backup-modal" onClose={() => { work.current?.abort(); onClose(); }}>
+    <p className="muted">检查只更新来源事实和可用性。网络、账号和限流错误标为暂时无法确认；清理仅接受已确认不存在的版本。</p>
+    <label className="field"><span className="field-label">歌曲（包括未收藏的资料）</span><select className="select" aria-label="维护歌曲" value={songId} disabled={busy} onChange={event => { setSong(event.target.value); setVersion(''); setSelected([]); setPreview(undefined); }}>{library.snapshot.songs.map(song => <option key={song.id} value={song.id}>{song.title} · {song.artists?.join(' / ') || '歌手待整理'}</option>)}</select></label>
+    <div className="settings-group"><h3>检查播放版本</h3>{versions.map(version => <label className="choice" key={version.id}><input type="checkbox" disabled={busy || !selected.includes(version.id) && selected.length >= 20} checked={selected.includes(version.id)} onChange={() => { setSelected(old => old.includes(version.id) ? old.filter(id => id !== version.id) : [...old, version.id]); setPreview(undefined); }}/><span>{version.label || version.facts.title} · {version.ref.id}{version.ref.part ? ' / ' + version.ref.part : ''} · {version.availability.state === 'available' ? '可用' : version.availability.state === 'unknown' ? '尚未检查' : (version.availability.state === 'unavailable' ? '已失效' : '暂时无法确认') + ' · ' + version.availability.code}</span></label>)}
+      <button className="btn btn-secondary" disabled={busy || !selected.length} onClick={() => void run(async signal => { const saved = await request<SongLibraryState & { summary: { checked: number; unavailable: number; uncertain: number; skipped: number; stoppedReason?: string } }>('/api/song-library/maintenance/check', { revision: library.revision, versionIds: selected }, signal); onChange(saved); setPreview(undefined); setMessage(`已检查 ${saved.summary.checked} 个版本，失效 ${saved.summary.unavailable}，待确认 ${saved.summary.uncertain}，跳过 ${saved.summary.skipped}${saved.summary.stoppedReason ? '；已停止：' + errorText({ code: saved.summary.stoppedReason }) : ''}`); })}>检查所选版本（最多 20 个）</button>
+    </div>
+    <label className="field"><span className="field-label">维护操作</span><select className="select" aria-label="维护操作" value={type} disabled={busy} onChange={event => { setType(event.target.value as SongMaintenanceAction['type']); setPreview(undefined); }}><option value="merge-songs">合并歌曲到另一首</option><option value="move-version">移动版本到另一首歌曲</option><option value="delete-version">删除单个版本</option><option value="clean-unavailable">清理已选失效版本</option><option value="delete-song">完整删除歌曲</option></select></label>
+    {['move-version', 'delete-version'].includes(type) && <label className="field"><span className="field-label">版本</span><select className="select" aria-label="维护版本" value={versionId} disabled={busy} onChange={event => { setVersion(event.target.value); setPreview(undefined); }}><option value="">选择版本</option>{versions.map(version => <option key={version.id} value={version.id}>{version.label || version.facts.title}</option>)}</select></label>}
+    {['move-version', 'merge-songs'].includes(type) && <label className="field"><span className="field-label">目标歌曲</span><select className="select" aria-label="维护目标歌曲" value={targetId} disabled={busy} onChange={event => { setTarget(event.target.value); setPreview(undefined); }}><option value="">选择目标歌曲</option>{library.snapshot.songs.filter(song => song.id !== songId).map(song => <option key={song.id} value={song.id}>{song.title} · {song.artists?.join(' / ')}</option>)}</select></label>}
+    <p className="muted">合并保留目标歌曲的人工资料和默认版本、歌单成员与重复次数。移动／删除版本会取消原歌曲对该版本的默认和固定选择；解除映射后仅在最后一个 BV 引用消失时请求远端删除。</p>
+    <button className="btn btn-secondary" disabled={busy || !song || ['move-version', 'merge-songs'].includes(type) && (!targetId || targetId === songId) || ['move-version', 'delete-version'].includes(type) && !versionId || type === 'clean-unavailable' && !selected.length} onClick={() => void prepare()}>预览影响</button>
+    {preview && <section className="settings-group" aria-label="维护影响预览"><h3>影响预览</h3><p>移除歌曲 {preview.impact.songs}；移动／删除版本 {preview.impact.versions}；减少收藏 {preview.impact.favorites}、歌单成员 {preview.impact.entries}；取消默认 {preview.impact.defaults}、固定选择 {preview.impact.pins}；解除映射 {preview.impact.mappings}。</p><p>远端删除意图：{preview.impact.remoteRemovals.length} 个 BV。</p>{preview.impact.remoteRemovals.map(item => <p className="muted" key={item.linkId + item.bvid}>{item.bvid} · 关联 {item.linkId}</p>)}{preview.revision !== library.revision && <p role="alert">资料已变化，请重新预览。</p>}<button className="btn btn-danger" disabled={busy || preview.revision !== library.revision || preview.expiresAt <= Date.now()} onClick={() => void run(async signal => { onChange(await request('/api/song-library/maintenance/commit', { revision: preview.revision, token: preview.token }, signal)); setPreview(undefined); setMessage('维护已提交'); })}>确认执行维护</button></section>}
+    {busy && <p role="status">正在处理… <button className="btn btn-ghost" onClick={() => work.current?.abort()}>取消</button></p>}{message && <p role="status">{message}</p>}{error && <p className="feedback" role="alert">{error}</p>}
+  </Modal>;
+}

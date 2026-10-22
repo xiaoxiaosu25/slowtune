@@ -1,0 +1,7 @@
+{
+  "package": "@esbuild/win32-x64",
+  "version": "0.25.12",
+  "sources": {
+    "LICENSE-MIT.txt": "https://raw.githubusercontent.com/evanw/esbuild/v0.25.12/LICENSE.md"
+  }
+}

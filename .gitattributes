@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.tgz binary
+*.tar.gz binary
+*.png binary
+*.woff2 binary
+public/fonts/*-OFL.txt whitespace=-blank-at-eol
+public/legal/THIRD-PARTY-NOTICES.txt whitespace=-blank-at-eol
+legal/upstream/**/LICENSE* whitespace=-blank-at-eol

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; form-action 'none'; base-uri 'none'">
+  <title>慢听 SlowTune</title>
+  <link rel="stylesheet" href="setup.css">
+  <link rel="stylesheet" href="setup-chrome.css">
+</head>
+<body class="desktop-startup" data-phase="starting" data-entering="true">
+  <img id="background" class="startup-background" alt="" hidden>
+  <div id="shade" class="startup-shade"></div><div class="startup-vignette"></div>
+  <main class="startup-main">
+    <div class="startup-stack">
+      <section class="startup-brand" aria-label="慢听启动页">
+        <img class="startup-mark" src="mark.svg" alt="">
+        <h1>慢听</h1>
+        <p class="startup-tagline">留一点时间，听见喜欢。</p>
+      </section>
+      <footer class="startup-footer">
+        <div class="startup-loader" aria-hidden="true"><span></span></div>
+        <div id="status" class="startup-status" role="status" aria-live="polite">正在准备你的音乐…</div>
+        <div class="startup-actions" hidden><button id="retry">重试</button><button id="data" class="secondary">打开资料文件夹</button><button id="logs" class="secondary">打开日志文件夹</button><button id="quit" class="quiet">退出</button></div>
+      </footer>
+    </div>
+  </main>
+  <script src="setup.js"></script>
+</body>
+</html>

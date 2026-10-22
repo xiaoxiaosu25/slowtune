@@ -1,0 +1,72 @@
+import { test } from 'node:test';
+import { desktopBuildDirectory, developmentPaths } from '../scripts/workspace-paths.mjs';
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import electron from 'electron';
+import { _electron } from 'playwright-core';
+import { ensureLocalProfile } from '../desktop/profile.mjs';
+import { closeDesktop } from './helpers/desktop-process.mjs';
+
+test('real desktop enters its local profile without a code and restores a revoked session', { timeout: 90000 }, async t => {
+  const root = resolve('.'), output = join(developmentPaths().testRuntime, 'desktop-local-startup-tests'); mkdirSync(output, { recursive: true });
+  const data = mkdtempSync(join(output, 'profile-')), configFile = await ensureLocalProfile(data);
+  writeFileSync(join(data, 'preferences.json'), JSON.stringify({ 'slow-listening:desktop-lyric-size:v1': '40' }));
+  const env = { ...process.env, MUSIC_APP_CONFIG: configFile, MUSIC_APP_DESKTOP_DATA: data, MUSIC_APP_DESKTOP_ROOT: resolve(process.env.MUSIC_APP_TEST_BUILD ?? desktopBuildDirectory()), MUSIC_APP_NODE: process.execPath };
+  delete env.ELECTRON_RUN_AS_NODE; delete env.NODE_OPTIONS;
+  let application = await _electron.launch({ executablePath: electron, args: [join(root, 'desktop')], env, timeout: 25000 });
+  t.after(async () => { if (application) await closeDesktop(application); });
+  const splash = await application.firstWindow();
+  await splash.waitForURL('**/setup.html');
+  await splash.getByRole('heading', { name: '慢听', exact: true }).waitFor();
+  await splash.waitForFunction(() => performance.getEntriesByName('slowtune:welcome-visible').length > 0);
+  const splashStarted = await splash.evaluate(() => performance.timeOrigin + performance.getEntriesByName('slowtune:welcome-visible').at(-1).startTime);
+  await splash.screenshot({ path: join(data, 'startup.png'), animations: 'disabled' });
+  let page;
+  for (let n = 0; n < 350; n++) { page = application.windows().find(window => window.url().startsWith('http:')); if (page) break; await new Promise(done => setTimeout(done, 100)); }
+  assert(page, 'the player opens automatically');
+  await page.getByRole('button', { name: '打开正在播放', exact: true }).waitFor({ timeout: 20000 });
+  assert(await page.evaluate(() => performance.timeOrigin) - splashStarted >= 2000, 'the complete splash stays visible for at least two seconds after its artwork and entrance animation finish');
+  assert.equal(await page.getByLabel('服务访问码', { exact: true }).count(), 0);
+  assert.equal(application.windows().some(window => window.url().endsWith('/setup.html')), false);
+  assert.equal(await page.evaluate(() => document.cookie.includes('music_session')), false);
+  assert.equal((await fetch(new URL('/api/song-library', page.url()))).status, 401);
+  const lyricFont = async () => {
+    await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
+    await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
+    return page.getByRole('slider', { name: '沉浸歌词字号', exact: true });
+  };
+  const font = await lyricFont();
+  assert.equal(await font.inputValue(), '40', 'saved lyric size is restored after asynchronous preference initialization');
+  await font.fill('36');
+  await page.evaluate(() => fetch('/api/logout', { method: 'POST', headers: { 'X-Music-App': '1' } }));
+  await page.reload();
+  await page.getByRole('button', { name: '打开正在播放', exact: true }).waitFor({ timeout: 20000 });
+  assert.equal(await page.getByLabel('服务访问码', { exact: true }).count(), 0);
+  assert.equal(await page.evaluate(() => fetch('/api/song-library').then(response => response.status)), 200);
+  assert.equal(await (await lyricFont()).inputValue(), '36', 'a changed lyric size survives a fresh renderer');
+  const config = JSON.parse(readFileSync(configFile, 'utf8'));
+  const state = resolve(dirname(configFile), config.runtimeDirectory, 'service.json');
+  await closeDesktop(application, { mainWindow: true }); application = undefined;
+  assert.equal(existsSync(state), false);
+});
+
+test('startup errors keep the same welcome window and retry without a configuration picker', { timeout: 60000 }, async t => {
+  const root = resolve('.'), output = join(developmentPaths().testRuntime, 'desktop-local-startup-tests'); mkdirSync(output, { recursive: true });
+  const data = mkdtempSync(join(output, 'retry-')), file = await ensureLocalProfile(data), config = JSON.parse(readFileSync(file, 'utf8'));
+  writeFileSync(file, JSON.stringify({ ...config, host: '0.0.0.0' }));
+  const env = { ...process.env, MUSIC_APP_DESKTOP_DATA: data, MUSIC_APP_DESKTOP_ROOT: resolve(process.env.MUSIC_APP_TEST_BUILD ?? desktopBuildDirectory()), MUSIC_APP_NODE: process.execPath }; delete env.ELECTRON_RUN_AS_NODE; delete env.NODE_OPTIONS;
+  const application = await _electron.launch({ executablePath: electron, args: [join(root, 'desktop')], env, timeout: 25000 }); t.after(() => closeDesktop(application));
+  const page = await application.firstWindow(); await page.getByText('桌面内部连接必须仅限本机。', { exact: true }).waitFor();
+  const id = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].id);
+  assert.equal(application.windows().length, 1); assert.equal(await page.getByRole('button', { name: '选择服务配置…', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '打开日志文件夹', exact: true }).waitFor(); await page.getByRole('button', { name: '退出', exact: true }).waitFor();
+  await page.screenshot({ path: join(data, 'welcome-error.png') });
+  writeFileSync(file, JSON.stringify(config)); await page.getByRole('button', { name: '重试', exact: true }).click();
+  await page.getByRole('button', { name: '打开正在播放', exact: true }).waitFor({ timeout: 25000 });
+  assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => window.webContents.getURL().startsWith('http:')).id), id);
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  assert.equal(await page.getByRole('navigation', { name: '设置分组', exact: true }).getByRole('button', { name: '启动与访问', exact: true }).count(), 0);
+  await page.getByRole('button', { name: '本地资料', exact: true }).click(); await page.getByRole('button', { name: '打开资料文件夹', exact: true }).waitFor();
+  await page.screenshot({ path: join(data, 'local-data-settings.png') });
+});

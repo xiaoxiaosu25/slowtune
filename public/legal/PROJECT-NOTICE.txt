@@ -1,0 +1,15 @@
+SlowTune
+Copyright (C) 2026 SlowTune authors.
+
+Original code in this repository is licensed under the GNU Affero General
+Public License, version 3 only (AGPL-3.0-only). See LICENSE for the full terms.
+
+The original code in the bundled @studio/player 0.12.5,
+@studio/music-sources 0.2.8 and @studio/recommendation 0.3.3 artifacts and
+their supplied source snapshots is offered under the same license for this
+distribution. See vendor/README.md and vendor/provenance.json.
+
+Third-party software, fonts and other third-party material retain their
+respective copyright notices and licenses. See 第三方声明.md and the supplied
+third-party notices. This software license grants no rights to third-party
+music, video, artwork, lyrics, comments or trademarks.

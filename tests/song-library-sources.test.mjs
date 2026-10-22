@@ -1,0 +1,121 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const built = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.', 'dist/server');
+const { SongLibraryStore } = await import(pathToFileURL(join(built, 'song-library-store.js')));
+const { SongLibraryService } = await import(pathToFileURL(join(built, 'song-library-service.js')));
+const { SongLibrarySources } = await import(pathToFileURL(join(built, 'song-library-sources.js')));
+const bvid = 'BV1tX4y1W7Xm', ref = { provider: 'bilibili', kind: 'video', id: bvid }, alternate = { provider: 'youtube', kind: 'video', id: 'dQw4w9WgXcQ' };
+const metadata = input => ({ ref: input.provider === 'bilibili' ? { ...input, part: input.part ?? '900' } : input, resourceId: input.id, title: '相同原标题', url: 'https://example.com', uploader: { id: '42', name: '上传者' }, durationSeconds: 30 });
+function fixture(t, overrides = {}) {
+  const parent = resolve('local/song-library-sources'); mkdirSync(parent, { recursive: true });
+  const directory = mkdtempSync(join(parent, 'run-')), store = new SongLibraryStore(join(directory, 'songs.sqlite'), 'test'), library = new SongLibraryService(store);
+  t.after(() => store.close());
+  let generation = 'one', enabled = true, reads = 0;
+  const access = { metadata: async value => { reads++; return metadata(value); }, resolve: async () => metadata(ref), enabled: () => enabled, generation: () => generation, ...overrides };
+  return { library, store, sources: new SongLibrarySources(library, access), signal: new AbortController().signal, generation: () => generation = 'two', disable: () => enabled = false, reads: () => reads };
+}
+test('source saves acquire exact cid, reuse ownership and keep song identity, field protection, favorites and playlist occurrences', async t => {
+  const f = fixture(t);
+  const saved = await f.sources.save(null, { refs: [ref, ref], target: 'favorite' }, f.signal);
+  assert.equal(saved.snapshot.songs.length, 1); assert.equal(saved.snapshot.versions.length, 1); assert.equal(saved.snapshot.versions[0].ref.part, '900'); assert.equal(saved.snapshot.favorites.length, 1);
+  const song = saved.snapshot.songs[0], favorite = saved.snapshot.favorites[0], firstVersion = song.defaultVersionId;
+  f.library.execute(saved.revision, [{ type: 'edit-song', songId: song.id, title: '人工标准名', artists: ['人工歌手'] }]);
+  const version = await f.sources.save(f.library.read().revision, { refs: [alternate], target: 'version', songId: song.id }, f.signal);
+  assert.equal(version.snapshot.songs.length, 1); assert.equal(version.snapshot.versions.length, 2); assert.equal(version.snapshot.songs[0].defaultVersionId, firstVersion); assert.equal(version.snapshot.songs[0].title, '人工标准名');
+  const repeated = await f.sources.save(version.revision, { refs: [ref], target: 'favorite' }, f.signal);
+  assert.deepEqual(repeated.snapshot.favorites[0], favorite);
+  const playlist = await f.sources.save(repeated.revision, { refs: [ref, alternate, ref], target: 'playlist', name: '重复成员', duplicates: 'allow' }, f.signal);
+  assert.equal(playlist.snapshot.playlists[0].entries.length, 3); assert.equal(new Set(playlist.snapshot.playlists[0].entries.map(entry => entry.entryId)).size, 3);
+  const before = f.library.read();
+  await assert.rejects(f.sources.save(before.revision, { refs: [ref], target: 'playlist', playlistId: playlist.playlistId, duplicates: 'reject' }, f.signal), { code: 'duplicate' });
+  assert.deepEqual(f.library.read(), before);
+  const second = await f.sources.save(before.revision, { refs: [{ ...ref, part: '901' }], target: 'favorite' }, f.signal);
+  assert.equal(second.snapshot.songs.length, 2, 'same title does not merge different exact sources');
+  await assert.rejects(f.sources.save(second.revision, { refs: [ref], target: 'version', songId: second.snapshot.songs[1].id }, f.signal), { code: 'duplicate' });
+});
+test('chart favorites need no source, link by explicit source context and playback never persists temporary choices', async t => {
+  const f = fixture(t), context = { source: 'qq', title: '榜单歌曲', artists: ['榜单歌手'], chart: 'hot', rank: 1 };
+  const saved = f.sources.favoriteChart(null, context, f.signal); assert.equal(f.reads(), 0); assert.equal(saved.snapshot.versions.length, 0);
+  const original = f.library.read();
+  const played = await f.sources.playback({ kind: 'song', songId: saved.snapshot.songs[0].id }, f.signal);
+  assert.equal(played.song.title, '榜单歌曲'); assert.equal(played.entry.ref.part, '900'); assert.deepEqual(f.library.read(), original, 'temporary search creates no version, default or favorite');
+  const adopted = await f.sources.save(saved.revision, { refs: [ref], target: 'favorite', context }, f.signal);
+  assert.equal(adopted.snapshot.songs.length, 1); assert.equal(adopted.snapshot.favorites.length, 1); assert.equal(adopted.snapshot.songs[0].title, '榜单歌曲');
+  const songId = adopted.snapshot.songs[0].id, versionId = adopted.snapshot.versions[0].id;
+  const defaultPlayback = await f.sources.playback({ kind: 'song', songId }, f.signal); assert.equal(defaultPlayback.versionId, versionId);
+  f.sources.favoriteChart(f.library.read().revision, { ...context, source: 'netease' }, f.signal);
+  assert.equal(f.library.read().snapshot.songs.length, 2, 'another catalogue is not silently merged');
+  f.disable(); await assert.rejects(f.sources.playback({ kind: 'song', songId }, f.signal), { code: 'source-disabled' });
+});
+test('desktop chart resolution forwards decoder support and preserves the checked exact rendition through metadata',async t=>{
+  const entry=metadata(ref),support=['audio/mp4; codecs="mp4a.40.2"'],verifiedAudio={ref:entry.ref,format:{id:'30280',codec:'mp4a.40.2',mimeType:'audio/mp4',container:'mp4'}};
+  const queries=[],f=fixture(t,{resolve:async query=>{queries.push(query);return {...entry,verifiedAudio};}}),before=f.library.read();
+  const selection={kind:'chart',context:{source:'qq',title:'雨爱',artists:['杨丞琳']}};
+  const result=await f.sources.playback(selection,f.signal,'title-artists',support);
+  assert.deepEqual(queries[0],{title:'雨爱',artists:['杨丞琳'],searchMode:'title-artists',audioSupport:support});
+  assert.deepEqual(result.entry.verifiedAudio,verifiedAudio);assert.deepEqual(f.library.read(),before);
+  const mobile=await f.sources.playback(selection,f.signal);assert.equal(mobile.entry.verifiedAudio,undefined);
+  assert.deepEqual(queries[1],{title:'雨爱',artists:['杨丞琳']});
+  await assert.rejects(f.sources.playback(selection,f.signal,'title-artists',['invalid']),{code:'invalid-input'});
+});
+test('desktop search uses catalogue duration only when its title and performers still describe the query',async t=>{
+  const queries=[],f=fixture(t,{resolve:async query=>{queries.push(query);return metadata(ref);}});
+  f.library.execute(null,[{type:'create-song',id:'song',title:'雨爱',artists:['杨丞琳']}]);
+  f.library.transaction(f.library.revision(),({document})=>{document.snapshot.songs[0].desktopCatalog={state:'matched',selection:'manual',checkedAt:1,record:{provider:'netease',id:'123',title:'雨爱',artists:['杨丞琳'],durationSeconds:270,url:'https://music.163.com/song?id=123'}};});
+  await f.sources.playback({kind:'song',songId:'song'},f.signal,'title-artists');assert.equal(queries[0].durationSeconds,270);
+  await f.sources.playback({kind:'song',songId:'song'},f.signal);assert.equal(queries[1].durationSeconds,undefined);
+  f.library.execute(f.library.revision(),[{type:'edit-song',songId:'song',title:'另一个名字'}]);
+  await f.sources.playback({kind:'song',songId:'song'},f.signal,'title-artists');assert.equal(queries[2].durationSeconds,undefined);
+});
+test('grouping the current source creates song, favorite and first default atomically; later versions keep that default', async t => {
+  const f=fixture(t), first=await f.sources.save(null,{refs:[ref],target:'favorite',song:{title:'七里香',artists:['周杰伦']},label:'无损版'},f.signal);
+  const song=first.snapshot.songs[0],version=first.snapshot.versions[0];
+  assert.equal(first.snapshot.favorites[0].songId,song.id);assert.equal(song.title,'七里香');assert.deepEqual(song.artists,['周杰伦']);assert.equal(song.defaultVersionId,version.id);assert.equal(version.label,'无损版');assert.equal(song.fields.title.protected,true);
+  const second=await f.sources.save(first.revision,{refs:[alternate],target:'version',songId:song.id,label:'现场版'},f.signal);
+  assert.equal(second.snapshot.songs.length,1);assert.equal(second.snapshot.versions.length,2);assert.equal(second.snapshot.songs[0].defaultVersionId,version.id);
+  const before=f.library.read();await assert.rejects(f.sources.save(before.revision,{refs:[ref],target:'favorite',song:{title:'错误',artists:[42]}},f.signal),{code:'invalid-input'});assert.deepEqual(f.library.read(),before);
+});
+test('saved exact sources reuse relations without metadata or availability changes; unresolved BV still needs metadata', async t => {
+  let reads=0, offline=false;
+  const f=fixture(t,{metadata:async value=>{reads++;if(offline)throw Object.assign(new Error('offline'),{code:'network'});return metadata(value);}});
+  const exact={...ref,part:'900'},saved=await f.sources.save(null,{refs:[exact],target:'favorite'},f.signal);
+  const original=saved.snapshot.versions[0],songId=original.songId;
+  f.library.transaction(saved.revision,c=>{c.document.snapshot.versions[0].availability={state:'unavailable',checkedAt:1,code:'not-found'};});
+  f.library.execute(f.library.read().revision,[{type:'remove-favorite',favoriteId:saved.snapshot.favorites[0].favoriteId}]);
+  offline=true;
+  const favorited=await f.sources.save(f.library.read().revision,{refs:[exact],target:'favorite'},f.signal);
+  const playlist=await f.sources.save(favorited.revision,{refs:[exact,exact],target:'playlist',name:'本地关系'},f.signal);
+  assert.equal(reads,1,'known sources do not depend on the upstream being available');
+  assert.equal(playlist.snapshot.playlists[0].entries.length,2);
+  assert.equal(playlist.snapshot.songs[0].defaultVersionId,original.id);
+  assert.deepEqual(playlist.snapshot.versions[0].facts,original.facts);
+  assert.deepEqual(playlist.snapshot.versions[0].availability,{state:'unavailable',checkedAt:1,code:'not-found'});
+  const chart={source:'qq',title:'目录歌曲',artists:['目录歌手']};
+  const linked=await f.sources.save(playlist.revision,{refs:[exact],target:'version',songId,context:chart,label:'我的版本'},f.signal);
+  assert.equal(reads,1);assert.equal(linked.snapshot.catalogLinks[0].songId,songId);
+  assert.equal(linked.snapshot.versions[0].label,'我的版本');assert.equal(linked.snapshot.songs[0].title,'目录歌曲');
+  const before=f.library.read();
+  await assert.rejects(f.sources.save(before.revision,{refs:[ref],target:'favorite'},f.signal),{code:'network'});
+  assert.equal(reads,2,'a video without cid is not assumed to mean its saved P');
+  assert.deepEqual(f.library.read(),before);
+  f.disable();await assert.rejects(f.sources.save(before.revision,{refs:[exact],target:'favorite'},f.signal),{code:'source-disabled'});
+  assert.equal(reads,2);assert.deepEqual(f.library.read(),before);
+});
+test('late metadata cannot cross cancellation, account/source generations, revision changes or exact source ownership', async t => {
+  for (const action of ['cancel', 'generation', 'conflict', 'wrong-part']) {
+    let release, started;
+    const gate = new Promise(resolve => release = resolve), ready = new Promise(resolve => started = resolve);
+    const f = fixture(t, { metadata: async value => { started(); await gate; return metadata(action === 'wrong-part' ? { ...value, part: '901' } : value); } });
+    const controller = new AbortController(), task = f.sources.save(null, { refs: [{ ...ref, part: '900' }], target: 'favorite' }, controller.signal);
+    await ready;
+    if (action === 'cancel') controller.abort();
+    if (action === 'generation') f.generation();
+    if (action === 'conflict') f.library.execute(null, [{ type: 'create-playlist', name: '并发修改' }]);
+    const current = f.library.read(); release();
+    await assert.rejects(task, { code: action === 'conflict' ? 'conflict' : action === 'wrong-part' ? 'invalid-input' : 'cancelled' });
+    assert.deepEqual(f.library.read(), current);
+  }
+});

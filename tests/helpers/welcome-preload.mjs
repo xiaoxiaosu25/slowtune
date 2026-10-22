@@ -1,0 +1,4 @@
+import {AccountBilibiliProvider} from '../../dist/server/bilibili-recommendations.js';
+import {MusicCharts} from '../../dist/server/charts.js';
+AccountBilibiliProvider.prototype.discoverCandidates=async function(){return [{id:'music-recommendation',title:'B站推荐',kind:'recommendation',page:{items:Array.from({length:20},(_,i)=>({ref:{provider:'bilibili',kind:'video',id:'BV'+String(i+1).padStart(10,'0')},resourceId:'welcome-fixture-'+i,title:['午后的轻音乐','沿着海岸散步','写给夜晚的旋律','钢琴与微风'][i%4]+' · '+(i+1),url:'https://www.bilibili.com/video/BV'+String(i+1).padStart(10,'0'),durationSeconds:180+i*10,uploader:{name:'慢听测试音乐人'}}))}}];};
+MusicCharts.prototype.read=async function(input){return {source:input.source,chart:input.chart,title:'测试榜单',items:[],sourceUrl:'https://example.com',fetchedAt:Date.now(),refreshAfter:Date.now()+86400000};};

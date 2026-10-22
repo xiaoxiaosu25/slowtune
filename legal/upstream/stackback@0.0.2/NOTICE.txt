@@ -1,0 +1,3 @@
+stackback 0.0.2
+Author: Roman Shtylman <shtylman@gmail.com>
+The package metadata declares MIT, but the published package and repository contain no separate license text. The accompanying file is the standard SPDX MIT text, not an original upstream copyright notice.
