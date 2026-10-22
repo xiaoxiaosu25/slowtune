@@ -1584,7 +1584,7 @@
     },
     {
       "name": "vite",
-      "version": "6.4.3",
+      "version": "6.4.5",
       "license": "MIT",
       "purpose": "运行依赖",
       "source": "https://github.com/vitejs/vite",
