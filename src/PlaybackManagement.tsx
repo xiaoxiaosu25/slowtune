@@ -6,7 +6,7 @@ import { key, request, time, errorText, cancelled, type Track } from './api';
 import { LyricsSettings } from './LyricsSettings';
 import type { LyricsController } from './useLyrics';
 import { versionKinds } from './song-management';
-import { VersionStatus } from './DesktopSongDialog';
+import { VersionStatus } from './VersionStatus';
 
 export type PlaybackManagementTab = 'versions' | 'lyrics';
 type Props = {

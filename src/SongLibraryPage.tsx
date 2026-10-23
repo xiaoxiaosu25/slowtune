@@ -9,11 +9,16 @@ import { SongMaintenancePanel } from './SongMaintenancePanel';
 import { SongOrganizationPanel } from './SongOrganizationPanel';
 import { ControlPopover } from './ControlPopover';
 import { SongCover } from './SongCover';
-import { DesktopSongDialog } from './DesktopSongDialog';
+import type { ComponentProps } from 'react';
+import { desktopFeature } from './DesktopRegion';
+import { DesktopSongDialog as songDialogUrl, DesktopPlaylistCoverDialog as coverDialogUrl } from 'virtual:desktop-feature-urls';
 import type { SongCommit, SongDialogContext } from './song-management';
 import { desktopSongIndex } from './desktop-song-index';
 import { PlaylistCover } from './PlaylistCover';
-import { DesktopPlaylistCoverDialog } from './DesktopPlaylistCoverDialog';
+import './song-catalog.css';
+import './playlist-cover.css';
+const DesktopSongDialog = desktopFeature<ComponentProps<typeof import('./DesktopSongDialog').DesktopSongDialog>>(songDialogUrl, 'DesktopSongDialog', '歌曲管理');
+const DesktopPlaylistCoverDialog = desktopFeature<ComponentProps<typeof import('./DesktopPlaylistCoverDialog').DesktopPlaylistCoverDialog>>(coverDialogUrl, 'DesktopPlaylistCoverDialog', '歌单封面');
 export { SongCover } from './SongCover';
 export type { SongCommit } from './song-management';
 

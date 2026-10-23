@@ -22,6 +22,7 @@ import { desktopSongSearchOptions } from './song-search';
 import { desktopSurface } from './song-search';
 import { recordPlaybackDiagnostic, playbackDiagnostics } from './playback-diagnostics';
 import { prunePlaybackRecords, DesktopNextPrefetch } from './desktop-continuity';
+import { PlaybackClock } from './playback-clock';
 
 // Queue instance IDs must also work on the personal service's LAN HTTP origin.
 const queueId=()=> 'queue-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
@@ -34,6 +35,7 @@ interface ChartSession {failed:Set<string>;handled:Set<unknown>;allowed:boolean}
 interface PlaybackEngine {player:StudioPlayer;queue:QueueController;bridge:BestAudioBridge;recovery:PlaybackRecovery;system:MediaSessionController;sleep:SleepTimerController;tracks:Map<string,QueueTrack>;aliases:Map<string,string>;committed:Map<string,EntryRef>;staged?:{id:string;plan:PlaybackPlan;track:Track;used:boolean};ownCommit?:boolean;restored?:string;releasing?:boolean;sourceStopping?:boolean;sourceSkipping?:boolean;nativeNext?:()=>Promise<boolean>;nativePrevious?:()=>Promise<boolean>;sync?:()=>void;intent:number;pendingRecords:Map<string,number>;created:Map<string,AbortSignal|undefined>;prune:()=>void;prefetch?:DesktopNextPrefetch<Track>;batchSession?:ChartSession;chartSession?:ChartSession;chartSelection?:{id:string;track:Track;signal:AbortSignal};advanceFailure?:()=>void}
 const idleSleep:SleepTimerSnapshot={status:'idle',deadline:null,remainingMs:0,trigger:null,action:'pause',remainingItems:null,actionPending:false,error:null};
 export function usePlayback(client:MusicClient, youtubeAvailable=false, partsStore?:PartMetadataStore,youtubeEnabled=youtubeAvailable) {
+  const [clock] = useState(() => new PlaybackClock());
   const enabled=useRef(youtubeEnabled);enabled.current=youtubeEnabled;
   const libraryChoices=useRef<{songs:Song[];versions:SongVersion[];catalogLinks:SongCatalogLink[]}>({songs:[],versions:[],catalogLinks:[]});
   const blocked=(t:QueueTrack)=>{
@@ -115,6 +117,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       if(q.current && e)e.restored=undefined;
       // Failed source preparation retains the previous plan; only expose an applied queue selection's format.
       const format=q.loaded?player.currentMetadata?.format as AudioFormat|undefined:undefined;
+      clock.publish({position:player.currentTime,duration:Number.isFinite(player.duration)&&player.duration>0?player.duration:current?.durationSeconds,buffered:player.buffered.map(range=>({start:range.start,end:range.end}))});
       setSnapshot({current,currentId:q.current?.id??e?.restored,format,position:player.currentTime,duration:Number.isFinite(player.duration)&&player.duration>0?player.duration:current?.durationSeconds,playing:player.state==='playing'&&!player.paused,loading:q.loading,volume:player.volume,rate:player.playbackRate,muted:player.muted,buffered:player.buffered.map(range=>({start:range.start,end:range.end})),items,order:q.order,repeat:q.repeat,state:player.state,canPrevious:q.canPrevious,canNext:q.canNext});
       try {const saved=JSON.stringify({version:3,items:items.map(savedQueueEntry),current:q.current?.id??e?.restored,order:q.order,repeat:q.repeat,volume:player.volume,rate:player.playbackRate,muted:player.muted});if(saved!==lastSaved){preferenceStorage().setItem(playbackStorageKey,saved);lastSaved=saved;}}catch{setError(window.slowTuneDesktop?'本地播放偏好无法保存；歌单与收藏仍保存在本应用的资料库。':'浏览器无法保存播放资料；歌单与收藏仍由服务保存。');}
       if(!q.loading&&e?.advanceFailure){const advance=e.advanceFailure;e.advanceFailure=undefined;queueMicrotask(advance);}
@@ -144,7 +147,13 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       const identity=JSON.stringify([queueIdentity,queue.snapshot.current?.id,next.id]);
       owned.prefetch.start(next.id,identity,async signal=>{const result=await request<{entry:Track}>('/api/playback/prefetch',{ref,audioSupport:bridge.audioSupport},signal);if(!result.entry.verifiedAudio?.preparationToken)throw new Error('Prefetch unavailable');return result.entry;});
     };
-    const progress=()=>{if(!alive||engine.current?.releasing)return;prefetchNext();setSnapshot(old=>({...old,position:player.currentTime,duration:Number.isFinite(player.duration)&&player.duration>0?player.duration:old.current?.durationSeconds,buffered:player.buffered.map(range=>({start:range.start,end:range.end}))}));};
+    const progress=()=>{
+      if(!alive||engine.current?.releasing)return;
+      prefetchNext();
+      const value={position:player.currentTime,duration:Number.isFinite(player.duration)&&player.duration>0?player.duration:clock.getSnapshot().duration,buffered:player.buffered.map(range=>({start:range.start,end:range.end}))};
+      clock.publish(value);
+      if(!desktopSurface())setSnapshot(old=>({...old,...value}));
+    };
     const unsubs=[()=>recovery.dispose(),player.on('timeupdate',progress),...['durationchange','pause','statechange','volumechange','ratechange','stop'].map(event=>player.on(event as 'timeupdate',update))];
     const suspend=window.slowTuneDesktop?.onCommand(command=>{if(command==='suspend')owned.prefetch?.cancel();});if(suspend)unsubs.push(suspend);
     unsubs.push(player.on('diagnostic',event=>recordPlaybackDiagnostic({operation:'player',code:event.code,at:event.timestamp,...(event.elapsedMs!==undefined?{elapsedMs:event.elapsedMs}:{})})));
@@ -442,7 +451,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     finally{if(e.chartSelection===selection)e.chartSelection=undefined;}
   };
   const readPosition=useCallback(()=>engine.current?.player.currentTime??0,[]);
-  return {snapshot,readPosition,sleep,sleepTimer,audioAnalysis,error,preparing,chartFailures,chartSearchTitle,chartSearchSong,diagnostics:playbackDiagnostics,
+  return {snapshot,clock,readPosition,sleep,sleepTimer,audioAnalysis,error,preparing,chartFailures,chartSearchTitle,chartSearchSong,diagnostics:playbackDiagnostics,
     playSelection,
     playSelections:(items:{selection:SongPlaybackSelection;song:Pick<Song,'title'|'artists'|'artwork'>}[])=>run(async(e,signal)=>{
       if(!items.length||items.length>500)throw {code:'queue-limit'};

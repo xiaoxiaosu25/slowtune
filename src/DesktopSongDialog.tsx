@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { ArrowLeftIcon, MagnifyingGlassIcon, MusicNotesIcon, PlayIcon, PlusIcon, TrashIcon, ArrowSquareOutIcon, ArrowsMergeIcon, ArrowRightIcon, CheckCircleIcon, WarningCircleIcon, HeartIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, MagnifyingGlassIcon, MusicNotesIcon, PlayIcon, PlusIcon, TrashIcon, ArrowSquareOutIcon, ArrowsMergeIcon, ArrowRightIcon, HeartIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState, SongPlaybackSelection, SongVersion } from '../server/song-library-types';
 import { Modal } from './Modal';
 import { SongCover } from './SongCover';
@@ -11,7 +11,8 @@ import { PagedList } from './Pagination';
 import { errorText, availabilityText } from './api';
 import { SongMaintenanceTask, useSongMaintenance, type SongTask } from './SongMaintenanceTask';
 import { desktopSongIndex } from './desktop-song-index';
-import { availabilityLabel, changedSongFields, entryFor, isMissingVersion, rebaseSongDraft, songDraft, songDraftEdits, splitArtists, versionKinds, versionName, type SongCommit, type SongDialogContext, type SongDraft } from './song-management';
+import { changedSongFields, entryFor, isMissingVersion, rebaseSongDraft, songDraft, songDraftEdits, splitArtists, versionKinds, versionName, type SongCommit, type SongDialogContext, type SongDraft } from './song-management';
+import { VersionStatus } from './VersionStatus';
 
 type Props = {
   library: SongLibraryState; context?: SongDialogContext; commit: SongCommit; youtubeEnabled: boolean;
@@ -19,12 +20,6 @@ type Props = {
   onSearch: (song: Song, onReturn: () => void) => void;
   onPlay: (selection: SongPlaybackSelection, song: Song) => void;
 };
-
-export function VersionStatus({ version }: { version: SongVersion }) {
-  return <span className={'version-status version-status-' + version.availability.state} title={'code' in version.availability ? availabilityText(version.availability.code) : undefined}>
-    {version.availability.state === 'available' ? <CheckCircleIcon size={14}/> : version.availability.state !== 'unknown' ? <WarningCircleIcon size={14}/> : null}{availabilityLabel(version)}
-  </span>;
-}
 
 /** One dialog hosts the manager, editor and impact preview. Search temporarily suspends it. */
 export function DesktopSongDialog(props: Props) {
