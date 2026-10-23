@@ -10583,7 +10583,7 @@ ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ========================================================================
 
-youtubei.js — 18.1.0
+youtubei.js — 18.2.0
 
 用途：YouTube 目录、搜索、作者内容与评论接入
 

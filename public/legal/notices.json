@@ -1686,7 +1686,7 @@
     },
     {
       "name": "youtubei.js",
-      "version": "18.1.0",
+      "version": "18.2.0",
       "license": "MIT",
       "purpose": "YouTube 目录、搜索、作者内容与评论接入",
       "source": "https://github.com/LuanRT/YouTube.js",
