@@ -11,15 +11,18 @@ const output = resolve(source, 'local/instance-path-tests');
 mkdirSync(output, { recursive: true });
 function fixture() {
   const base = mkdtempSync(join(output, 'workspace-'));
-  const root = join(base, 'studio/projects/slowtune');
+  const root = join(base, 'projects/slowtune');
   const instance = join(base, 'instances/slowtune/config.local.json');
   mkdirSync(root, { recursive: true });
+  mkdirSync(join(base, 'platform'));
+  writeFileSync(join(base, 'AGENTS.md'), '# Workspace');
+  writeFileSync(join(base, 'platform/AGENTS.md'), '# Platform');
   mkdirSync(dirname(instance), { recursive: true });
   writeFileSync(instance, JSON.stringify({ database: './library.sqlite' }));
   return { base, root, instance };
 }
 
-test('Workspace commands find the external instance while local and explicit configurations retain priority', () => {
+test('Workspace commands find the sibling instance while local and explicit configurations retain priority', () => {
   const { base, root, instance } = fixture();
   assert.equal(resolveConfigFile(root, {}), instance);
   const missing = join(base, 'missing.json');
@@ -37,7 +40,7 @@ test('Portable deliveries use their own configuration even beside a workspace in
   assert.equal(resolveConfigFile(root, {}), join(root, 'config.local.json'));
 });
 
-test('Foreground startup passes the external configuration to the built server from an unrelated cwd', () => {
+test('Foreground startup passes the workspace instance configuration from an unrelated cwd', () => {
   const { base, root, instance } = fixture();
   mkdirSync(join(root, 'scripts'));
   mkdirSync(join(root, 'dist/server'), { recursive: true });
