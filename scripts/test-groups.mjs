@@ -13,7 +13,7 @@ export const testGroups = {
   ],
   browser: [
     'song-targets-desktop-ui', 'desktop-runtime-ui', 'playback-performance-ui',
-    'playback', 'playback-retry', 'song-version-switch', 'playback-management-ui',
+    'playback', 'sleep-timer-ui', 'playback-retry', 'song-version-switch', 'playback-management-ui',
     'desktop-lyrics-ui', 'desktop-lyrics-progress-ui', 'lyrics-ui',
     'playlist-cover-ui', 'song-management-desktop-ui',
   ],

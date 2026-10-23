@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StudioPlayer } from '@studio/player/core';
 import { QueueController, type QueueItem } from '@studio/player/queue';
 import { MediaSessionController } from '@studio/player/media-session';
-import { SleepTimerController, type SleepTimerRule, type SleepTimerSnapshot } from '@studio/player/sleep-timer';
+import type { SleepTimerController, SleepTimerRule, SleepTimerSnapshot } from '@studio/player/sleep-timer';
+import { createSleepTimer } from './desktop-sleep-timer';
 import { BestAudioBridge, retainVerifiedAudio } from './audio-quality';
 import type { AudioFormat, EntryRef } from '@studio/music-sources';
 import type { MusicClient } from '@studio/music-sources/client';
@@ -82,7 +83,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     if(initial.muted)player.setMuted(true);
     const queue=new QueueController(player,{order:initial.order,repeat:initial.repeat,autoAdvance:true});
     const system=new MediaSessionController(player,{queue,getMetadata:()=>{const track=tracks.get(queue.snapshot.current?.id??'');return track?{title:track.title,artist:track.artists?.join(' / ')??track.uploader?.name,artwork:track.artwork?[{src:track.artwork}]:[]}:null;}});
-    const sleep=new SleepTimerController(player);
+    const sleep=createSleepTimer(player,audio);
     engine.current={player,queue,bridge,recovery,system,sleep,tracks,aliases,committed,restored:initial.current,intent:0,pendingRecords:new Map(),created:new Map(),prune:()=>{},...(initial.tracks.some(t=>t.chartItem)?{chartSession:{failed:new Set<string>(),handled:new Set<unknown>(),allowed:false}}:{})};
     const owned=engine.current;
     owned.prune=()=>{
@@ -193,12 +194,16 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     queue.addEventListener('error',queueError);
     // Sleep rules stay outside the playback queue: the countdown ticks every second while it runs.
     const onSleep=()=>setSleep(sleep.snapshot);
+    const onSleepExpire=()=>{if(desktopSurface()){operation.current?.abort();owned.recovery.cancelEnvironment();}};
+    const onSleepComplete=()=>{if(desktopSurface()&&sleep.snapshot.status==='expired'&&sleep.snapshot.action==='close')window.slowTuneDesktop?.quit();};
     sleep.addEventListener('change',onSleep);
+    sleep.addEventListener('expire',onSleepExpire);
+    sleep.addEventListener('complete',onSleepComplete);
     queue.addEventListener('change',update);queue.addEventListener('change',prefetchQueue);prefetchQueue();update();
     const leave=()=>{owned.prefetch?.cancel();operation.current?.abort();player.pause();void player.stop().finally(()=>bridge.dispose()).catch(()=>{});};
     window.addEventListener('pagehide',leave);
     const offline=()=>owned.prefetch?.cancel();window.addEventListener('offline',offline);
-    return()=>{alive=false;owned.prefetch?.cancel();operation.current?.abort();unsubs.forEach(fn=>fn());window.removeEventListener('pagehide',leave);window.removeEventListener('offline',offline);sleep.removeEventListener('change',onSleep);queue.removeEventListener('change',update);queue.removeEventListener('change',prefetchQueue);queue.removeEventListener('error',queueError);queue.destroy();system.destroy();sleep.destroy();setSleepTimer(null);setSleep(idleSleep);void player.destroyAsync().finally(()=>{analysis.dispose();tracks.clear();aliases.clear();committed.clear();return bridge.dispose();}).catch(()=>{});audio.remove();engine.current=null;analysisRef.current=null;};
+    return()=>{alive=false;owned.prefetch?.cancel();operation.current?.abort();unsubs.forEach(fn=>fn());window.removeEventListener('pagehide',leave);window.removeEventListener('offline',offline);sleep.removeEventListener('change',onSleep);sleep.removeEventListener('expire',onSleepExpire);sleep.removeEventListener('complete',onSleepComplete);queue.removeEventListener('change',update);queue.removeEventListener('change',prefetchQueue);queue.removeEventListener('error',queueError);queue.destroy();system.destroy();sleep.destroy();setSleepTimer(null);setSleep(idleSleep);void player.destroyAsync().finally(()=>{analysis.dispose();tracks.clear();aliases.clear();committed.clear();return bridge.dispose();}).catch(()=>{});audio.remove();engine.current=null;analysisRef.current=null;};
   },[client]);
   const nextPlayable=(e:PlaybackEngine,direction:1|-1)=>{
     const q=e.queue.snapshot,items=q.items;

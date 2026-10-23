@@ -486,7 +486,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   // Let the range's final native change finish before clearing its controlled preview.
   const releaseScrub=()=>requestAnimationFrame(commitScrub);
   const sleepRunning=playback.sleep.status==='running';
-  const sleepBadge=!sleepRunning?null:playback.sleep.trigger?.type==='duration'?time(playback.sleep.remainingMs/1000):`${playback.sleep.remainingItems??1} 首`;
+  const sleepBadge=!sleepRunning?null:playback.sleep.trigger?.type==='duration'?time(desktop?Math.ceil(playback.sleep.remainingMs/1000):playback.sleep.remainingMs/1000):`${playback.sleep.remainingItems??1} 首`;
   const rateControl=(labeled=false)=><RateControl value={snapshot.rate} onChange={playback.rate} labeled={labeled}/>;
   const sleepButton=(labeled=false)=><button type="button" className={'btn sleep-control player-setting '+(labeled?'labeled ':'')+(sleepRunning?'saved':'')} title={sleepRunning?'睡眠定时器 · 剩余 '+sleepBadge:'睡眠定时器'} aria-label="睡眠定时器" aria-pressed={sleepRunning} onClick={()=>open({type:'sleep'})}>
 <span className="setting-icon"><MoonIcon size={19}/></span>{labeled&&<span className="setting-label">定时</span>}<span className="setting-value">{sleepRunning?sleepBadge:labeled?'未开启':'定时'}</span>
@@ -750,7 +750,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
       {(current||desktop&&(preparingPlayback||playAction?.error||playback.error||playback.chartFailures.length>0))&&<div className="search-playing"><span>{current?displayTitle(current):playAction?.track.title??'播放状态'} · {playbackLabel}</span>{playbackSlot}{transport()}</div>}
     </Modal>}
     {popup&&<Modal className={['track','parts'].includes(popup.type)?'music-action-modal':popup.type==='sleep'?'sleep-modal':popup.type==='backup'?'backup-modal':popup.type==='maintenance'?'maintenance-modal':'form-modal'} title={{new:'新建歌单',rename:'歌单改名',delete:'删除歌单',backup:'备份与恢复',maintenance:'失效歌曲管理',link:'粘贴链接',parts:'歌曲与分 P',track:'歌曲与分 P',sleep:'睡眠定时器'}[popup.type]} onClose={()=>{linkWork.current?.abort();actionWork.current?.abort();authorWork.current?.abort();setAuthorBusy(false);setActionBusy(false);setPopup(null);}}>
-      {popup.type==='sleep'&&<SleepPanel timer={playback.sleepTimer}/>}
+      {popup.type==='sleep'&&<SleepPanel timer={playback.sleepTimer} desktop={desktop}/>}
       {['new','rename'].includes(popup.type)&&<form onSubmit={e=>{e.preventDefault();void mutate({edits:[popup.type==='new'?{type:'create-playlist',name:field.trim()}:{type:'rename-playlist',playlistId:popup.id,name:field.trim()}]});}}>
 <label className="field"><span className="field-label">歌单名称</span><input className="input" data-autofocus="true" value={field} onChange={e=>setField(e.target.value)} maxLength={200} required/>
 </label>
