@@ -31,7 +31,8 @@
     "update": "node scripts/update.mjs",
     "diagnose": "node scripts/control.mjs diagnose",
     "reset-access": "node scripts/reset-access.mjs",
-    "test": "node --import ./tests/helpers/isolated-build.mjs --test tests/*.test.mjs"
+    "pretest": "npm run build && npm run desktop:build",
+    "test": "node --import ./tests/helpers/isolated-build.mjs --test --test-concurrency=1 tests/*.test.mjs"
   },
   "dependencies": {
     "@applemusic-like-lyrics/core": "0.6.0",
@@ -58,6 +59,6 @@
     "markdown-it": "15.0.3",
     "playwright-core": "1.58.2",
     "typescript": "5.8.3",
-    "vite": "6.4.3"
+    "vite": "6.4.5"
   }
 }
