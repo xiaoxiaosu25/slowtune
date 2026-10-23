@@ -45,7 +45,7 @@
     "qrcode": "1.5.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "youtubei.js": "18.1.0"
+    "youtubei.js": "18.2.0"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
