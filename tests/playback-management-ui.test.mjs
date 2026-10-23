@@ -56,7 +56,12 @@ test('desktop versions, source facts, in-place audition and per-source lyric man
   await live.getByRole('button', { name: '播放此版本', exact: true }).click();
   await panel.getByRole('alert').waitFor(); assert.equal(await page.locator('audio').getAttribute('src'), oldSource); assert.equal((await record()).current, before.current); assert.equal(await page.locator('audio').evaluate(audio => audio.paused), false);
   fail = false; await live.getByRole('button', { name: '播放此版本', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000002'));
+  // A new currentSrc appears before the version switch restores native controls.
+  // Check the completed switch, including the actual rate and saved preference.
+  await page.waitForFunction(() => {
+    const audio = document.querySelector('audio'), saved = JSON.parse(localStorage.getItem('slow-listening:playback:v3'));
+    return audio?.currentSrc.includes('BV0000000002') && audio.playbackRate === 1.5 && saved?.rate === 1.5;
+  });
   const after = await record(); assert.equal(after.current, before.current); assert.deepEqual(after.items.map(item => item.instanceId), before.items.map(item => item.instanceId)); assert.equal(after.rate, 1.5);
   assert.equal(fixture.library.read().snapshot.songs.find(song => song.id === 'sun').defaultVersionId, 'studio');
   const liveSource = await page.locator('audio').getAttribute('src');

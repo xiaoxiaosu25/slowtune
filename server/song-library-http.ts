@@ -51,7 +51,10 @@ export function createSongLibraryRouter(service: SongLibraryService, identity: (
     if (origin && origin !== new URL(c.req.url).origin || !['GET', 'HEAD'].includes(c.req.method) && c.req.header('X-Music-App') !== '1') throw new SongLibraryError('origin-denied');
     c.header('Cache-Control', 'no-store'); c.header('X-Content-Type-Options', 'nosniff'); await service.store.onSurface(c.req.header('X-SlowTune-Surface')==='desktop',next);
   });
-  app.get('/', c => c.json(service.read()));
+  app.get('/', async c => {
+    const response = service.store.desktopResponse({ type: 'read' }, c.req.raw.signal);
+    return response ? c.body(await response, 200, { 'Content-Type': 'application/json; charset=UTF-8' }) : c.json(service.read());
+  });
   app.get('/export', c => c.body(service.export(), 200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="slowtune-library.json"' }));
   app.get('/events', c => c.json({ revision: service.revision() }));
   app.post('/covers/source', async c => {
@@ -92,7 +95,9 @@ export function createSongLibraryRouter(service: SongLibraryService, identity: (
   app.post('/edits', async c => {
     const input = await json(c.req.raw); object(input, ['revision', 'edits']);
     if (Array.isArray(input.edits) && input.edits.some(e => e?.type === 'set-playlist-cover') && c.req.header('X-SlowTune-Surface') !== 'desktop') throw new SongLibraryError('unsupported');
-    return c.json(service.execute(revision(input.revision), input.edits, c.req.raw.signal));
+    const expected = revision(input.revision);
+    const response = service.store.desktopResponse({ type: 'edit', revision: expected, edits: input.edits }, c.req.raw.signal);
+    return response ? c.body(await response, 200, { 'Content-Type': 'application/json; charset=UTF-8' }) : c.json(service.execute(expected, input.edits, c.req.raw.signal));
   });
   app.post('/organization/preview', async c => {
     const input = await json(c.req.raw); object(input, ['revision', 'songId']);

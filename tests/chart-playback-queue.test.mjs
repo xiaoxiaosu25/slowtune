@@ -90,11 +90,12 @@ function harness(t,search,savedPlayback,desktop=false){
   const values=new Map();
   if(savedPlayback)values.set('slow-listening:playback:v3',JSON.stringify(savedPlayback));
   const previous=new Map(['document','window','localStorage'].map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)]));
-  Object.assign(globalThis,{document:Object.assign(new EventTarget(),{createElement:()=>Object.assign(new EventTarget(),{dataset:{},remove(){}}),body:{append(){}}}),window:Object.assign(new EventTarget(),{matchMedia:()=>({matches:desktop})}),localStorage:{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)}});
+  const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)};
+  Object.assign(globalThis,{document:Object.assign(new EventTarget(),{createElement:()=>Object.assign(new EventTarget(),{dataset:{},remove(){}}),body:{append(){}}}),window:Object.assign(new EventTarget(),{matchMedia:()=>({matches:desktop}),localStorage:storage}),localStorage:storage});
   globalThis[contextKey]={player,bridge,
     async request(path,song,signal){assert.equal(path,'/api/search/resolve');if(resolved.has(song.title))return {entry:resolved.get(song.title)};const page=await client.search('bilibili',{query:song.title,mode:'video',limit:20},{signal});signal.throwIfAborted();if(!page.items.length)throw {code:'no-match'};resolved.set(song.title,page.items[0]);return {entry:page.items[0]};},
     useRef(value){return refs[refAt++]??(refs[refAt-1]={current:value});},
-    useState(value){const at=stateAt++;if(!(at in states))states[at]=value;return [states[at],value=>states[at]=typeof value==='function'?value(states[at]):value];},
+    useState(value){const at=stateAt++;if(!(at in states))states[at]=typeof value==='function'?value():value;return [states[at],value=>states[at]=typeof value==='function'?value(states[at]):value];},
     useEffect(fn){if(!mounted)effects.push(fn);}
   };
   let sourceEnabled=false;

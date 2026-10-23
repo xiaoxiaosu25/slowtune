@@ -13,6 +13,7 @@ import { DesktopOperationFeedback, PlaybackFeedback } from './DesktopFeedback';
 import { SongVersionDialog } from './SongVersionDialog';
 import { catalogSongKey, songSourceKey } from '../server/song-library-policy';
 import { usePlayback } from './playback';
+import { DesktopPlaybackProgress } from './DesktopPlaybackProgress';
 import { audioQualityLabel } from './audio-quality';
 import { readYoutubeRegion, youtubeMusicPath } from './youtube-candidates';
 import { PartsPanel, type PartBatchAction } from './PartsPanel';
@@ -59,12 +60,16 @@ import { PreferSongAction } from './SearchPreferences';
 import { DesktopLyricsView, LyricsToggle } from './DesktopLyricsView';
 import { DesktopLyricFont } from './DesktopLyricFont';
 import { PlaybackSource } from './PlaybackSource';
-import { PlaybackManagement, type PlaybackManagementTab } from './PlaybackManagement';
+import type { PlaybackManagementTab } from './PlaybackManagement';
+import type { ComponentProps } from 'react';
+import { DesktopRegion, desktopFeature } from './DesktopRegion';
+import { PlaybackManagement as managementUrl } from 'virtual:desktop-feature-urls';
 import { PagedList } from './Pagination';
 import { useDesktopHost } from './desktop-host';
 import { useDesktopWindowMode } from './desktop-chrome';
 import { preferredSong, searchPreferredVersions, searchFilterReasons, songSearchText, type SearchConfig, type SearchSettings, type SearchPage, type PreferredSong, type SongQuery } from '../server/search-policy';
 
+const PlaybackManagement = desktopFeature<ComponentProps<typeof import('./PlaybackManagement').PlaybackManagement>>(managementUrl, 'PlaybackManagement', '版本与歌词', false);
 const names={all:'全部',bilibili:'B站',youtube:'YouTube 视频'};
 const nav=[{id:'discover',label:'发现',icon:CompassIcon},{id:'charts',label:'音乐榜单',icon:MusicNotesIcon},{id:'follows',label:'关注',icon:UsersIcon},{id:'library',label:'歌单',icon:ListBulletsIcon}];
 const favoritesId='system:favorites';
@@ -469,7 +474,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const openLyricsManagement=()=>{if(desktop&&page==='playing')openManagement('lyrics');else lyrics.openSettings();};
   useEffect(()=>{if(!managementVisible){if(management){setManagement(undefined);lyrics.closeSettings();}return;}lyrics.openSettings();if(managementSection.current==='select')lyrics.setSelector(true);managementSection.current=undefined;},[managementVisible,lyrics.sourceKey]);
   const desktopSongMeta=()=>current?<><div className="playing-artist"><span>{current.artists?.join(' / ')||'歌手未提供'}</span></div><PlaybackSource key={key(current.ref)} track={current} version={currentVersion} store={partsStore} onVersions={()=>openManagement('versions')} versionsOpen={managementVisible&&management==='versions'}/></>:<p className="muted">从发现、搜索或歌单添加音乐</p>;
-  const lyricPlayback:LyricPlayback={position:snapshot.position,duration:snapshot.duration,playing:snapshot.playing&&!snapshot.loading,readPosition:playback.readPosition};
+  const lyricPlayback:LyricPlayback={position:snapshot.position,duration:snapshot.duration,playing:snapshot.playing&&!snapshot.loading,readPosition:playback.readPosition,...(desktop?{subscribePosition:playback.clock.subscribe}:{})};
   const desktopHost=useDesktopHost(lyrics,lyricPlayback,snapshot.state!=='idle'&&snapshot.state!=='stopped',{toggle:()=>preparingPlayback?cancelPlayback():startPlayback(()=>playback.toggle(),false),previous:()=>startPlayback(()=>playback.previous(),false),next:()=>startPlayback(()=>playback.next(),false),release:playback.release},issue=>setError(errorText(issue)));
   const bottomLyricsVisible=!desktopHost.available&&!!lyricTrack&&lyrics.bottom&&snapshot.state!=='idle'&&snapshot.state!=='stopped';
   const collectArtworks=()=>{const known={...artworks};for(const t of [...shelves.flatMap(s=>s.page?.items??[]),...Object.values(results).flatMap(r=>r.items),...snapshot.items,...(current?[current]:[])])if(isTrack(t)&&t.artwork)known[artworkKey(t)]=t.artwork;return known;};
@@ -481,7 +486,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   // Let the range's final native change finish before clearing its controlled preview.
   const releaseScrub=()=>requestAnimationFrame(commitScrub);
   const sleepRunning=playback.sleep.status==='running';
-  const sleepBadge=!sleepRunning?null:playback.sleep.trigger?.type==='duration'?time(playback.sleep.remainingMs/1000):`${playback.sleep.remainingItems??1} 首`;
+  const sleepBadge=!sleepRunning?null:playback.sleep.trigger?.type==='duration'?time(desktop?Math.ceil(playback.sleep.remainingMs/1000):playback.sleep.remainingMs/1000):`${playback.sleep.remainingItems??1} 首`;
   const rateControl=(labeled=false)=><RateControl value={snapshot.rate} onChange={playback.rate} labeled={labeled}/>;
   const sleepButton=(labeled=false)=><button type="button" className={'btn sleep-control player-setting '+(labeled?'labeled ':'')+(sleepRunning?'saved':'')} title={sleepRunning?'睡眠定时器 · 剩余 '+sleepBadge:'睡眠定时器'} aria-label="睡眠定时器" aria-pressed={sleepRunning} onClick={()=>open({type:'sleep'})}>
 <span className="setting-icon"><MoonIcon size={19}/></span>{labeled&&<span className="setting-label">定时</span>}<span className="setting-value">{sleepRunning?sleepBadge:labeled?'未开启':'定时'}</span>
@@ -496,7 +501,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
 <SkipForwardIcon size={23} weight="fill"/>
 </button>
 </div>;
-  const progress=()=>
+  const progress=()=>desktop?<DesktopPlaybackProgress key={snapshot.currentId} clock={playback.clock} enabled={!!current&&snapshot.state!=='idle'&&snapshot.state!=='stopped'} onSeek={playback.seek}/>:
 <div className="progress">
 <span>{time(scrub??snapshot.position)}</span>
 <div className="progress-track">
@@ -649,7 +654,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
 </>}
 {!desktop&&globalTools('topbar-actions')}
 </header>
-    <main className="main-content" inert={desktopLyricsOpen}>
+    <main className="main-content" inert={desktopLyricsOpen}><DesktopRegion enabled={desktop} resetKey={page} label="当前页面">
 {page!=='library'&&page!=='settings'&&page!=='playing'&&<div className="page-heading"><h1>{page==='discover'?'发现音乐':page==='charts'?'音乐榜单':activeCreator?'作者内容':'我的关注'}</h1>{page!=='charts'&&sourceTabs}</div>}
     {!desktop&&!online&&<div className="feedback" data-tone="info" role="alert">网络已断开。资料保留，联网后可重试。</div>}
     {!desktop&&authorBusy&&!popup&&<div className="feedback" role="status"><p>正在读取 UP / 博主信息…</p><button className="btn btn-ghost" onClick={()=>{authorWork.current?.abort();setAuthorBusy(false);}}>取消</button></div>}
@@ -688,7 +693,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
 {!current&&<button className="btn btn-primary" onClick={()=>navigate('discover')}>去发现音乐</button>}
 </div></div>{bottomLyricsVisible&&<BottomLyrics lyrics={lyrics} playback={lyricPlayback}/>}</section>}
     {page==='settings'&&<SettingsPage desktopLyricsRequest={desktopSettingsRequest} onLibraryChange={updateLibrary} onSearchPreferencesChanged={searchPreferencesChanged} status={status} statusCheckedAt={statusCheckedAt} onRefreshDiagnostics={refreshDiagnostics} sources={sources} onSourcesChanged={sourcesChanged} account={bilibiliAccount} library={lib} onAccountChange={accountChanged} onRecommendationChanged={recommendationChanged} onReload={()=>void reload()} onBack={()=>navigate(previousPage)} onOpenBackup={()=>open({type:'backup'})} onStopPlayback={()=>playback.stop()} onLogout={logout}/>}
-    </main>
+    </DesktopRegion></main>
 {page!=='playing'&&bottomLyricsVisible&&<BottomLyrics lyrics={lyrics} playback={lyricPlayback} compact/>}
 {desktopLyricsOpen&&<DesktopLyricsView onManage={section=>openManagement('lyrics',section)} lyrics={lyrics} playback={lyricPlayback} artwork={currentArtwork} onClose={closeDesktopLyrics} onSeek={seconds=>void playback.seek(seconds)} visual={<PlayingArtwork artwork={currentArtwork} playing={snapshot.playing&&!snapshot.loading} muted={snapshot.muted||snapshot.volume===0} analysis={playback.audioAnalysis} allowLyrics={false} desktop/>} songInfo={<><PlayingTitle key={current?.resourceId} title={current?displayTitle(current):undefined} fullTitle={current?.title}/><div className="playing-song-copy">{desktopSongMeta()}</div></>} controls={<>
 {progress()}{playbackSlot}<div className="desktop-lyrics-tools">{modeButton()}{volume}</div>{transport(true)}<div className="desktop-lyrics-tools"><button className="btn btn-icon" aria-label="播放队列" title="播放队列" aria-expanded={queueVisible} onClick={toggleQueue}><QueueIcon size={24}/></button>{current&&<button className={'btn btn-icon '+(isFavorite(current)?'saved':'')} title={isFavorite(current)?'取消收藏当前歌曲':'收藏当前歌曲'} aria-label="收藏当前歌曲" aria-pressed={isFavorite(current)} aria-busy={favoritePending(current)||undefined} disabled={saving||!lib||favoritePending(current)} onClick={()=>favorite(current,true,'part')}>{favoritePending(current)?<SpinnerGapIcon size={22} className="favorite-spinner"/>:<HeartIcon size={24} weight={isFavorite(current)?'fill':'regular'}/>}</button>}<LyricsToggle active onClick={toggleDesktopLyrics}/>{playerOptions(true)}</div>
@@ -745,7 +750,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
       {(current||desktop&&(preparingPlayback||playAction?.error||playback.error||playback.chartFailures.length>0))&&<div className="search-playing"><span>{current?displayTitle(current):playAction?.track.title??'播放状态'} · {playbackLabel}</span>{playbackSlot}{transport()}</div>}
     </Modal>}
     {popup&&<Modal className={['track','parts'].includes(popup.type)?'music-action-modal':popup.type==='sleep'?'sleep-modal':popup.type==='backup'?'backup-modal':popup.type==='maintenance'?'maintenance-modal':'form-modal'} title={{new:'新建歌单',rename:'歌单改名',delete:'删除歌单',backup:'备份与恢复',maintenance:'失效歌曲管理',link:'粘贴链接',parts:'歌曲与分 P',track:'歌曲与分 P',sleep:'睡眠定时器'}[popup.type]} onClose={()=>{linkWork.current?.abort();actionWork.current?.abort();authorWork.current?.abort();setAuthorBusy(false);setActionBusy(false);setPopup(null);}}>
-      {popup.type==='sleep'&&<SleepPanel timer={playback.sleepTimer}/>}
+      {popup.type==='sleep'&&<SleepPanel timer={playback.sleepTimer} desktop={desktop}/>}
       {['new','rename'].includes(popup.type)&&<form onSubmit={e=>{e.preventDefault();void mutate({edits:[popup.type==='new'?{type:'create-playlist',name:field.trim()}:{type:'rename-playlist',playlistId:popup.id,name:field.trim()}]});}}>
 <label className="field"><span className="field-label">歌单名称</span><input className="input" data-autofocus="true" value={field} onChange={e=>setField(e.target.value)} maxLength={200} required/>
 </label>

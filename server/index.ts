@@ -434,7 +434,7 @@ const chartInputs=[{source:'netease',chart:'hot'},{source:'netease',chart:'new'}
 batches.start([()=>batches.warm('bilibili'),...chartInputs.map(input=>()=>charts.read(input,AbortSignal.any([batches.signal,AbortSignal.timeout(20000)])))]);
 let warmedYoutube=false;
 sourceListeners.add(()=>{if(!youtube.status().available){warmedYoutube=false;return;}if(warmedYoutube)return;warmedYoutube=true;for(const region of warmRegions)void batches.warm('youtube:'+region).catch(()=>{});});
-server.on('error',async e=>{console.error('服务监听失败', (e as NodeJS.ErrnoException).code);await expireSessions();await songSync.dispose();lyricProviders.dispose();songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();await batches.dispose();await charts.dispose();await comments.dispose();await follows.dispose();await youtubeCandidates.dispose();await youtubeDiscovery.dispose();await delivery.dispose();await api.dispose();browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();songLibraryStore.close();process.exitCode=1;});
+server.on('error',async e=>{console.error('服务监听失败', (e as NodeJS.ErrnoException).code);await expireSessions();await songSync.dispose();lyricProviders.dispose();songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();await batches.dispose();await charts.dispose();await comments.dispose();await follows.dispose();await youtubeCandidates.dispose();await youtubeDiscovery.dispose();await delivery.dispose();await api.dispose();browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();await songLibraryStore.close();process.exitCode=1;});
 async function shutdown(reason = 'control') {
   if(stopping)return;stopping=true;
   if(desktopOwned)console.log(`${new Date().toISOString()} 正在停止桌面服务：${reason}`);
@@ -446,7 +446,7 @@ async function shutdown(reason = 'control') {
   // No work can commit or publish now. Node's idle-only close leaves unfinished
   // HTTP requests (and abandoned keep-alive sockets) holding desktop quit open.
   if(desktopOwned)(server as import('node:http').Server).closeAllConnections();
-  await closing; browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();songLibraryStore.close();
+  await closing; browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();await songLibraryStore.close();
   writeFileSync(join(config.runtimeDirectory,'last-shutdown.json'),JSON.stringify({date:new Date().toISOString(),...diagnostics()}));
   // A successor may already be serving and have written its own state file during this shutdown.
   try{if(JSON.parse(readFileSync(stateFile,'utf8')).pid===process.pid)unlinkSync(stateFile);}catch{}

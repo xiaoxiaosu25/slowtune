@@ -16,7 +16,7 @@ test('source desktop launch selects the declared external build independent of c
   const { studio, root } = fixture(), built = desktopBuildDirectory(root);
   assert.equal(built, join(studio, 'local/build/slowtune/desktop'));
   for (const file of ['dist/client/index.html', 'dist/server/index.js', 'dist/server/config.js']) { mkdirSync(dirname(join(built, file)), { recursive: true }); writeFileSync(join(built, file), 'fixture'); }
-  const options = desktopLaunchOptions(root, { MUSIC_APP_CONFIG: join(studio, '../instances/slowtune/config.local.json') });
+  const options = desktopLaunchOptions(root, { MUSIC_APP_CONFIG: join(studio, 'instances/slowtune/config.local.json') });
   assert.equal(options.serviceRoot, built); assert.equal(options.env.MUSIC_APP_DESKTOP_ROOT, built);
   assert.equal(assertDesktopBuildDirectory(built, root), built);
 });
@@ -29,7 +29,7 @@ test('build cleaning rejects a wrong target, instance directory, and linked buil
   const { studio, root } = fixture(), built = desktopBuildDirectory(root);
   assert.throws(() => assertDesktopBuildDirectory(root, root), /不一致/);
   const file = join(root, 'workspace.paths.json');
-  writeFileSync(file, JSON.stringify({ schemaVersion: 1, project: 'slowtune', paths: { studio: '../..', build: '../../../instances/slowtune', artifacts: '../../local/artifacts/slowtune', testRuntime: '../../local/runtime/slowtune' } }));
+  writeFileSync(file, JSON.stringify({ schemaVersion: 1, project: 'slowtune', paths: { studio: '../..', build: '../../instances/slowtune', artifacts: '../../local/artifacts/slowtune', testRuntime: '../../local/runtime/slowtune' } }));
   assert.throws(() => desktopBuildDirectory(root), /超出/);
   writeFileSync(file, JSON.stringify({ schemaVersion: 1, project: 'slowtune', paths: { studio: '../..', build: '../../local/build/slowtune', artifacts: '../../local/artifacts/slowtune', testRuntime: '../../local/runtime/slowtune' } }));
   mkdirSync(join(studio, 'local/build'), { recursive: true }); mkdirSync(join(studio, 'private'));

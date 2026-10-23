@@ -6,9 +6,11 @@ const productRoot = fileURLToPath(new URL('..', import.meta.url));
 
 function studioDirectory(root) {
   const parent = dirname(resolve(root));
-  const studio = basename(parent).toLowerCase() === 'projects' ? dirname(parent) : parent;
-  return basename(studio).toLowerCase() === 'studio'
-    && ['slowtune', 'music-app'].includes(basename(resolve(root)).toLowerCase()) ? studio : undefined;
+  if (basename(parent).toLowerCase() !== 'projects'
+    || !['slowtune', 'music-app'].includes(basename(resolve(root)).toLowerCase())) return undefined;
+  const studio = dirname(parent);
+  return existsSync(resolve(studio, 'AGENTS.md'))
+    && existsSync(resolve(studio, 'platform/AGENTS.md')) ? studio : undefined;
 }
 
 export const workspaceRoot = studioDirectory(productRoot) ?? resolve(productRoot);
@@ -18,6 +20,6 @@ export function resolveConfigFile(root = productRoot, env = process.env) {
   const local = resolve(root, 'config.local.json');
   if (existsSync(local)) return local;
   const studio = studioDirectory(root);
-  const instance = studio && resolve(studio, '../instances/slowtune/config.local.json');
+  const instance = studio && resolve(studio, 'instances/slowtune/config.local.json');
   return instance && existsSync(instance) ? instance : local;
 }

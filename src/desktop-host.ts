@@ -73,5 +73,6 @@ export function useDesktopHost(lyrics: LyricsController, playback: LyricPlayback
     const timer = setInterval(publishClock, 50);
     return () => clearInterval(timer);
   }, [api, visible, sourceKey, playback.playing, playback.position]);
+  useEffect(() => api ? playback.subscribePosition?.(publishClock) : undefined, [api, playback.subscribePosition]);
   return { available: !!api, visible, toggle: () => { void api?.setLyricsVisible(!visible).catch(onError); } };
 }

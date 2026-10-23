@@ -15,7 +15,7 @@ concurrency:
 jobs:
   source:
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
@@ -29,9 +29,9 @@ jobs:
       - run: npm run source:check
       - run: npm run build
       - name: Source, documentation and service regression
-        run: node --test tests/documentation.test.mjs tests/desktop-lyric-source.test.mjs tests/desktop-profile.test.mjs tests/browser-config.test.mjs tests/workspace-paths.test.mjs tests/lyric-timing.test.mjs tests/audio-quality.test.mjs tests/song-library.test.mjs tests/song-library-sync.test.mjs tests/recommendation.test.mjs
+        run: node scripts/test-groups.mjs core
       - name: Browser playback regression
-        run: node --test --test-concurrency=1 tests/song-targets-desktop-ui.test.mjs tests/playback.test.mjs tests/playback-retry.test.mjs tests/song-version-switch.test.mjs
+        run: node scripts/test-groups.mjs browser
 
   desktop:
     runs-on: windows-latest

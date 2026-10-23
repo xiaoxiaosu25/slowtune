@@ -86,6 +86,7 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
     };
   }, [document, synced, lyrics.translations, playback.duration, attempt]);
   useEffect(() => { wake.current(); }, [playback.playing, playback.position, lyrics.offsetMs, fontSize]);
+  useEffect(() => playback.subscribePosition?.(() => { if (!live.current.playback.playing) wake.current(true); }), [playback.subscribePosition]);
   const browse = () => {
     if (!synced || failed) return;
     engine.current?.browse(); setBrowsing(true); clearTimeout(browseTimer.current);

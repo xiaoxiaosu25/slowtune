@@ -11,6 +11,7 @@ export interface LyricPlayback {
   duration?: number;
   playing: boolean;
   readPosition: () => number;
+  subscribePosition?: (listener: () => void) => () => void;
 }
 
 function LyricText({ line, index, current }: { line: LyricLine; index: number; current: boolean }) {
@@ -45,9 +46,10 @@ function useLyricPlayback(document: LyricDocument | null | undefined, offsetMs: 
     };
     const restart = () => { cancelAnimationFrame(frame); tick(); };
     restart();
+    const unsubscribe = playback.subscribePosition?.(paint);
     window.document.addEventListener('visibilitychange', restart); reduced.addEventListener('change', restart);
-    return () => { cancelAnimationFrame(frame); window.document.removeEventListener('visibilitychange', restart); reduced.removeEventListener('change', restart); };
-  }, [document, offsetMs, playback.position, playback.duration, playback.playing, playback.readPosition, root]);
+    return () => { unsubscribe?.(); cancelAnimationFrame(frame); window.document.removeEventListener('visibilitychange', restart); reduced.removeEventListener('change', restart); };
+  }, [document, offsetMs, playback.position, playback.duration, playback.playing, playback.readPosition, playback.subscribePosition, root]);
   useLayoutEffect(() => { paintRef.current(); }, [active]);
   return active;
 }

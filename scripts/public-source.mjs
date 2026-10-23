@@ -13,12 +13,17 @@ export const publicDocuments = [
   'docs/参考/依赖清单.md', 'docs/参考/素材与来源.md',
 ];
 
+// Keep the README's curated product screenshots in source exports as well.
+export const publicDocumentAssets = [
+  'docs/images/player.png', 'docs/images/lyrics.png', 'docs/images/library.png',
+];
+
 export function publicSourceFiles(root) {
   const files = [
     'README.md', 'CONTRIBUTING.md', 'LICENSE', 'NOTICE', 'package.json', 'package-lock.json',
     'index.html', 'vite.config.ts', 'tsconfig.json', 'tsconfig.server.json',
     'config.example.json', '.gitignore', '.gitattributes', '第三方声明.md',
-    '一键启动.cmd', 'public/theme-init.js', ...publicDocuments,
+    '一键启动.cmd', 'public/theme-init.js', ...publicDocuments, ...publicDocumentAssets,
   ].filter(path => existsSync(join(root, path)));
   const privateName = /^(?:\.git|node_modules|maintainer|data|runtime|local|artifacts|dist|test-results|coverage|playwright-report)$|^\.env(?:\.|$)|\.local\.|\.(?:log|pem|key|sqlite(?:-wal|-shm)?)$/i;
   function walk(path) {

@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { SongLibraryError as LibraryError } from './song-library-errors.js';
 import { decodeSongLibrarySnapshot, emptySongLibrary, object, text, list } from './song-library-codec.js';
 import type { SongLibraryDocument, SongLibraryEvent, SongMember } from './song-library-types.js';
+import { DesktopLibraryWorker, type DesktopLibraryOperation } from './song-library-worker-client.js';
 
 export const memberKey = (member: SongMember) => member.kind === 'favorite' ? JSON.stringify(['favorite', member.favoriteId]) : JSON.stringify(['playlist-entry', member.playlistId, member.entryId]);
 export const emptySongDocument = (): SongLibraryDocument => ({ snapshot: emptySongLibrary(), origins: [], syncMappings: [], syncLinks: [] });
@@ -71,9 +72,10 @@ export class SongLibraryStore {
   private cached?: StoredSongLibrary;
   private encoded?:{revision:string|null;json:string};
   private surface=new AsyncLocalStorage<boolean>();
+  private desktopWorker?: DesktopLibraryWorker;
   /** Scoped by the authenticated HTTP adapter; no mobile/default behavior changes. */
   onSurface<T>(desktop:boolean,task:()=>T):T{return this.surface.run(desktop,task);}
-  constructor(path: string, readonly userSpace: string, private now = Date.now) {
+  constructor(readonly path: string, readonly userSpace: string, private now = Date.now) {
     text(userSpace, 500); this.db = new DatabaseSync(path);
     try {
       const tables = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row => String(row.name));
@@ -151,5 +153,11 @@ export class SongLibraryStore {
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   events(): SongLibraryEvent[] { return this.db.prepare('SELECT document FROM song_library_events WHERE scope=? ORDER BY rowid').all(this.userSpace).map(r => JSON.parse(String(r.document))); }
-  close() { this.db.close(); }
+  /** File-backed desktop HTTP only; private in-memory fixtures keep their own store. */
+  desktopResponse(operation: DesktopLibraryOperation, signal?: AbortSignal) {
+    if (!this.surface.getStore() || !this.path || this.path === ':memory:' || this.now !== Date.now) return undefined;
+    this.desktopWorker ??= new DesktopLibraryWorker(this.path, this.userSpace);
+    return this.desktopWorker.request(operation, signal);
+  }
+  close() { const stopped = this.desktopWorker?.close(); this.db.close(); return stopped; }
 }
