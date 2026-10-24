@@ -11,10 +11,14 @@ export async function navigate(page, name) {
   await page.locator('.app').waitFor();
   const search=page.getByRole('dialog',{name:'搜索音乐',exact:true});
   if(await search.count())await search.getByRole('button',{name:'关闭',exact:true}).click();
-  if(name==='搜索'){await page.getByRole('button',{name:'开始搜索',exact:true}).click();return;}
+  if(name==='搜索'){await page.getByRole('button',{name:await page.locator('.app').getAttribute('data-layout')==='mobile'?'搜索歌曲或视频':'开始搜索',exact:true}).click();return;}
   if(name==='收藏'){await navigate(page,'歌单');await selectPlaylist(page,'我的收藏');return;}
   const button = page.locator('nav:visible').getByRole('button', { name, exact: true });
-  if (!await button.count()) await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
+  if (!await button.count()) {
+    const back=page.getByRole('button',{name:'返回浏览音乐',exact:true});
+    if(await back.isVisible())await back.click();
+    if(['音乐榜单','关注'].includes(name)&&await page.locator('.app').getAttribute('data-layout')==='mobile')await page.locator('.mobile-nav').getByRole('button',{name:'发现',exact:true}).click();
+  }
   await button.click();
 }
 
@@ -54,7 +58,11 @@ export async function queueTrackMenu(page, title) {
 }
 
 export async function openSettingsPage(page, section = '外观') {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  if(await page.locator('.app').getAttribute('data-layout')==='mobile'){
+    const back=page.getByRole('button',{name:'返回浏览音乐',exact:true});if(await back.isVisible())await back.click();
+    await page.locator('.mobile-nav').getByRole('button',{name:'我的',exact:true}).click();
+    await page.getByRole('button',{name:'打开设置',exact:true}).click();
+  }else await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.locator('.settings-view').waitFor();
   if (section !== '外观') await page.locator('.settings-nav').getByRole('button', { name: section, exact: true }).click();
 }

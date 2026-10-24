@@ -23,7 +23,7 @@ export { SongCover } from './SongCover';
 export type { SongCommit } from './song-management';
 
 export const songFavoritesId = 'system:favorites';
-function SongEditor({ song, state, commit, onSearch, onPlay, onClose, onChange }: { song: Song; state: SongLibraryState; commit: SongCommit; onSearch: (song: Song) => void; onPlay: (selection: SongPlaybackSelection, song: Song) => void; onClose: () => void; onChange: (state: SongLibraryState) => void }) {
+export function SongEditor({ song, state, commit, onSearch, onPlay, onClose, onChange }: { song: Song; state: SongLibraryState; commit: SongCommit; onSearch: (song: Song) => void; onPlay: (selection: SongPlaybackSelection, song: Song) => void; onClose: () => void; onChange: (state: SongLibraryState) => void }) {
   const [title, setTitle] = useState(song.title), [artists, setArtists] = useState(song.artists?.join('\n') ?? ''), [revision, setRevision] = useState(state.revision);
   const [dirty,setDirty]=useState({title:false,artists:false});
   const [editingInfo,setEditingInfo]=useState(false);

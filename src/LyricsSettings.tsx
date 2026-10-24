@@ -22,10 +22,10 @@ export function LyricsSettings({ lyrics, desktopImmersive = false, nativeDesktop
     {error && <div className="lyrics-feedback feedback" data-tone="error" role="alert"><span>{error}</span>{stale ? <button className="btn btn-secondary" disabled={!!busy} onClick={() => void load(true)}>重读当前歌词</button> : <button className="btn btn-ghost" disabled={!!busy} onClick={() => void resolve()}>重试读取歌词</button>}</div>}
   </>;
   const displaySettings = <>
-    {!nativeDesktop && <label className="choice"><input type="checkbox" checked={lyrics.bottom} onChange={event => lyrics.updateDisplay({ bottom: event.target.checked })}/>显示底部歌词</label>}
+    {desktopImmersive && !nativeDesktop && <label className="choice"><input type="checkbox" checked={lyrics.bottom} onChange={event => lyrics.updateDisplay({ bottom: event.target.checked })}/>显示底部歌词</label>}
     <label className="choice"><input type="checkbox" checked={lyrics.translations} onChange={event => lyrics.updateDisplay({ translations: event.target.checked })}/>显示翻译</label>
     {desktopImmersive && <DesktopLyricFont/>}
-    <p className="muted lyrics-settings-help">{nativeDesktop ? '歌词显示在独立桌面窗口，可通过应用菜单或托盘调整；点击歌曲操作区的“词”打开沉浸歌词。此处的翻译开关用于沉浸歌词。' : desktopImmersive ? '底部歌词独立显示；点击歌曲操作区的“词”打开沉浸歌词。有真实逐字时间时逐字推进，普通 LRC 整句高亮。' : '底部歌词独立显示；左侧可像切换唱片、圆形一样切换为歌词。有逐字时间时准确变色，普通 LRC 按句时长平滑推进。'}</p>
+    <p className="muted lyrics-settings-help">{nativeDesktop ? '歌词显示在独立桌面窗口，可通过应用菜单或托盘调整；点击歌曲操作区的“词”打开沉浸歌词。此处的翻译开关用于沉浸歌词。' : desktopImmersive ? '底部歌词独立显示；点击歌曲操作区的“词”打开沉浸歌词。有真实逐字时间时逐字推进，普通 LRC 整句高亮。' : '在播放页点击“歌词”进入完整歌词，再点击“唱片”返回。有逐字时间时准确变色，普通 LRC 按句时长平滑推进。'}</p>
   </>;
   const content = <>
     {selector ? <>

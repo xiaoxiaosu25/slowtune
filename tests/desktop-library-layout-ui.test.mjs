@@ -4,7 +4,7 @@ import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
 import { navigate, selectPlaylist, libraryAction } from '../scripts/browser-ui.mjs';
 
-test('desktop library keeps songs above the player, menus reachable and browser lyrics compact without changing mobile', { timeout: 90000 }, async t => {
+test('desktop library keeps songs above the player, menus reachable and desktop lyrics independent from the mobile dock', { timeout: 90000 }, async t => {
   const fixture = await startSongManagementFixture(); t.after(fixture.close);
   fixture.library.execute(fixture.library.read().revision, [
     { type: 'create-playlist', id: 'layout', name: '晚风与散步' },
@@ -83,6 +83,7 @@ test('desktop library keeps songs above the player, menus reachable and browser 
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('radio', { name: '底部长条', exact: true }).check(); await page.keyboard.press('Escape');
   assert(await page.evaluate(() => document.querySelector('.bottom-lyrics').getBoundingClientRect().bottom <= document.querySelector('.playbar').getBoundingClientRect().top + 1));
+  const desktopLyricPreference=await page.evaluate(()=>localStorage.getItem('slow-listening:lyrics-display:v1'));
   await page.setViewportSize({ width: 390, height: 844 });
   const queue = page.getByRole('dialog', { name: '播放队列', exact: true });
   await queue.waitFor(); await page.keyboard.press('Escape'); await queue.waitFor({ state: 'detached' });
@@ -90,9 +91,12 @@ test('desktop library keeps songs above the player, menus reachable and browser 
   assert.equal(await library.locator('.page-heading').getByRole('heading', { name: '我的歌单', exact: true }).isVisible(), true);
   assert.equal(await library.getByRole('button', { name: '改名', exact: true }).isVisible(), true);
   assert.equal(await library.getByRole('button', { name: '歌单管理', exact: true }).count(), 0);
-  assert.equal(await dock.locator('.bottom-lyrics-next').isVisible(), true);
-  assert.equal(await dock.getByRole('button', { name: '展开歌词', exact: true }).count(), 0);
-  assert.equal(await dock.evaluate(e => e.getBoundingClientRect().height), 88);
+  assert.equal(await dock.count(), 0,'mobile does not inherit the desktop lyric dock');
+  assert.equal(await page.locator('.mobile-mini-player').evaluate(e => e.getBoundingClientRect().height),72);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.setViewportSize({ width:1280,height:720 });
+  await page.locator('.app[data-layout="desktop"]').waitFor();
+  await dock.waitFor();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('slow-listening:lyrics-display:v1')),desktopLyricPreference,'mobile leaves the desktop preference intact');
   assert.deepEqual(errors, []);
 });

@@ -218,11 +218,12 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
     await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
     for (const [width, height] of [[1803,1022], [1440,900], [1100,768], [1024,600], [800,600], [390,844], [320,568], [320,480], [844,390]]) {
       await page.setViewportSize({ width, height });
+      await page.waitForFunction(width=>document.querySelector('.app')?.dataset.layout===(width<=760?'mobile':'desktop'),width);
       const anchor = await page.locator('.playing-detail').boundingBox();
       for (const visual of ['vinyl', 'original', 'square', 'disc', 'spectrum', 'halo']) {
         await selectMode(page, visual);
         const measurement = await page.evaluate(() => {
-          const stage = document.querySelector('.listening-stage').getBoundingClientRect();
+          const stage = document.querySelector('.listening-stage,.mobile-player').getBoundingClientRect();
           const boxes = [...document.querySelectorAll('.playing-art-switch,.playing-detail,.stage-controls,.listening-transport')].map(el => { const r = el.getBoundingClientRect(); return { name: el.className, x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; });
           return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollHeight > innerHeight + 1 || document.documentElement.scrollWidth > innerWidth + 1, fits: boxes.every(r => r.y >= stage.top - 1 && r.bottom <= stage.bottom + 1 && r.x >= 0 && r.right <= innerWidth + 1), boxes };
         });
@@ -292,7 +293,7 @@ test('desktop vinyl and circular covers rotate with reduced motion and preserve 
   const page = await context.newPage(); page.setDefaultTimeout(5000);
   await openPlaying(page, fixture.base);
   const selectors = { vinyl: '.vinyl-rotor', disc: '.playing-art-disc .playing-art' };
-  const animation = visual => page.locator('.listening-stage ' + selectors[visual]).evaluate(el => {
+  const animation = visual => page.locator('.listening-stage ' + selectors[visual] + ',.mobile-player ' + selectors[visual]).evaluate(el => {
     const style = getComputedStyle(el), animation = el.getAnimations()[0];
     return { name: style.animationName, duration: style.animationDuration, state: style.animationPlayState, transform: style.transform, time: animation?.currentTime };
   });

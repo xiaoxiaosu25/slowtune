@@ -143,18 +143,20 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   for (let i = 0; i < 5; i++) await page.locator('.playing-art-switch').click();
   assert.deepEqual(await geometry(page), normal, 'normal layout survives the full-screen mode unchanged');
   assert.equal(await page.locator('audio').getAttribute('src'), source); assert.equal(fixture.preparations.length, prepares); assert.equal(requests.length, lyricReads);
-  // Six desktop artwork modes; the dormant mobile-only lyric preference is never rewritten.
+  // Both layouts retain six artwork modes; mobile lyrics have a separate direct control.
   const mode = page.locator('.playing-art-switch'), modes = [];
   for (let i = 0; i < 6; i++) { modes.push(await mode.getAttribute('data-visual-mode')); await mode.click(); }
   assert.deepEqual(modes, ['vinyl', 'original', 'square', 'disc', 'spectrum', 'halo']); assert.equal(await mode.getAttribute('data-visual-mode'), 'vinyl');
   await open(page); await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => !document.querySelector('.desktop-lyrics-view'));
   assert.equal(await page.locator(selector).count(), 0); assert.equal(await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).count(), 0);
-  for (let i = 0; i < 6; i++) await mode.click(); assert.equal(await mode.getAttribute('data-visual-mode'), 'lyrics');
+  for (let i = 0; i < 6; i++) await mode.click(); assert.equal(await mode.getAttribute('data-visual-mode'), 'vinyl');
+  await page.getByRole('button',{name:'查看歌词',exact:true}).click(); await page.locator('.mobile-player.is-lyrics').waitFor();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).waitFor();
   assert.equal(await mode.getAttribute('data-visual-mode'), 'vinyl');
-  assert.equal(await page.evaluate(() => localStorage.getItem('slow-listening:playing-visual:v1')), 'lyrics');
+  assert.equal(await page.evaluate(() => localStorage.getItem('slow-listening:playing-visual:v1')), 'vinyl');
+  assert.equal(await page.evaluate(() => localStorage.getItem('slow-listening:mobile-lyric-view:v1')), 'true');
   await open(page); await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.desktop-lyrics-view'));
   // A renderer chunk failure has a readable, seekable fallback and can be retried.
   const failure = await context.newPage();
