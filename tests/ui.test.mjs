@@ -205,12 +205,10 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       await closeSettings();
       await navigate(page, '发现');
       await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
-      const listeningTools = await tools.boundingBox();
-      assert(listeningTools.x <= 24 && listeningTools.y > 900 && listeningTools.y + listeningTools.height <= 1000, 'the listening page keeps the tools at the bottom left');
-      await openSettings();
-      await closeSettings();
-      assert(await page.locator('.listening-stage').isVisible(), 'settings opened from the listening page returns there');
+      await page.locator('.listening-stage').waitFor();
+      assert.equal(await tools.count(), 0, 'desktop listening uses the sidebar tools after returning to browsing');
       await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
+      await tools.waitFor();
       await tools.getByRole('button', { name: '粘贴链接', exact: true }).click();
       const link = page.getByRole('dialog', { name: '粘贴链接', exact: true });
       await link.waitFor();
@@ -242,6 +240,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       await closeSettings();
       for (const width of [320, 390]) {
         await page.setViewportSize({ width, height: 844 });
+        await page.locator('.topbar-actions').waitFor();
         for (const name of ['设置', '粘贴链接', '切换为浅色']) {
           const button = tools.getByRole('button', { name, exact: true });
           assert(await button.isVisible(), 'phone tools stay reachable');
@@ -702,11 +701,12 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
 
   await t.test('acceptance helpers operate playlist menus, queue drawers and the independent player page', async () => {
     await page.locator('.song-library-row').filter({hasText:part.title}).first().getByRole('button',{name:'更多操作 '+part.title,exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 '+part.title,exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与版本'});
+    await menu.getByRole('tab', { name: '播放版本', exact: true }).waitFor();
     assert(await menu.getByRole('tab', { name: '播放版本', exact: true }).isVisible());
     await menu.getByRole('button', { name: '关闭', exact: true }).click();
     await createPlaylist(page, '新验收歌单');
     await selectPlaylist(page, '新验收歌单');
-    assert.equal(await page.locator('.playlist-copy h2').textContent(), '新验收歌单');
+    assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(), '新验收歌单');
     await page.getByRole('button', { name: '打开播放队列', exact: true }).click();
     const firstActions = await queueTrackMenu(page, part.title);
     await firstActions.getByRole('button', { name: '下移', exact: true }).click();
@@ -883,7 +883,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
   await t.test('B站扫码登录: offline QR, scanned confirmation, personalized discovery, cancellation and disconnect', async () => {
     await page.setViewportSize({width:1440,height:1000});
     await openSettings('外观');
-    await page.locator('[data-settings-section="appearance"]').getByRole('button',{name:'白天',exact:true}).click();
+    await page.getByRole('group',{name:'明暗模式',exact:true}).getByRole('button',{name:'白天',exact:true}).click();
     await page.locator('.settings-nav').getByRole('button',{name:'B站账号',exact:true}).click();
     const dialog=page.locator('[data-settings-section="account"]');
     await dialog.getByRole('button',{name:'扫码登录 B站',exact:true}).click();

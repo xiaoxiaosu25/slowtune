@@ -63,10 +63,27 @@
 
 /* Desktop workspace: the dialog is the surface; its sections use space and rules. */
 @media(min-width:761px) {
-  .playlist-list-toolbar { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
-  .playlist-list-toolbar .search-field { margin:0 auto 0 0; max-width:320px; }
+  .main-content .song-library-page { margin-top:0; }
+  .main-content .song-library-page .playlist-intro { gap:24px; padding:0 0 16px; margin-bottom:16px; }
+  .song-library-page .playlist-cover-button { width:128px; height:128px; }
+  .song-library-page .playlist-copy { flex:1; }
+  .song-library-page .playlist-copy h1 { margin:0 0 8px; font-size:28px; font-weight:650; line-height:1.3; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .song-library-page .playlist-copy>p { margin-bottom:16px; }
+  .playlist-manage-menu>.btn[aria-expanded="true"] { background:var(--selected); color:var(--accent-text); border-color:color-mix(in srgb,var(--accent) 25%,var(--border)); }
+  .playlist-manage-menu .control-popover-panel { width:208px; border-radius:12px; }
+  .playlist-manage-menu hr { margin:6px 4px; border:0; border-top:1px solid var(--border-subtle); }
+  .playlist-manage-menu .danger-text,.playlist-manage-menu .danger-text>svg { color:var(--danger); }
+  .playlist-list-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:16px; }
+  .playlist-list-toolbar .search-field { flex:1 1 160px; margin:0 auto 0 0; max-width:320px; }
+  .playlist-list-toolbar .source-tabs { margin:0; }
   .playlist-list-toolbar>span { font-size:13px; white-space:nowrap; }
-  .song-library-row { flex-wrap:nowrap; padding:12px 8px; border-color:var(--border-subtle); border-radius:8px; }
+  .song-library-page>.paged-list>.track-list { margin-top:0; }
+  .song-library-row { flex-wrap:nowrap; min-height:64px; padding:8px; border-color:var(--border-subtle); border-radius:8px; }
+  .song-library-row>.row-cover { flex-basis:44px; width:44px; height:44px; }
+  .song-library-row>.row-info { flex-basis:0; }
+  .song-library-row>.row-info>.row-sub { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
+  .song-library-row>.song-version-link { flex:0 0 auto; min-height:36px; padding:0 8px; border-radius:8px; background:var(--selected); white-space:nowrap; }
+  .song-library-row>.song-version-link:hover { background:var(--hover); }
   .song-library-row:hover { background:var(--hover); }
   .song-library-row:last-child { border-bottom:0; }
   .song-library-row>.row-number { font-size:12px; font-variant-numeric:tabular-nums; text-align:center; }

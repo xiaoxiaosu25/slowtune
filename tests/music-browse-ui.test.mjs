@@ -136,11 +136,11 @@ test('music browsing: discovery, four chart tabs, search dialogs and the default
     searchDelay=350;await dialog.getByLabel('弹窗搜索关键词').fill('迟到搜索');await dialog.getByRole('button',{name:'搜索',exact:true}).click();await dialog.getByRole('button',{name:'关闭',exact:true}).click();await page.waitForTimeout(400);assert.equal(await dialog.count(),0);searchDelay=0;
   });
   await t.test('existing favorites become a protected playlist with ordering, filtering and removal',async()=>{
-    await nav('歌单');assert.equal(await page.locator('.playlist-copy h2').textContent(),'我的收藏');assert.equal(await page.getByRole('button',{name:'删除歌单',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'改名',exact:true}).count(),0);
+    await nav('歌单');assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(),'我的收藏');assert.equal(await page.getByRole('button',{name:'删除歌单',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'改名',exact:true}).count(),0);
     const rows=page.locator('.main-content .song-library-row');assert.equal(await rows.count(),libraryFixture.library.read().snapshot.favorites.length);assert((await rows.locator('.track-name').allTextContents()).includes('旧收藏甲'));
     await rows.first().getByRole('button',{name:'更多操作 旧收藏甲',exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'下移 旧收藏甲',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.song-library-row .track-name')?.textContent==='旧收藏乙');
     await page.getByLabel('搜索歌单内音乐').fill('旧收藏甲');assert.equal(await rows.count(),1);await rows.getByRole('button',{name:'取消收藏 旧收藏甲',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.main-content .song-library-row'));assert(!libraryFixture.library.read().snapshot.favorites.some(f=>f.songId==='song-0'));
-    await page.getByLabel('搜索歌单内音乐').fill('');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'自建歌单'}).first().click();await nav('关注');await nav('歌单');assert.equal(await page.locator('.playlist-copy h2').textContent(),'自建歌单');
+    await page.getByLabel('搜索歌单内音乐').fill('');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'自建歌单'}).first().click();await nav('关注');await nav('歌单');assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(),'自建歌单');
     await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'我的收藏'}).first().click();await page.screenshot({path:join(artifacts,'favorites-desktop.png'),fullPage:true});
   });
   await t.test('public playlists use the search dialog and mobile dialogs fit the viewport',async()=>{

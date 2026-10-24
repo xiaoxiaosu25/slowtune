@@ -1,0 +1,98 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { chromium } from './helpers/browser.mjs';
+import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
+import { navigate, selectPlaylist, libraryAction } from '../scripts/browser-ui.mjs';
+
+test('desktop library keeps songs above the player, menus reachable and browser lyrics compact without changing mobile', { timeout: 90000 }, async t => {
+  const fixture = await startSongManagementFixture(); t.after(fixture.close);
+  fixture.library.execute(fixture.library.read().revision, [
+    { type: 'create-playlist', id: 'layout', name: '晚风与散步' },
+    ...Array.from({ length: 12 }, (_, i) => ({ type: 'add-entry', playlistId: 'layout', entryId: 'layout-' + i, songId: 'sun' })),
+  ]);
+  const browser = await chromium.launch({ headless: true, args: ['--autoplay-policy=no-user-gesture-required'] }); t.after(() => browser.close());
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } }); page.setDefaultTimeout(8000);
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/*', route => new URL(route.request().url()).origin === fixture.origin ? route.continue() : route.abort());
+  let lyricReads = 0;
+  await page.route('**/api/lyrics/state', route => { lyricReads++; return route.fulfill({ json: { revision: 'layout', offsetMs: 0, document: { provider: 'local', id: 'layout', title: '晴天', synced: true, lines: [{ startMs: 0, text: '留一段旋律，陪今天收场', translation: 'Stay with the melody' }, { startMs: 50000, text: '不必赶路，也不必寻找答案' }] } } }); });
+  await page.goto(fixture.origin); await navigate(page, '歌单'); await selectPlaylist(page, '晚风与散步');
+  const library = page.locator('.song-library-page');
+  assert.equal(await library.getByRole('heading', { level: 1 }).innerText(), '晚风与散步');
+  assert.equal(await library.locator('.page-heading').count(), 0);
+  const manage = page.getByRole('button', { name: '歌单管理', exact: true });
+  await manage.click();
+  await page.waitForFunction(() => document.querySelector('.playlist-manage-menu>button')?.getAttribute('aria-expanded') === 'true');
+  const menu = library.locator('.playlist-manage-menu [popover]');
+  assert.equal(await menu.getByRole('button').first().innerText(), '歌单改名');
+  const buttonStyle = await manage.evaluate(button => {
+    const style = getComputedStyle(button), play = getComputedStyle(document.querySelector('.playlist-copy .play-all'));
+    return { radius: style.borderRadius, height: style.height, playRadius: play.borderRadius, playHeight: play.height };
+  });
+  assert.equal(buttonStyle.radius, buttonStyle.playRadius);
+  assert.equal(buttonStyle.height, buttonStyle.playHeight);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('button', { name: '歌单管理', exact: true }).evaluate(e => e === document.activeElement), true);
+  await libraryAction(page, '歌单改名');
+  const rename = page.getByRole('dialog', { name: '歌单改名', exact: true });
+  await rename.getByLabel('歌单名称').fill('散步歌单'); await rename.getByRole('button', { name: '保存歌单', exact: true }).click();
+  await rename.waitFor({ state: 'detached' }); await library.getByRole('heading', { name: '散步歌单', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '歌单管理', exact: true }).evaluate(e => e === document.activeElement), true, 'dialog closes back to the visible menu trigger');
+  assert.equal(fixture.library.read().snapshot.playlists.find(p => p.id === 'layout').name, '散步歌单');
+  await selectPlaylist(page, '我的收藏'); await manage.click();
+  assert.equal(await menu.getByRole('button', { name: '歌单改名', exact: true }).count(), 0);
+  await page.keyboard.press('Escape');
+  await selectPlaylist(page, '周杰伦精选'); await libraryAction(page, '歌单改名');
+  assert.equal(await rename.getByLabel('歌单名称').inputValue(), '周杰伦精选');
+  await page.keyboard.press('Escape');
+  await selectPlaylist(page, '散步歌单');
+  await libraryAction(page, '删除歌单'); await page.getByRole('dialog', { name: '删除歌单', exact: true }).getByRole('button', { name: '关闭', exact: true }).click();
+  assert(fixture.library.read().snapshot.playlists.some(p => p.id === 'layout'));
+  await libraryAction(page, '新建歌单'); await page.getByLabel('歌单名称').fill('新建验证'); await page.getByRole('button', { name: '保存歌单', exact: true }).click();
+  await page.getByRole('dialog', { name: '新建歌单', exact: true }).waitFor({ state: 'detached' });
+  assert(fixture.library.read().snapshot.playlists.some(p => p.name === '新建验证'));
+  await libraryAction(page, '歌曲管理'); await page.getByRole('dialog', { name: '歌曲管理', exact: true }).waitFor(); await page.keyboard.press('Escape');
+  await page.locator('.song-library-row').first().getByRole('button', { name: '播放 晴天', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .1);
+  const audio = await page.locator('audio').elementHandle();
+  const dock = page.getByRole('region', { name: '底部歌词', exact: true });
+  await dock.getByText('留一段旋律，陪今天收场', { exact: true }).waitFor();
+  const firstReads = lyricReads;
+  const bounds = await page.evaluate(() => {
+    const dock = document.querySelector('.bottom-lyrics').getBoundingClientRect();
+    return { height: dock.height, visibleRows: [...document.querySelectorAll('.song-library-row')].filter(e => { const r = e.getBoundingClientRect(); return r.top >= 72 && r.bottom <= dock.top; }).length };
+  });
+  assert.equal(bounds.height, 36); assert(bounds.visibleRows >= 4, JSON.stringify(bounds));
+  assert.equal(await dock.locator('.bottom-lyrics-next').isVisible(), false);
+  await dock.getByRole('button', { name: '展开歌词', exact: true }).press('Enter');
+  assert.equal(await dock.locator('.bottom-lyrics-next').isVisible(), true);
+  assert.equal(await dock.evaluate(e => e.getBoundingClientRect().height), 68);
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  assert.equal(await dock.getByRole('button', { name: '收起歌词', exact: true }).getAttribute('aria-expanded'), 'true');
+  await dock.getByRole('button', { name: '收起歌词', exact: true }).press('Enter');
+  assert.equal(await dock.evaluate(e => e.getBoundingClientRect().height), 36);
+  assert(await audio.evaluate(a => a === document.querySelector('audio') && !a.paused));
+  assert.equal(lyricReads, firstReads, 'expansion and navigation reuse the lyric session');
+  await navigate(page, '歌单');
+  await page.getByRole('button', { name: '打开播放队列', exact: true }).click();
+  for (const width of [1280, 1060, 800]) {
+    await page.setViewportSize({ width, height: 720 });
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow at ' + width);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
+  await page.getByRole('radio', { name: '底部长条', exact: true }).check(); await page.keyboard.press('Escape');
+  assert(await page.evaluate(() => document.querySelector('.bottom-lyrics').getBoundingClientRect().bottom <= document.querySelector('.playbar').getBoundingClientRect().top + 1));
+  await page.setViewportSize({ width: 390, height: 844 });
+  const queue = page.getByRole('dialog', { name: '播放队列', exact: true });
+  await queue.waitFor(); await page.keyboard.press('Escape'); await queue.waitFor({ state: 'detached' });
+  await library.locator('.page-heading').getByRole('heading', { name: '我的歌单', exact: true }).waitFor();
+  assert.equal(await library.locator('.page-heading').getByRole('heading', { name: '我的歌单', exact: true }).isVisible(), true);
+  assert.equal(await library.getByRole('button', { name: '改名', exact: true }).isVisible(), true);
+  assert.equal(await library.getByRole('button', { name: '歌单管理', exact: true }).count(), 0);
+  assert.equal(await dock.locator('.bottom-lyrics-next').isVisible(), true);
+  assert.equal(await dock.getByRole('button', { name: '展开歌词', exact: true }).count(), 0);
+  assert.equal(await dock.evaluate(e => e.getBoundingClientRect().height), 88);
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  assert.deepEqual(errors, []);
+});

@@ -9,6 +9,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
 import { chromium } from './helpers/browser.mjs';
 import { startupFixture } from './helpers/startup-fixture.mjs';
+import { libraryAction } from '../scripts/browser-ui.mjs';
 const root = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
 const load = name => import(pathToFileURL(join(root, 'dist/server', name + '.js')));
 const { SongLibraryStore } = await load('song-library-store'), { SongLibraryService } = await load('song-library-service'), { SongLibrarySources } = await load('song-library-sources'), { createSongLibraryRouter } = await load('song-library-http');
@@ -124,7 +125,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   assert.equal(await page.getByRole('combobox', { name: '本条歌单记录播放版本',exact:true }).inputValue(), versionId);
   await page.keyboard.press('Escape');
   const snapshot = service.read().snapshot;
-  await page.getByRole('button', { name: '导入 / 导出', exact: true }).click();
+  await libraryAction(page, '导入 / 导出');
   await page.getByLabel('新资料库快照内容').fill(JSON.stringify(snapshot)); await page.getByRole('combobox', { name: '导入方式' }).selectOption('replace');
   await page.getByRole('button', { name: '校验并预览影响', exact: true }).click(); await page.getByRole('checkbox', { name: /我已导出/ }).check(); await page.getByRole('button', { name: '确认导入', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('textarea[aria-label="新资料库快照内容"]').value === ''); assert.deepEqual(service.read().snapshot, snapshot);
@@ -165,7 +166,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
     await page.locator('.playlist-intro').getByRole('button',{name:'播放全部',exact:true}).click();
     await page.waitForFunction(()=>/part=901/.test(document.querySelector('audio').currentSrc)&&!document.querySelector('audio').paused);
     const queued=await page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')));assert.equal(queued.items.length,3);
-    await page.getByRole('button',{name:'歌曲管理',exact:true}).click();await page.getByRole('button',{name:'管理歌曲 七里香',exact:true}).click();
+    await libraryAction(page, '歌曲管理');await page.getByRole('button',{name:'管理歌曲 七里香',exact:true}).click();
     const maintenance=page.getByRole('dialog',{name:'歌曲与版本',exact:true});
     await maintenance.getByRole('tab',{name:'歌曲资料',exact:true}).click();await maintenance.getByRole('button',{name:'合并到另一首歌曲',exact:true}).click();
     await maintenance.getByRole('radiogroup',{name:'目标歌曲'}).getByRole('radio').nth(0).check();

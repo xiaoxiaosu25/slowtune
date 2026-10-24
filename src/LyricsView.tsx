@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { MusicNotesIcon } from '@phosphor-icons/react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { MusicNotesIcon, CaretUpIcon, CaretDownIcon } from '@phosphor-icons/react';
 import { activeLyricLine } from '../server/lyrics-format';
 import type { LyricDocument, LyricLine } from '../server/lyrics-types';
 import { time } from './api';
@@ -58,16 +58,20 @@ function statusText(lyrics: LyricsController) {
   return lyrics.document?.instrumental ? '纯音乐，安心听' : lyrics.busy === '匹配' || lyrics.busy === '读取' ? '正在寻找歌词…' : lyrics.error ? '歌词暂不可用' : '暂无匹配歌词';
 }
 
-export function BottomLyrics({ lyrics, playback, compact = false }: { lyrics: LyricsController; playback: LyricPlayback; compact?: boolean }) {
+export function BottomLyrics({ lyrics, playback, compact = false, desktop = false }: { lyrics: LyricsController; playback: LyricPlayback; compact?: boolean; desktop?: boolean }) {
   const root = useRef<HTMLElement>(null);
+  const [expanded, setExpanded] = useState(false), nextId = useId();
   const active = useLyricPlayback(lyrics.document, lyrics.offsetMs, playback, root);
   const document = lyrics.document;
   const index = Math.max(0, active), current = document?.lines[index], next = document?.lines[index + 1];
-  return <section ref={root} className={'bottom-lyrics' + (compact ? ' is-compact' : '')} aria-label="底部歌词">
+  const desktopDock = desktop && compact, hasLyrics = document && !document.instrumental && current;
+  const showNext = !desktopDock || expanded;
+  return <section ref={root} className={'bottom-lyrics' + (compact ? ' is-compact' : '') + (desktopDock ? ' desktop-lyrics-dock' : '') + (desktopDock && expanded && hasLyrics ? ' is-expanded' : '')} aria-label="底部歌词">
     {!document || document.instrumental || !current ? <p className="bottom-lyrics-status" role="status"><MusicNotesIcon size={16}/>{statusText(lyrics)}</p> : <div className="bottom-lyrics-lines" key={lyrics.sourceKey + ':' + document.id + ':' + index}>
       <p className="bottom-lyrics-current" title={current.text}><LyricText line={current} index={index} current={active >= 0}/></p>
-      <p className="bottom-lyrics-next">{document.synced && active < 0 ? '前奏 · ' : ''}{lyrics.translations && current.translation ? current.translation : next?.text || (document.synced ? '♪' : '纯文本歌词')}</p>
+      <p id={nextId} className="bottom-lyrics-next" hidden={!showNext}>{document.synced && active < 0 ? '前奏 · ' : ''}{lyrics.translations && current.translation ? current.translation : next?.text || (document.synced ? '♪' : '纯文本歌词')}</p>
     </div>}
+    {desktopDock && hasLyrics && <button type="button" className="btn btn-icon bottom-lyrics-expand" aria-label={expanded ? '收起歌词' : '展开歌词'} title={expanded ? '收起歌词' : '展开下一句或译文'} aria-expanded={expanded} aria-controls={nextId} onClick={() => setExpanded(value => !value)}>{expanded ? <CaretDownIcon size={16}/> : <CaretUpIcon size={16}/>}</button>}
   </section>;
 }
 

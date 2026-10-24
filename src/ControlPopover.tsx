@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /** Native popovers keep light dismissal, Escape and focus return consistent. */
-export function ControlPopover({label,icon,children,className='',side='top'}:{label:string;icon:ReactNode;children:ReactNode;className?:string;side?:'top'|'bottom'}) {
+export function ControlPopover({label,icon,children,className='',buttonClassName='btn-icon',side='top'}:{label:string;icon:ReactNode;children:ReactNode;className?:string;buttonClassName?:string;side?:'top'|'bottom'}) {
   const id=useId(),button=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null);
   const [open,setOpen]=useState(false);
   useEffect(()=>{
@@ -29,7 +29,7 @@ export function ControlPopover({label,icon,children,className='',side='top'}:{la
     return()=>{element.removeEventListener('beforetoggle',before);element.removeEventListener('toggle',toggle);window.removeEventListener('resize',dismiss);window.removeEventListener('scroll',dismiss,true);};
   },[side]);
   return <div className={'control-popover '+className} data-open={open||undefined}>
-    <button ref={button} type="button" className={'btn btn-icon '+(open?'saved':'')} aria-label={label} title={label} aria-expanded={open} aria-controls={id} popoverTarget={id}>{icon}</button>
+    <button ref={button} type="button" className={'btn '+buttonClassName+(open?' saved':'')} aria-label={label} title={label} aria-expanded={open} aria-controls={id} popoverTarget={id}>{icon}</button>
     <div ref={panel} id={id} popover="auto" className="control-popover-panel" aria-label={label} onClick={event=>{const button=(event.target as HTMLElement).closest('button');if(button&&!button.hasAttribute('popovertarget'))panel.current?.hidePopover();}}>{children}</div>
   </div>;
 }

@@ -15,7 +15,7 @@ export const testGroups = {
     'song-targets-desktop-ui', 'desktop-runtime-ui', 'playback-performance-ui',
     'playback', 'sleep-timer-ui', 'playback-retry', 'song-version-switch', 'playback-management-ui',
     'desktop-lyrics-ui', 'desktop-lyrics-progress-ui', 'lyrics-ui',
-    'playlist-cover-ui', 'song-management-desktop-ui',
+    'playlist-cover-ui', 'song-management-desktop-ui', 'desktop-library-layout-ui',
   ],
   desktop: ['desktop-host', 'desktop-lifecycle', 'desktop-state-recovery', 'desktop-restart'],
 };

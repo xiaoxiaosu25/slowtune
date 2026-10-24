@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate } from '../scripts/browser-ui.mjs';
+import { navigate, libraryAction } from '../scripts/browser-ui.mjs';
 
 const sourceArtwork = 'https://i0.hdslb.com/catalog-source.jpg', directoryArtwork = 'https://p2.music.126.net/catalog-studio.jpg';
 const record = { provider: 'netease', id: '100', title: '晴天', artists: ['周杰伦'], album: '叶惠美', artwork: directoryArtwork, url: 'https://music.163.com/song?id=100' };
@@ -120,7 +120,7 @@ for (const sourceCover of [undefined, sourceArtwork]) {
     await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .1);
     assert.equal(await page.locator('.now-playing img').getAttribute('src'), directoryArtwork);
     const before = await page.locator('audio').evaluate(audio => ({ source: audio.currentSrc, time: audio.currentTime })), count = preparations;
-    await page.getByRole('button', { name: '歌曲管理', exact: true }).click();
+    await libraryAction(page, '歌曲管理');
     await page.getByRole('button', { name: '管理歌曲 晴天', exact: true }).click();
     const editor = page.getByRole('dialog', { name: '歌曲与版本', exact: true });
     await editor.getByRole('tab', { name: '歌曲资料', exact: true }).click();

@@ -20,10 +20,17 @@ export async function navigate(page, name) {
 
 export async function createPlaylist(page, name) {
   await navigate(page, '歌单');
-  await page.locator('.page-heading').getByRole('button', { name: '新建歌单', exact: true }).click();
+  await libraryAction(page, '新建歌单');
   await page.getByLabel('歌单名称').fill(name);
   await page.getByRole('button', { name: '保存歌单', exact: true }).click();
   await page.locator('dialog').waitFor({ state: 'detached' });
+}
+
+export async function libraryAction(page, name) {
+  const library = page.locator('.song-library-page');
+  const action = library.getByRole('button', { name, exact: true });
+  if (!await action.isVisible()) await library.getByRole('button', { name: '歌单管理', exact: true }).click();
+  await action.click();
 }
 
 export async function selectPlaylist(page, name) {
