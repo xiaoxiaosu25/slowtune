@@ -1,14 +1,14 @@
 import { createPlayingArtworkFixture } from './playing-artwork-fixture.mjs';
 
 /** An isolated real-player fixture; no user data, accounts or remote media. */
-export async function createMobileFixture({ preview = false } = {}) {
+export async function createMobileFixture({ preview = false, title = '风从远方来', artists = ['SlowTune 演示'] } = {}) {
   let fixture;
   const lyricDocument = { provider:'local', id:'mobile-demo', title:'风从远方来', artist:'SlowTune 演示', synced:true, instrumental:false, lines:[
     {startMs:0,text:'把窗打开，让晚风进来'}, {startMs:3000,text:'城市的声音慢慢走远'}, {startMs:6000,text:'风从远方来，停在你身旁'}, {startMs:12000,text:'留一段旋律，陪今天收藏'}, {startMs:18000,text:'不必赶路，也不必寻找答案'},
   ] };
   fixture = await createPlayingArtworkFixture({ preview,
     librarySeed:tracks => {
-      tracks[0].title = '风从远方来'; tracks[0].artists = ['SlowTune 演示'];
+      tracks[0].title = title; tracks[0].artists = artists;
       const saved = track => ({ref:track.ref,metadata:{title:track.title,artists:track.artists},availability:{state:'unknown'},addedAt:1});
       return {favorites:tracks.map(saved),playlists:[{id:'evening',name:'晚风与散步',entries:tracks.map(saved)}]};
     },

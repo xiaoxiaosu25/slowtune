@@ -16,20 +16,20 @@ export function MobilePlayer({ artwork, lyrics, title, artist, source, progress,
     const next = !lyricView; setLyricView(next);
     try { preferenceStorage().setItem(lyricViewKey, String(next)); } catch { /* Keep the current view usable when storage is unavailable. */ }
   };
+  const song = <div className="mobile-player-song"><div className="playing-title">{title}</div><div className="mobile-player-artist">{artist}</div><div className="mobile-player-source">{source}</div></div>;
   return <section className={'mobile-player' + (lyricView ? ' is-lyrics' : '')} aria-label="正在播放">
+    {lyricView && song}
     <div className="mobile-player-visual">{lyricView ? lyrics : artwork}</div>
-    <div className="mobile-player-details playing-detail">
-      <div className="mobile-player-song"><div className="playing-title">{title}</div><div className="mobile-player-artist">{artist}</div><div className="mobile-player-source">{source}</div></div>
-      <div className="mobile-player-controls">
-        {progress}
-        <div className="playbar-controls listening-transport mobile-player-transport">{mode}{transport}{favorite || <span className="transport-balance" aria-hidden="true"/>}</div>
-        <div className="mobile-player-tools">
-          <button className={'btn btn-ghost' + (lyricView ? ' saved' : '')} aria-label={lyricView ? '返回唱片' : '查看歌词'} aria-pressed={lyricView} onClick={toggleLyrics}>{lyricView ? <VinylRecordIcon size={21}/> : <MusicNotesIcon size={21}/>}<span>{lyricView ? '唱片' : '歌词'}</span></button>
-          {timer}
-          <button className="btn btn-ghost" aria-label="播放队列" aria-expanded={queueOpen} onClick={onQueue}><QueueIcon size={22}/><span>队列</span><small>{queueCount}</small></button>
-        </div>
-        {empty}
+    {!lyricView && song}
+    <div className="mobile-player-controls playing-detail">
+      {progress}
+      <div className="playbar-controls listening-transport mobile-player-transport">{mode}{transport}{favorite || <span className="transport-balance" aria-hidden="true"/>}</div>
+      <div className="mobile-player-tools">
+        <button className={'btn btn-ghost' + (lyricView ? ' saved' : '')} aria-label={lyricView ? '返回唱片' : '查看歌词'} aria-pressed={lyricView} onClick={toggleLyrics}>{lyricView ? <VinylRecordIcon size={21}/> : <MusicNotesIcon size={21}/>}<span>{lyricView ? '唱片' : '歌词'}</span></button>
+        {timer}
+        <button className="btn btn-ghost" aria-label="播放队列" aria-expanded={queueOpen} onClick={onQueue}><QueueIcon size={22}/><span>队列</span><small>{queueCount}</small></button>
       </div>
+      {empty}
     </div>
   </section>;
 }
