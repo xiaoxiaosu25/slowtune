@@ -34,8 +34,6 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
   const mode = !allowLyrics && storedMode === 'lyrics' ? 'vinyl' : storedMode;
   const [failed, setFailed] = useState('');
   const [dimensions, setDimensions] = useState({ url: '', ratio: 16 / 9 });
-  const [prefersReduced, setPrefersReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const reduced = !desktop && prefersReduced;
   const [visible, setVisible] = useState(() => !document.hidden);
   const state = useSyncExternalStore(analysis?.subscribe ?? noSubscription, analysis?.getSnapshot ?? idleAnalysis);
   // The desktop lyric view shares this preference; refresh the retained normal view on return.
@@ -45,20 +43,18 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
       if (event.key !== playingVisualStorageKey && event.key !== null) return;
       try { if (event.storageArea === preferenceStorage()) setMode(readMode()); } catch { /* Session preference stays usable. */ }
     };
-    const media = matchMedia('(prefers-reduced-motion: reduce)'), update = () => setPrefersReduced(media.matches);
     const visibility = () => setVisible(!document.hidden);
-    window.addEventListener('storage', sync); media.addEventListener('change', update); document.addEventListener('visibilitychange', visibility);
-    return () => { window.removeEventListener('storage', sync); media.removeEventListener('change', update); document.removeEventListener('visibilitychange', visibility); };
+    window.addEventListener('storage', sync); document.addEventListener('visibilitychange', visibility);
+    return () => { window.removeEventListener('storage', sync); document.removeEventListener('visibilitychange', visibility); };
   }, []);
-  // Only desktop bypasses reduced motion; the existing mobile visual stays static.
   useEffect(() => {
-    analysis?.request(!suspended && !reduced && (mode === 'spectrum' || mode === 'halo'));
+    analysis?.request(!suspended && (mode === 'spectrum' || mode === 'halo'));
     return () => analysis?.request(false);
-  }, [mode, analysis, suspended, reduced]);
+  }, [mode, analysis, suspended]);
   const availableModes = allowLyrics ? modes : modes.filter(value => value !== 'lyrics');
   const next = availableModes[(availableModes.indexOf(mode) + 1) % availableModes.length];
   const cycle = () => {
-    if ((next === 'spectrum' || next === 'halo') && !reduced) analysis?.request(true, true);
+    if (next === 'spectrum' || next === 'halo') analysis?.request(true, true);
     setMode(next);
     try { preferenceStorage().setItem(playingVisualStorageKey, next); } catch { /* Apply for this session if storage is blocked. */ }
   };
@@ -67,7 +63,7 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
     onLoad={event => { const { naturalWidth, naturalHeight } = event.currentTarget; if (naturalWidth && naturalHeight) setDimensions({ url: artwork, ratio: naturalWidth / naturalHeight }); }}
     onError={() => setFailed(artwork)}/> : <span className="playing-art unknown-cover"><MusicNotesIcon size={60}/></span>;
   const ratio = hasArtwork && dimensions.url === artwork ? dimensions.ratio : 16 / 9;
-  const message = reduced ? '已减少动态效果' : state === 'unavailable' ? '当前环境暂不支持实时音波' : state !== 'ready' ? '点击播放后显示实时音波' : '';
+  const message = state === 'unavailable' ? '当前环境暂不支持实时音波' : state !== 'ready' ? '点击播放后显示实时音波' : '';
   if (mode === 'lyrics') return <div className="playing-art-slot playing-lyrics-slot">
     <div className="playing-art-lyrics">{lyrics ?? <p className="muted">播放音乐后自动显示歌词</p>}</div>
     <button type="button" className="btn btn-ghost playing-art-switch lyrics-style-switch" data-visual-mode={mode} aria-label="封面样式：歌词，点击切换为唱片" onClick={cycle}><ArrowClockwiseIcon size={15}/>歌词 · 切换样式</button>
@@ -86,10 +82,10 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
       <span className={'playing-art-layer playing-art-square' + (mode === 'square' ? ' is-active' : '')} aria-hidden="true"><span className="playing-art-frame">{image()}</span></span>
       <span className={'playing-art-layer playing-art-disc' + (mode === 'disc' ? ' is-active' : '') + (mode === 'disc' && playing && visible ? ' is-playing' : '')} aria-hidden="true"><span className="playing-art-frame">{image()}</span></span>
       <span className={'playing-art-layer playing-art-frequency' + (mode === 'spectrum' ? ' is-active' : '')} aria-hidden="true">
-        <PlayingSpectrum active={mode === 'spectrum' && !(desktop && suspended)} playing={playing} muted={muted} reduced={reduced} analysis={analysis} state={state}/>
+        <PlayingSpectrum active={mode === 'spectrum' && !(desktop && suspended)} playing={playing} muted={muted} analysis={analysis} state={state}/>
       </span>
       <span className={'playing-art-layer playing-art-halo' + (mode === 'halo' ? ' is-active' : '')} aria-hidden="true">
-        <PlayingSpectrum variant="halo" active={mode === 'halo' && !(desktop && suspended)} playing={playing} muted={muted} reduced={reduced} analysis={analysis} state={state}/>
+        <PlayingSpectrum variant="halo" active={mode === 'halo' && !(desktop && suspended)} playing={playing} muted={muted} analysis={analysis} state={state}/>
         <span className="playing-halo-core"><VinylLabel/></span>
       </span>
       <span className="playing-art-hint" aria-hidden="true">{names[mode]}<span className="playing-art-hint-cue"> · 点击切换</span><ArrowClockwiseIcon size={14}/></span>

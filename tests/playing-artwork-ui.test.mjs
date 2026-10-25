@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import {queueRecord} from './helpers/song-fixture.mjs';
 import { createPlayingArtworkFixture } from './helpers/playing-artwork-fixture.mjs';
+import { developmentPaths } from '../scripts/workspace-paths.mjs';
 
 const preference = 'slow-listening:playing-visual:v1';
 const executablePath = process.env.MUSIC_APP_BROWSER;
@@ -216,7 +217,7 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
   const measurements = [];
   for (const theme of ['light', 'dark']) {
     await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
-    for (const [width, height] of [[1803,1022], [1440,900], [1100,768], [1024,600], [800,600], [390,844], [320,568], [320,480], [844,390]]) {
+    for (const [width, height] of [[1803,1022], [1440,900], [1100,768], [1024,600], [800,600], [390,844], [320,568], [320,480], [667,375]]) {
       await page.setViewportSize({ width, height });
       await page.waitForFunction(width=>document.querySelector('.app')?.dataset.layout===(width<=760?'mobile':'desktop'),width);
       const anchor = await page.locator('.playing-detail').boundingBox();
@@ -227,7 +228,15 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
           const boxes = [...document.querySelectorAll('.playing-art-switch,.playing-detail,.stage-controls,.listening-transport')].map(el => { const r = el.getBoundingClientRect(); return { name: el.className, x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; });
           return { width: innerWidth, height: innerHeight, overflow: document.documentElement.scrollHeight > innerHeight + 1 || document.documentElement.scrollWidth > innerWidth + 1, fits: boxes.every(r => r.y >= stage.top - 1 && r.bottom <= stage.bottom + 1 && r.x >= 0 && r.right <= innerWidth + 1), boxes };
         });
-        assert.equal(measurement.overflow, false, JSON.stringify(measurement)); assert(measurement.fits, JSON.stringify(measurement));
+        assert.equal(measurement.overflow, false, JSON.stringify(measurement));
+        if (width <= 760 && height < 568) {
+          assert(measurement.boxes.every(box => box.x >= 0 && box.right <= width + 1), JSON.stringify(measurement));
+          const queue = page.locator('.mobile-player-tools').getByRole('button', { name: '播放队列', exact: true });
+          await queue.scrollIntoViewIfNeeded();
+          const bounds = await queue.boundingBox();
+          assert(bounds.y >= 64 && bounds.y + bounds.height <= height + 1, 'short mobile screens scroll to expose the bottom controls');
+          await page.locator('.main-content').evaluate(element => { element.scrollTop = 0; });
+        } else assert(measurement.fits, JSON.stringify(measurement));
         if (width <= 760) assert(measurement.boxes[0].width >= 44 && measurement.boxes[0].height >= 44, 'artwork retains a 44px touch target: ' + JSON.stringify(measurement));
         const hint = await page.locator('.playing-art-hint').boundingBox();
         assert(hint.x >= 0 && hint.x + hint.width <= width, 'mode hint fits the screen');
@@ -240,7 +249,7 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
         if (visual === 'vinyl' && (width === 390 || width === 320 || (theme === 'dark' && width === 1803))) await page.screenshot({ path: join(artifacts, `${theme}-vinyl-${width}x${height}.png`) });
         if ((width === 390 || width === 1803) && visual !== 'vinyl') await page.screenshot({ path: join(artifacts, `${theme}-${visual}-${width}x${height}.png`) });
       }
-      if (width === 390 || width === 844 || (width === 320 && height === 480)) {
+      if (width === 390 || width === 667 || (width === 320 && height === 480)) {
         await selectMode(page, 'spectrum');
         await page.screenshot({ path: join(artifacts, `${theme}-spectrum-${width}x${height}.png`) });
       }
@@ -340,42 +349,97 @@ test('desktop vinyl and circular covers rotate with reduced motion and preserve 
   assert.equal(await media(page).evaluate(el => el.currentSrc), source); assert.equal(fixture.preparations.length, preparations);
   assert.equal(await media(page).count(), 1);
   await page.locator('.listening-transport .play-toggle').click();
-  // The paused mobile path remains frozen while mobile development is suspended.
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.app[data-layout="mobile"]').waitFor();
   for (const visual of ['vinyl', 'disc']) {
-    await selectMode(page, visual); assert.equal((await animation(visual)).name, 'none');
+    await selectMode(page, visual);
+    assert.equal((await animation(visual)).name, 'playing-art-turn');
+    assert.equal((await animation(visual)).state, 'paused');
+    await page.locator('.listening-transport .play-toggle').click(); await moves(visual);
+    await page.locator('.listening-transport .play-toggle').click();
+    await page.waitForFunction(selector => getComputedStyle(document.querySelector(selector)).animationPlayState === 'paused', selectors[visual]);
+    const paused = await animation(visual); await page.waitForTimeout(160);
+    assert.deepEqual(await animation(visual), paused, 'mobile pause retains the current angle');
   }
 });
 
-test('mobile spectrum and halo retain their static reduced-motion behavior', { timeout: 30000 }, async t => {
+test('mobile spectrum and halo keep following real audio regardless of system motion preferences', { timeout: 30000 }, async t => {
   const fixture = await createPlayingArtworkFixture(), browser = await chromium.launch({ executablePath, headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, reducedMotion: 'reduce' });
+  await context.route('**/*', route => new URL(route.request().url()).origin === fixture.base ? route.continue() : route.abort());
   await context.addInitScript(({ record, preference }) => {
     localStorage.setItem('slow-listening:playback:v3', JSON.stringify(record)); localStorage.setItem(preference, 'spectrum');
-    window.__graphs = 0; window.__paints = 0;
+    window.__graphs = 0; window.__bindings = 0; window.__paints = 0;
     const NativeContext = window.AudioContext;
-    window.AudioContext = class extends NativeContext { constructor(...args) { super(...args); window.__graphs++; } };
+    window.AudioContext = class extends NativeContext {
+      constructor(...args) { super(...args); window.__graphs++; }
+      createMediaElementSource(audio) { window.__bindings++; return super.createMediaElementSource(audio); }
+    };
     const clear = CanvasRenderingContext2D.prototype.clearRect;
     CanvasRenderingContext2D.prototype.clearRect = function (...args) { if (this.canvas.classList.contains('playing-spectrum')) window.__paints++; return clear.apply(this, args); };
   }, { record: queueRecord(fixture.tracks), preference });
   const page = await context.newPage(); page.setDefaultTimeout(6000);
   await openPlaying(page, fixture.base); await page.locator('.listening-transport .play-toggle').click();
   await page.waitForFunction(() => document.querySelector('audio').currentTime > .2);
-  for (const visual of ['spectrum', 'halo']) {
-    await selectMode(page, visual); await page.getByText('已减少动态效果', { exact: true }).waitFor();
-    assert.equal(await page.evaluate(() => window.__graphs), 0);
-    await page.waitForTimeout(350); const paints = await page.evaluate(() => window.__paints);
-    await page.waitForTimeout(200); assert.equal(await page.evaluate(() => window.__paints), paints);
-  }
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.locator('.listening-transport .play-toggle').click(); await page.locator('.listening-transport .play-toggle').click();
   await page.waitForFunction(() => document.querySelector('.playing-art-switch').dataset.analysisState === 'ready');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.getByText('已减少动态效果', { exact: true }).waitFor(); await page.waitForTimeout(350);
-  const paints = await page.evaluate(() => window.__paints); await page.waitForTimeout(200);
-  assert.equal(await page.evaluate(() => window.__paints), paints, 'an existing live graph also returns to a static mobile ring');
+  const source = await media(page).evaluate(audio => audio.currentSrc), preparations = fixture.preparations.length;
+  for (const [visual, variant] of [['spectrum', 'bars'], ['halo', 'halo']]) {
+    await selectMode(page, visual);
+    await media(page).evaluate(audio => { audio.currentTime = 1; }); await page.waitForTimeout(450);
+    const low = await spectrumPeak(page, variant);
+    await media(page).evaluate(audio => { audio.currentTime = 10; }); await page.waitForTimeout(700);
+    const high = await spectrumPeak(page, variant);
+    assert(low.max > low.min + 15 && high.index > low.index + 6, JSON.stringify({ visual, low, high }));
+    for (const reducedMotion of ['no-preference', 'reduce']) {
+      await page.emulateMedia({ reducedMotion });
+      const paints = await page.evaluate(() => window.__paints);
+      await page.waitForFunction(before => window.__paints > before, paints);
+      assert.equal(await page.getByText('已减少动态效果', { exact: true }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: '启用实时音波', exact: true }).count(), 0);
+    }
+  }
+  assert.deepEqual(await page.evaluate(() => ({ graphs: window.__graphs, bindings: window.__bindings })), { graphs: 1, bindings: 1 });
+  assert.equal(await media(page).evaluate(audio => audio.currentSrc), source);
+  assert.equal(fixture.preparations.length, preparations);
   assert.equal(await media(page).evaluate(audio => audio.paused), false);
+});
+
+test('touch artwork hints stay hidden after tapping while pointer and keyboard cues remain available', { timeout: 60000 }, async t => {
+  const fixture = await createPlayingArtworkFixture(), browser = await chromium.launch({ executablePath, headless: true });
+  t.after(async () => { await browser.close(); await fixture.close(); });
+  const artifacts = join(developmentPaths().artifacts, 'playing-artwork'); mkdirSync(artifacts, { recursive: true });
+  for (const width of [320, 360, 390, 430]) {
+    const context = await browser.newContext({ viewport: { width, height: 844 }, hasTouch: true, colorScheme: 'dark', reducedMotion: 'reduce' });
+    await context.route('**/*', route => new URL(route.request().url()).origin === fixture.base ? route.continue() : route.abort());
+    await context.addInitScript(record => localStorage.setItem('slow-listening:playback:v3', JSON.stringify(record)), queueRecord(fixture.tracks));
+    const page = await context.newPage(); page.setDefaultTimeout(6000);
+    await openPlaying(page, fixture.base);
+    assert.equal(await page.evaluate(() => matchMedia('(pointer:coarse)').matches), true);
+    const opacity = () => page.locator('.playing-art-hint').evaluate(element => getComputedStyle(element).opacity);
+    assert.equal(await opacity(), '0', 'touch screens do not show a persistent switch hint');
+    await mode(page).tap();
+    assert.equal(await mode(page).getAttribute('data-visual-mode'), 'original', 'tapping the artwork still changes its style');
+    await page.waitForTimeout(220);
+    assert.equal(await opacity(), '0', 'touch hover does not leave the switch hint visible');
+    await selectMode(page, 'vinyl');
+    await page.locator('.listening-transport .play-toggle').click();
+    const angle = await page.locator('.vinyl-rotor').evaluate(element => getComputedStyle(element).transform);
+    await page.waitForFunction(before => getComputedStyle(document.querySelector('.vinyl-rotor')).transform !== before, angle);
+    if (width === 390) await page.screenshot({ path: join(artifacts, 'mobile-vinyl.png') });
+    await context.close();
+  }
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage(); await openPlaying(page, fixture.base);
+  await page.mouse.move(0, 0);
+  const hint = page.locator('.playing-art-hint');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.playing-art-hint')).opacity === '0');
+  await mode(page).hover();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.playing-art-hint')).opacity === '1');
+  await page.mouse.move(0, 0); await page.keyboard.press('Tab'); await mode(page).focus();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.playing-art-hint')).opacity === '1');
+  assert.equal(await mode(page).evaluate(element => element.matches(':focus-visible')), true);
+  assert(await hint.isVisible());
 });
 
 test('real spectrum and halo keep following audio when the browser prefers reduced motion', { timeout: 30000 }, async t => {

@@ -790,13 +790,10 @@ input[type=range]:disabled { opacity:.4; cursor:default; }
 .playing-art-hint { position:absolute; display:flex; align-items:center; justify-content:center; left:50%; bottom:12px; transform:translateX(-50%); padding:4px 12px; border:1px solid var(--border-subtle); border-radius:var(--r-full); background:var(--surface); color:var(--muted); font-size:var(--fs-md); white-space:nowrap; opacity:0; pointer-events:none; transition:opacity 180ms ease; }
 .playing-art-hint>svg { display:none; }
 .playing-art-hint-cue { white-space:pre; }
-.playing-art-switch:hover .playing-art-hint,.playing-art-switch:focus-visible .playing-art-hint { opacity:1; }
+.playing-art-switch:focus-visible .playing-art-hint { opacity:1; }
+@media (hover:hover) and (pointer:fine) { .playing-art-switch:hover .playing-art-hint { opacity:1; } }
 .playing-spectrum-status { position:absolute; top:74%; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100vw - 48px); color:var(--muted); font-size:var(--fs-md); line-height:1.5; text-align:center; pointer-events:none; }
 @keyframes playing-art-turn { to { transform:rotate(360deg); } }
-@media (hover:none),(pointer:coarse) { .playing-art-hint { opacity:1; } }
-@media (prefers-reduced-motion:reduce) { .playing-art-layer,.playing-art-hint { transition:none; } }
-/* Desktop record rotation is a selected playback visual, including with reduced motion. */
-@media (prefers-reduced-motion:reduce) and (max-width:760px) { .playing-art-disc .playing-art,.vinyl-rotor { animation:none; } }
 .playing-art.unknown-cover { display:flex; align-items:center; justify-content:center; }
 .playing-art.unknown-cover>svg { width:60px; height:60px; max-width:70%; max-height:70%; }
 .playing-detail { display:flex; flex-direction:column; gap:clamp(6px,2cqh,24px); width:100%; max-width:520px; min-width:0; min-height:0; justify-self:center; }
