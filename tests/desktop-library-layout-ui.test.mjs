@@ -87,10 +87,11 @@ test('desktop library keeps songs above the player, menus reachable and desktop 
   await page.setViewportSize({ width: 390, height: 844 });
   const queue = page.getByRole('dialog', { name: '播放队列', exact: true });
   await queue.waitFor(); await page.keyboard.press('Escape'); await queue.waitFor({ state: 'detached' });
-  await library.locator('.page-heading').getByRole('heading', { name: '我的歌单', exact: true }).waitFor();
-  assert.equal(await library.locator('.page-heading').getByRole('heading', { name: '我的歌单', exact: true }).isVisible(), true);
-  assert.equal(await library.getByRole('button', { name: '改名', exact: true }).isVisible(), true);
-  assert.equal(await library.getByRole('button', { name: '歌单管理', exact: true }).count(), 0);
+  await library.getByRole('button', { name: '选择歌单', exact: true }).waitFor();
+  await library.getByRole('button', { name: '歌单管理', exact: true }).click();
+  const mobileManage = page.getByRole('dialog', { name: '歌单管理', exact: true });
+  await mobileManage.getByRole('button', { name: '歌单改名', exact: true }).waitFor();
+  await mobileManage.getByRole('button', { name: '关闭', exact: true }).click();
   assert.equal(await dock.count(), 0,'mobile does not inherit the desktop lyric dock');
   assert.equal(await page.locator('.mobile-mini-player').evaluate(e => e.getBoundingClientRect().height),72);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));

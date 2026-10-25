@@ -8,6 +8,7 @@ import { CatalogViewToggle, useCatalogView } from './CatalogView';
 import { PlayAllButton, RefreshButton, AddToPlaylistButton } from './ListActions';
 import type { ListImportRequest } from './SongListImportPanel';
 import { PagedList, Pagination, usePagination } from './Pagination';
+import { initialFollowView, type FollowView } from './mobile-follow';
 
 const identity=(creator:CreatorRef)=>`${creator.provider}:${creator.id}`;
 const sourceName=(provider:string)=>provider==='bilibili'?'B站':'YouTube';
@@ -35,7 +36,8 @@ export function FollowTrackButton({client,track,state,onChange,author,onResolved
 }
 const feedCache=new Map<string,FollowFeed>();
 const videoCache=new Map<string,CreatorVideos>();
-let lastFollowView:{tab:'creators'|'updates';selected?:CreatorProfile;collection?:CreatorCollection;view:'collections'|'videos'}={tab:'creators',view:'collections'};
+let lastFollowView:FollowView=initialFollowView;
+const collectionCache=new Map<string,CreatorCollections>();
 function FeedPages({revision,source,refresh,render,onData}:{revision:string;source:string;refresh:number;render:(items:Track[],offset:number)=>ReactNode;onData:(feed:FollowFeed)=>void}) {
   const id='follow-feed:'+source+':'+revision;
   const [feed,setFeed]=useState<FollowFeed|undefined>(()=>feedCache.get(id)),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -99,10 +101,17 @@ function CreatorVideoPages({creator,collection,refresh,render,onData}:{creator:C
   </div>;
 }
 interface Props { client:MusicClient;state:FollowState|null;onChange:(value:FollowState)=>void;source:'all'|'bilibili'|'youtube';renderList:(items:Track[],timestamps?:boolean,offset?:number,all?:Track[])=>ReactNode;renderCovers:(items:Track[],timestamps?:boolean,offset?:number,all?:Track[])=>ReactNode;onPlayAll:(items:Track[])=>void;onImport?:(items:Track[],title?:string)=>void;onImportSource?:(input:ListImportRequest)=>void;onSearch:()=>void;initialCreator?:CreatorProfile;onClearCreator:()=>void }
-export function FollowsPage({client,state,onChange,source,renderList,renderCovers,onPlayAll,onImport,onImportSource,onSearch,initialCreator,onClearCreator,youtubeEnabled=true}:Props&{youtubeEnabled?:boolean}) {
+export function FollowsPage({client,state,onChange,source,renderList,renderCovers,onPlayAll,onImport,onImportSource,onSearch,initialCreator,onClearCreator,youtubeEnabled=true,navigationView,onNavigationViewChange,onMobileBack}:Props&{youtubeEnabled?:boolean;navigationView?:FollowView;onNavigationViewChange?:(update:(old:FollowView)=>FollowView)=>void;onMobileBack?:(target:FollowView,fallback:()=>void)=>void}) {
   const updatesView=useCatalogView('follow-updates','list');
-  const [tab,setTab]=useState<'creators'|'updates'>(lastFollowView.tab),[selected,setSelected]=useState<CreatorProfile|undefined>(initialCreator??lastFollowView.selected),[collection,setCollection]=useState<CreatorCollection|undefined>(initialCreator?undefined:lastFollowView.collection),[view,setView]=useState<'collections'|'videos'>(initialCreator?'collections':lastFollowView.view);
-  const [collections,setCollections]=useState<CreatorCollections>(),[videos,setVideos]=useState<CreatorVideos>(),[feed,setFeed]=useState<FollowFeed>(),[feedRefresh,setFeedRefresh]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[writing,setWriting]=useState(false),[addOpen,setAddOpen]=useState(false),[input,setInput]=useState(''),[writeError,setWriteError]=useState('');
+  const [localView,setLocalView]=useState<FollowView>(()=>initialCreator?{...lastFollowView,selected:initialCreator,collection:undefined,view:'collections'}:lastFollowView);
+  const {tab,selected,collection,view}=navigationView??localView;
+  useEffect(()=>{if(navigationView)setLocalView(navigationView);},[navigationView]);
+  const changeView=(update:(old:FollowView)=>FollowView)=>(onNavigationViewChange??setLocalView)(update);
+  const setTab=(tab:FollowView['tab'])=>changeView(old=>({...old,tab}));
+  const setSelected=(next:CreatorProfile|undefined|((old:CreatorProfile|undefined)=>CreatorProfile|undefined))=>changeView(old=>({...old,selected:typeof next==='function'?next(old.selected):next}));
+  const setCollection=(collection:CreatorCollection|undefined)=>changeView(old=>({...old,collection}));
+  const setView=(view:FollowView['view'])=>changeView(old=>({...old,view}));
+  const [collections,setCollections]=useState<CreatorCollections|undefined>(()=>selected?collectionCache.get(identity(selected)):undefined),[videos,setVideos]=useState<CreatorVideos>(),[feed,setFeed]=useState<FollowFeed>(),[feedRefresh,setFeedRefresh]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[writing,setWriting]=useState(false),[addOpen,setAddOpen]=useState(false),[input,setInput]=useState(''),[writeError,setWriteError]=useState('');
   const work=useRef<AbortController|null>(null),writeWork=useRef<AbortController|null>(null);
   const [videoRefresh,setVideoRefresh]=useState(0);
   const visibleCreators=state?.creators.filter(c=>(youtubeEnabled||c.provider!=='youtube')&&(source==='all'||c.provider===source)) ?? [];
@@ -120,12 +129,15 @@ export function FollowsPage({client,state,onChange,source,renderList,renderCover
           void request<CreatorProfile>('/api/creators/profile?'+query+(refresh?'&refresh=1':''),undefined,controller.signal).then(profile=>{if(!controller.signal.aborted)setSelected(previous=>previous&&identity(previous)===identity(profile)?{...previous,artwork:profile.artwork??previous.artwork}:previous);}).catch(()=>{});
         }
         if(view==='collections'&&!collection) {
+          const cached=collectionCache.get(selectedKey);if(!more&&!refresh&&cached){setCollections(cached);return;}
           if(more&&collections?.cursor)query.set('cursor',collections.cursor);
           const value=await request<CreatorCollections>('/api/follows/collections?'+query,undefined,controller.signal);
-          if(!controller.signal.aborted)setCollections(previous=>({...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(c=>[c.id,c])).values()]:value.items}));
+          if(!controller.signal.aborted)setCollections(previous=>{const next={...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(c=>[c.id,c])).values()]:value.items};if(collectionCache.size>=20&&!collectionCache.has(selectedKey))collectionCache.delete(collectionCache.keys().next().value!);collectionCache.set(selectedKey,next);return next;});
         } else if(selected.provider==='bilibili'){
           if(refresh)setVideoRefresh(value=>value+1);
         } else {
+          const cacheKey='author-videos:'+selectedKey+':'+(collection?.id??'uploads'),cached=videoCache.get(cacheKey);
+          if(!more&&!refresh&&cached){setVideos(cached);return;}
           if(more&&videos?.cursor)query.set('cursor',videos.cursor);
           let value:CreatorVideos;
           if(collection?.kind==='playlist'&&collection.ref) {
@@ -134,15 +146,15 @@ export function FollowsPage({client,state,onChange,source,renderList,renderCover
             if(collection)query.set('collection',collection.id);
             value=await request<CreatorVideos>((collection?'/api/follows/collection?':'/api/follows/videos?')+query,undefined,controller.signal);
           }
-          if(!controller.signal.aborted)setVideos(previous=>({...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(t=>[t.resourceId,t])).values()]:value.items}));
+          if(!controller.signal.aborted)setVideos(previous=>{const next={...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(t=>[t.resourceId,t])).values()]:value.items};if(videoCache.size>=20&&!videoCache.has(cacheKey))videoCache.delete(videoCache.keys().next().value!);videoCache.set(cacheKey,next);return next;});
         }
       } else if(tab==='updates'&&refresh)setFeedRefresh(value=>value+1);
     } catch(e){if(!cancelled(e)&&!controller.signal.aborted)setError(errorText(e));}
     finally{if(work.current===controller)setBusy(false);}
   };
-  useEffect(()=>{setSelected(initialCreator);setCollection(undefined);setView('collections');},[initialCreator]);
+  useEffect(()=>{if(!navigationView)changeView(old=>({...old,selected:initialCreator,collection:undefined,view:'collections'}));},[initialCreator]);
   useEffect(()=>{lastFollowView={tab,selected,collection,view};},[tab,selected,collection,view]);
-  useEffect(()=>{if(selected&&(!youtubeEnabled&&selected.provider==='youtube'||source!=='all'&&source!==selected.provider)){setSelected(undefined);setCollection(undefined);onClearCreator();return;}setError('');setCollections(undefined);setVideos(undefined);setFeed(undefined);void load();return()=>work.current?.abort();},[selectedKey,collectionId,view,tab,source,updatesRevision,youtubeEnabled]);
+  useEffect(()=>{if(selected&&(!youtubeEnabled&&selected.provider==='youtube'||source!=='all'&&source!==selected.provider)){setSelected(undefined);setCollection(undefined);onClearCreator();return;}setError('');setCollections(selected?collectionCache.get(selectedKey):undefined);setVideos(undefined);setFeed(undefined);void load();return()=>work.current?.abort();},[selectedKey,collectionId,view,tab,source,updatesRevision,youtubeEnabled]);
   useEffect(()=>()=>{writeWork.current?.abort();},[]);
   const change=async(creator?:CreatorProfile)=>{
     if(writing)return;const controller=new AbortController();writeWork.current=controller;setWriting(true);setWriteError('');
@@ -160,9 +172,10 @@ export function FollowsPage({client,state,onChange,source,renderList,renderCover
   const filteredVideos=(videos?.items ?? []).filter(t=>source==='all'||t.ref.provider===source);
   const filteredFeed=(feed?.items ?? []).filter(t=>(youtubeEnabled||t.ref.provider!=='youtube')&&(source==='all'||t.ref.provider===source)&&state?.creators.some(c=>c.provider===t.ref.provider&&c.id===t.uploader?.id));
   const retry=()=>void load(false,tab==='updates');
+  const returnToParent=()=>{const fallback=()=>{if(collection){setCollection(undefined);setView('collections');}else {setSelected(undefined);onClearCreator();}};if(onMobileBack)onMobileBack({tab,selected:collection?selected:undefined,view:'collections'},fallback);else fallback();};
   return <section className="follows-page">
     <div className="toolbar follow-toolbar">
-      {selected?<button className="btn btn-ghost" onClick={()=>{if(collection){setCollection(undefined);setView('collections');}else {setSelected(undefined);onClearCreator();}}}><ArrowLeftIcon size={18}/>{collection?'返回作者合集':'返回关注'}</button>:<div className="segmented" aria-label="关注视图"><button className={tab==='creators'?'selected':''} aria-pressed={tab==='creators'} onClick={()=>setTab('creators')}>关注的 UP</button><button className={tab==='updates'?'selected':''} aria-pressed={tab==='updates'} onClick={()=>setTab('updates')}>最近更新</button></div>}
+      {selected?<button className="btn btn-ghost" onClick={returnToParent}><ArrowLeftIcon size={18}/>{collection?'返回作者合集':'返回关注'}</button>:<div className="segmented" aria-label="关注视图"><button className={tab==='creators'?'selected':''} aria-pressed={tab==='creators'} onClick={()=>setTab('creators')}>关注的 UP</button><button className={tab==='updates'?'selected':''} aria-pressed={tab==='updates'} onClick={()=>setTab('updates')}>最近更新</button></div>}
       {!selected&&tab==='updates'&&<CatalogViewToggle title="关注的最近更新" view={updatesView.view} onChange={updatesView.setView}/>}
       {!selected&&tab==='updates'&&<><PlayAllButton label="播放本页" count={filteredFeed.length} onClick={()=>onPlayAll(filteredFeed)}/>{onImport&&<AddToPlaylistButton count={filteredFeed.length} title="加入本页更新到歌单" onClick={()=>onImport(filteredFeed,'关注的最近更新 · 本页')}/>}</>}
       <RefreshButton busy={busy} onClick={()=>void load(false,true)}/>

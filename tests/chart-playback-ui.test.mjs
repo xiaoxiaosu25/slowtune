@@ -135,16 +135,17 @@ test('chart playback: direct first results, lazy whole charts, failures, cancell
     try {await page.locator('.chart-play-all').click();await openIssues();await page.getByText('来源暂时无法返回有效内容，请重试。',{exact:true}).first().waitFor();await page.waitForTimeout(100);assert.equal(searches.length,n+1);}
     finally {failureMode='';}
   });
-  await t.test('missing/failed artwork has a placeholder and 390/320px layouts retain 44px play targets',async()=>{
+  await t.test('missing/failed artwork has a placeholder and mobile keeps 48px controls with a roomy play surface',async()=>{
     await load([one('手机歌曲',{artists:['歌手甲','歌手乙'],artwork:'bad'}),{rank:2,title:'缺资料'}]);await page.route('https://example.com/cover.jpg',route=>route.abort());await page.reload();await nav('音乐榜单');await page.locator('.chart-song').first().waitFor();await page.locator('.chart-song').getByLabel('封面未知').first().waitFor();await page.getByText('歌手未知',{exact:true}).waitFor();assert.equal(await page.getByText('歌手未知',{exact:true}).count(),1);
     for(const width of [1440,390,320]){
-      await page.setViewportSize({width,height:740});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert(await page.locator('.chart-song .row-number').first().isVisible());
-      for(const selector of ['.chart-song-play','.chart-song-search']){
+      await page.setViewportSize({width,height:740});await page.locator('.app[data-layout="'+(width>760?'desktop':'mobile')+'"]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert(await page.locator('.chart-song .row-number').first().isVisible());
+      for(const selector of width>760?['.chart-song-play','.chart-song-search']:['.chart-song-search']){
         const button=page.locator(selector).first(),box=await button.boundingBox();
-        assert.equal(box.width,width>760?36:44);assert.equal(box.height,width>760?36:44);
+        assert.equal(box.width,width>760?36:48);assert.equal(box.height,width>760?36:48);
         const style=await button.evaluate(el=>{const s=getComputedStyle(el);return {border:s.borderColor,background:s.backgroundColor};});
         assert.equal(style.border,'rgba(0, 0, 0, 0)');assert.equal(style.background,'rgba(0, 0, 0, 0)');
       }
+      if(width<=760){assert.equal(await page.locator('.chart-song-play').first().isVisible(),false);assert((await page.locator('.chart-song-main').first().boundingBox()).height>=48);}
       assert.equal(await page.locator('.chart-song-play svg').first().getAttribute('width'),'16');
       assert.equal(await page.locator('.chart-song .row-number').first().evaluate(el=>getComputedStyle(el).fontSize),'12px');
       await page.screenshot({path:join(artifacts,'charts-'+width+'.png'),fullPage:true});

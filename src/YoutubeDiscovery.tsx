@@ -8,6 +8,7 @@ import type { RecommendedShelf } from '../server/recommendation';
 import { discoverySize } from './CatalogView';
 
 interface Props {
+  mobile?: boolean;
   displayActive?:boolean;
   available: boolean;
   refreshToken: number;
@@ -17,7 +18,7 @@ interface Props {
   onImport?:(items:Track[],title?:string)=>void;
 }
 
-export function YoutubeDiscovery({ available, refreshToken, renderCovers, renderList, onPlayAll, onImport, displayActive=true }: Props) {
+export function YoutubeDiscovery({ available, refreshToken, renderCovers, renderList, onPlayAll, onImport, displayActive=true, mobile=false }: Props) {
   const [region, setRegion] = useState(readYoutubeRegion);
   const [data, setData] = useState<YoutubeMusicResult>();
   const [busy, setBusy] = useState(false), [failure, setFailure] = useState<unknown>();
@@ -58,7 +59,8 @@ export function YoutubeDiscovery({ available, refreshToken, renderCovers, render
 
   const shelf: Shelf = current?.shelf ?? { id: 'youtube-music-selection', title: 'YouTube 音乐精选', kind: 'recommendation' };
   const retry = <button className="btn btn-secondary btn-sm" onClick={() => void load(true)}>重试音乐精选</button>;
-  return <DiscoveryShelf shelf={shelf} displayActive={displayActive} loading={busy} renderCovers={renderCovers} renderList={renderList}
+  return <DiscoveryShelf mobile={mobile} shelf={shelf} displayActive={displayActive} loading={busy} renderCovers={renderCovers} renderList={renderList}
+    feedback={mobile&&<>{!available&&<p className="feedback" role="alert">YouTube 视频来源暂不可用，请在设置中检查取源工具。</p>}{!!failure&&<p className="feedback" role="alert">{errorText(failure)} {retry}</p>}{recommendation?.issue&&<p className="feedback" role="alert">{errorText({code:recommendation.issue})} {retry}</p>}{!!current?.warnings.length&&<p className="muted" role="status">部分歌单暂时无法读取，已展示可用歌曲。</p>}</>}
     renderError={error => <p role="alert">{errorText(error)} {retry}</p>}
     onRefresh={available ? () => void load(true) : undefined}
     onPlayAll={onPlayAll}

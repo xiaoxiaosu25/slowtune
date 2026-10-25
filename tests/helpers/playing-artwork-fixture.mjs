@@ -19,7 +19,7 @@ function toneFixture(seconds, changing = false) {
   return bytes;
 }
 
-export async function createPlayingArtworkFixture({ preview = false, artwork, librarySeed, handleRequest } = {}) {
+export async function createPlayingArtworkFixture({ preview = false, artwork, librarySeed, handleRequest, beforeWrite } = {}) {
   const root = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
   const tracks = [
     { ref: { provider: 'bilibili', kind: 'video', id: 'BV1tX4y1W7Xm', part: '900' }, resourceId: 'artwork-first', url: 'https://www.bilibili.com/video/BV1tX4y1W7Xm?p=1', title: '海边慢听 · 风从远方来', uploader: { name: 'SlowTune' }, artwork: 'https://i1.hdslb.com/fixture-artwork.png', durationSeconds: 24 },
@@ -67,7 +67,7 @@ export async function createPlayingArtworkFixture({ preview = false, artwork, li
       response.end(readFileSync(path));
     } catch { response.writeHead(404); response.end(); }
   });
-  installSongFixture(server, { seed: typeof librarySeed === 'function' ? librarySeed(tracks) : librarySeed });
+  installSongFixture(server, { seed: typeof librarySeed === 'function' ? librarySeed(tracks) : librarySeed, beforeWrite });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   base = 'http://127.0.0.1:' + server.address().port;
   return { base, tracks, preparations, close: async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); } };

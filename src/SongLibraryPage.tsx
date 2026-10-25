@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { HeartIcon, MusicNotesIcon, PlayIcon, DotsThreeIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, PlusIcon, CameraIcon, PencilSimpleIcon, ArrowsDownUpIcon, ListBulletsIcon } from '@phosphor-icons/react';
+import { HeartIcon, MusicNotesIcon, PlayIcon, DotsThreeIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, PlusIcon, CameraIcon, PencilSimpleIcon, ArrowsDownUpIcon, ListBulletsIcon, CaretDownIcon, CheckIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState, SongPlaybackSelection, SongPlaylistEntry, SongVersion } from '../server/song-library-types';
 import { Modal } from './Modal';
 import { errorText, availabilityText } from './api';
@@ -23,13 +23,23 @@ export { SongCover } from './SongCover';
 export type { SongCommit } from './song-management';
 
 export const songFavoritesId = 'system:favorites';
-export function SongEditor({ song, state, commit, onSearch, onPlay, onClose, onChange }: { song: Song; state: SongLibraryState; commit: SongCommit; onSearch: (song: Song) => void; onPlay: (selection: SongPlaybackSelection, song: Song) => void; onClose: () => void; onChange: (state: SongLibraryState) => void }) {
+export type MobileVersionPlayback = { currentVersionId?: string; preparing: boolean; error: string; play: (selection: SongPlaybackSelection, song: Song) => Promise<unknown> };
+export function SongEditor({ song, state, commit, onSearch, onPlay, onClose, onChange, versionPlayback }: { song: Song; state: SongLibraryState; commit: SongCommit; onSearch: (song: Song) => void; onPlay: (selection: SongPlaybackSelection, song: Song) => void; onClose: () => void; onChange: (state: SongLibraryState) => void; versionPlayback?:MobileVersionPlayback }) {
   const [title, setTitle] = useState(song.title), [artists, setArtists] = useState(song.artists?.join('\n') ?? ''), [revision, setRevision] = useState(state.revision);
   const [dirty,setDirty]=useState({title:false,artists:false});
   const [editingInfo,setEditingInfo]=useState(false);
   useEffect(()=>{if(!dirty.title)setTitle(song.title);if(!dirty.artists)setArtists(song.artists?.join('\n')??'');},[song.title,JSON.stringify(song.artists),dirty.title,dirty.artists]);
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [labels, setLabels] = useState<Record<string, string>>({});
   const [kinds,setKinds]=useState<Record<string,string>>({}),[performers,setPerformers]=useState<Record<string,string>>({});
+  const [switching,setSwitching]=useState<string>(),[switchFeedback,setSwitchFeedback]=useState('');
+  const switchVersion=async(version:SongVersion)=>{
+    const selection:SongPlaybackSelection={kind:'song',songId:song.id,explicitVersionId:version.id};
+    if(!versionPlayback){onPlay(selection,song);return;}
+    setSwitching(version.id);setSwitchFeedback('正在切换版本…');
+    try {const result=await versionPlayback.play(selection,song);setSwitchFeedback(result===false?'版本未能切换，请重试。当前播放保留。':'已切换到「'+(version.label||version.facts.title)+'」');}
+    catch(issue){setSwitchFeedback(errorText(issue));}
+    finally{setSwitching(undefined);}
+  };
   const versions = state.snapshot.versions.filter(version => version.songId === song.id);
   const run = async (edits: unknown[]) => { setBusy(true); setError(''); try { const saved = await commit(edits, revision); if (saved) { setRevision(saved.revision); return true; } setError('未能保存，请检查提示并重读当前修订。草稿已保留。'); } catch (issue) { setError(errorText(issue)); } finally { setBusy(false); } return false; };
   return <Modal title="歌曲与版本" className="song-editor-modal" onClose={onClose}>
@@ -41,8 +51,10 @@ export function SongEditor({ song, state, commit, onSearch, onPlay, onClose, onC
     </form>}
     <SongOrganizationPanel song={song} revision={state.revision} disabled={busy || dirty.title || dirty.artists} onChange={saved => { setRevision(saved.revision); onChange(saved); }}/>
     <section className="song-version-section"><div className="section-heading"><h3>播放版本 <small>{versions.length}</small></h3><button className="btn btn-secondary btn-sm" onClick={()=>{onClose();onSearch(song);}}><PlusIcon size={17}/>搜索并添加版本</button></div>{!versions.length && <p className="muted">还没有版本。添加第一个版本后，将默认播放它。</p>}
-      {versions.map(version => <div className="song-version-item" key={version.id}><div className="song-version-copy"><strong>{version.label || version.facts.title}</strong><p className="muted">{version.ref.provider === 'bilibili' ? 'B站' : 'YouTube'}{version.facts.uploader ? ' · '+version.facts.uploader : ''}{version.id === song.defaultVersionId && <span className="song-default-badge">默认播放</span>}</p></div>
-        <div className="song-version-actions"><button className="btn btn-secondary btn-sm" onClick={() => onPlay({ kind: 'song', songId: song.id, explicitVersionId: version.id }, song)}><PlayIcon size={16}/>播放此版本</button><button className="btn btn-ghost btn-sm" disabled={busy || song.defaultVersionId === version.id} onClick={() => void run([{ type: 'set-default', songId: song.id, versionId: version.id }])}>设为默认版本</button></div>
+      {versionPlayback&&<p className="muted">切换本次播放与设为默认分别保存；浏览版本不改变播放。</p>}
+      {switchFeedback&&<p className="feedback" role="status">{switchFeedback}{versionPlayback?.error&&<span> {versionPlayback.error}</span>}</p>}
+      {versions.map(version => <div className={'song-version-item'+(versionPlayback?.currentVersionId===version.id?' current':'')} aria-current={versionPlayback?.currentVersionId===version.id?'true':undefined} key={version.id}><div className="song-version-copy"><strong>{version.label || version.facts.title}</strong><p className="muted">{version.ref.provider === 'bilibili' ? 'B站' : 'YouTube'}{version.facts.uploader ? ' · '+version.facts.uploader : ''}{versionPlayback?.currentVersionId===version.id&&<span className="song-current-badge">当前播放版本</span>}{version.id === song.defaultVersionId && <span className="song-default-badge">默认播放</span>}</p></div>
+        <div className="song-version-actions"><button className="btn btn-secondary btn-sm" disabled={!!switching||versionPlayback?.preparing} aria-busy={switching===version.id||undefined} onClick={() => void switchVersion(version)}><PlayIcon size={16}/>{switching===version.id?'切换中…':'播放此版本'}</button><button className="btn btn-ghost btn-sm" disabled={busy || song.defaultVersionId === version.id} onClick={() => void run([{ type: 'set-default', songId: song.id, versionId: version.id }])}>设为默认版本</button></div>
         <details className="song-version-details"><summary>版本详情</summary>
         <label className="field"><span className="field-label">版本名称</span><input className="input" aria-label={'版本名称 ' + version.facts.title} value={labels[version.id] ?? version.label} disabled={busy} onChange={event => setLabels(old => ({ ...old, [version.id]: event.target.value }))}/></label>
         <label className="field"><span className="field-label">版本类别</span><select className="select" aria-label={'版本类别 '+version.facts.title} value={kinds[version.id]??version.kind} onChange={event=>setKinds(old=>({...old,[version.id]:event.target.value}))}><option value="studio">录音室</option><option value="mv">MV</option><option value="live">现场</option><option value="cover">翻唱</option><option value="remix">混音</option><option value="other">其他</option></select></label>
@@ -61,6 +73,7 @@ type Props = {
   loadError?: string; onRetry?: () => void;
   youtubeEnabled?: boolean; disabledDisplay?: 'show' | 'dim' | 'hide'; source?: 'all' | 'bilibili' | 'youtube';
   sourceControls?: ReactNode; desktop?: boolean;
+  versionPlayback?:MobileVersionPlayback;
   onManage?: () => void;
 };
 
@@ -83,13 +96,14 @@ export function SongLibraryWorkspace(props: Props) {
   return <><MemoSongLibraryPage {...props} {...(props.desktop ? actions : {})}/>{managing && props.state && <MemoDesktopSongDialog library={props.state} commit={managerActions.commit} youtubeEnabled={props.youtubeEnabled ?? true} onChange={actions.onChange} onClose={managerActions.onClose} onSearch={actions.onSearch} onPlay={actions.onPlay}/>}</>;
 }
 
-export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, onSearch, onPlay, onPlayAll, busy, onChange, loadError, onRetry, youtubeEnabled = true, disabledDisplay = 'dim', source = 'all', sourceControls, desktop = false, onManage }: Props) {
+export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, onSearch, onPlay, onPlayAll, busy, onChange, loadError, onRetry, youtubeEnabled = true, disabledDisplay = 'dim', source = 'all', sourceControls, desktop = false, onManage, versionPlayback }: Props) {
   const [filter, setFilter] = useState(''), [editing, setEditing] = useState<string>(), [name, setName] = useState(''), [creating, setCreating] = useState<'new' | 'rename'>(), [destination, setDestination] = useState(''), [remove, setRemove] = useState(false);
   const [maintenance, setMaintenance] = useState(false);
   const [desktopContext, setDesktopContext] = useState<SongDialogContext>(), [managing, setManaging] = useState(false), [adding, setAdding] = useState<Song>();
   const [addError, setAddError] = useState('');
   const [playlistFormError, setPlaylistFormError] = useState('');
   const [coverTarget, setCoverTarget] = useState<string>();
+  const [mobileSheet,setMobileSheet]=useState<'playlists'|'manage'>();
   useEffect(() => { setCoverTarget(undefined); }, [selected, desktop]);
   useEffect(() => { setPlaylistFormError(''); }, [creating, remove]);
   const changePlaylist = (edits: unknown[], complete: () => void) => {
@@ -123,20 +137,19 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
   const move = (id: string, delta: number) => { const ids = members.map(member => member.id), index = ids.indexOf(id), at = index + delta; if (at < 0 || at >= ids.length) return; ids.splice(index, 1); ids.splice(at, 0, id); void commit([favorites ? { type: 'reorder-favorites', favoriteIds: ids } : { type: 'reorder-entries', playlistId: selected, entryIds: ids }]); };
   const edited = index.songs.get(editing ?? '');
   const openEditor = (row: typeof rows[number]) => desktop ? setDesktopContext({ songId: row.songId, ...(row.entry ? { playlistId: selected, entryId: row.id } : {}), versionId: chosenFor(row)?.id }) : setEditing(row.songId);
-  const PlaylistHeading = desktop ? 'h1' : 'h2';
+  const PlaylistHeading = 'h1';
   const playlistName = favorites ? '我的收藏' : playlist?.name;
   return <section className="catalog list-view song-library-page">
-    {!desktop && <><div className="page-heading"><h1>我的歌单</h1><div className="page-actions"><button className="btn btn-secondary" onClick={() => setMaintenance(true)}>资料库维护</button><button className="btn btn-secondary" onClick={onBackup}>导入 / 导出</button><button className="btn btn-primary" onClick={() => { setName(''); setCreating('new'); }}><PlusIcon size={18}/>新建歌单</button></div></div>{sourceControls}</>}
     {loadError && <div className="feedback" role="status"><p>歌单更新暂时失败，当前内容保留。{loadError}</p><button className="btn btn-secondary" onClick={onRetry}>重试读取歌单</button></div>}
-    <div className="segmented playlist-switcher" aria-label="选择歌单"><button className={favorites ? 'selected' : ''} onClick={() => onSelect(songFavoritesId)}>我的收藏<small>{state.snapshot.favorites.length} 首</small></button>{state.snapshot.playlists.map(playlist => <button key={playlist.id} className={selected === playlist.id ? 'selected' : ''} onClick={() => onSelect(playlist.id)}>{playlist.name}<small>{playlist.entries.length} 首</small></button>)}</div>
-    <div className="playlist-intro">{desktop ? <button className="playlist-cover-button" aria-label="更换封面" title="更换封面" disabled={busy || !favorites && !playlist} onClick={() => setCoverTarget(selected)}><PlaylistCover image={coverImage} song={autoCoverSong} className="playlist-art"/><span className="playlist-cover-overlay"><CameraIcon size={28}/><span>更换封面</span></span></button> : <SongCover song={rows[0]?.song} className="playlist-art"/>}<div className="playlist-copy"><PlaylistHeading title={desktop ? playlistName : undefined}>{playlistName}</PlaylistHeading><p>{members.length} 首歌曲</p><div className="toolbar"><button className="btn btn-primary play-all" disabled={!visible.some(row => !blocked(row))} onClick={() => onPlayAll(visible.map(({ selection, song }) => ({ selection, song })))}><PlayIcon size={18}/>播放全部</button>{desktop ? <ControlPopover key={selected} className="playlist-manage-menu" buttonClassName="btn-secondary" label="歌单管理" icon={<><DotsThreeIcon size={20}/><span>管理</span></>} side="bottom">
+    {desktop&&<div className="segmented playlist-switcher" aria-label="选择歌单"><button className={favorites ? 'selected' : ''} onClick={() => onSelect(songFavoritesId)}>我的收藏<small>{state.snapshot.favorites.length} 首</small></button>{state.snapshot.playlists.map(playlist => <button key={playlist.id} className={selected === playlist.id ? 'selected' : ''} onClick={() => onSelect(playlist.id)}>{playlist.name}<small>{playlist.entries.length} 首</small></button>)}</div>}
+    <div className="playlist-intro">{desktop ? <button className="playlist-cover-button" aria-label="更换封面" title="更换封面" disabled={busy || !favorites && !playlist} onClick={() => setCoverTarget(selected)}><PlaylistCover image={coverImage} song={autoCoverSong} className="playlist-art"/><span className="playlist-cover-overlay"><CameraIcon size={28}/><span>更换封面</span></span></button> : <SongCover song={rows[0]?.song} className="playlist-art"/>}<div className="playlist-copy">{desktop?<PlaylistHeading title={playlistName}>{playlistName}</PlaylistHeading>:<div className="mobile-playlist-heading"><h1 aria-label={playlistName}><button aria-label="选择歌单" onClick={()=>setMobileSheet('playlists')}><span>{playlistName}</span><CaretDownIcon size={18}/></button></h1><button className="btn btn-icon" aria-label="歌单管理" onClick={()=>setMobileSheet('manage')}><DotsThreeIcon size={25}/></button></div>}<p>{members.length} 首歌曲</p><div className="toolbar"><button className="btn btn-primary play-all" disabled={!visible.some(row => !blocked(row))} onClick={() => onPlayAll(visible.map(({ selection, song }) => ({ selection, song })))}><PlayIcon size={18}/>播放全部</button>{desktop && <ControlPopover key={selected} className="playlist-manage-menu" buttonClassName="btn-secondary" label="歌单管理" icon={<><DotsThreeIcon size={20}/><span>管理</span></>} side="bottom">
       {playlist && <><button disabled={busy} onClick={() => { setName(playlist.name); setCreating('rename'); }}><PencilSimpleIcon size={18}/>歌单改名</button><hr/></>}
       <button onClick={() => { setName(''); setCreating('new'); }}><PlusIcon size={18}/>新建歌单</button>
       <button onClick={() => onManage ? onManage() : setManaging(true)}><ListBulletsIcon size={18}/>歌曲管理</button>
       <button onClick={onBackup}><ArrowsDownUpIcon size={18}/>导入 / 导出</button>
       {playlist && <><hr/><button className="danger-text" disabled={busy} onClick={() => setRemove(true)}><TrashIcon size={18}/>删除歌单</button></>}
-    </ControlPopover> : playlist && <><button className="btn btn-secondary" onClick={() => { setName(playlist.name); setCreating('rename'); }}>改名</button><button className="btn btn-secondary" onClick={() => setRemove(true)}>删除歌单</button></>}</div></div></div>
-    {desktop ? <div className="playlist-list-toolbar"><label className="search-field search-field-inline"><input aria-label="搜索歌单内音乐" placeholder="搜索歌单内音乐" value={filter} onChange={event => setFilter(event.target.value)}/></label>{sourceControls}<span className="muted">{visible.length === members.length ? `${visible.length} 首歌曲` : `${visible.length} / ${members.length} 首歌曲`}</span></div> : <label className="search-field search-field-inline"><input aria-label="搜索歌单内音乐" placeholder="搜索歌单内音乐" value={filter} onChange={event => setFilter(event.target.value)}/></label>}
+    </ControlPopover>}</div></div></div>
+    <div className="playlist-list-toolbar"><label className="search-field search-field-inline"><input aria-label="搜索歌单内音乐" placeholder="搜索歌单内音乐" value={filter} onChange={event => setFilter(event.target.value)}/></label>{sourceControls}{desktop&&<span className="muted">{visible.length === members.length ? `${visible.length} 首歌曲` : `${visible.length} / ${members.length} 首歌曲`}</span>}</div>
     <PagedList id={'songs:' + selected + ':' + filter} group="library" label="歌单歌曲" items={visible}>{items => items.length ? <div className="track-list">{items.map(row => {
       const versions = index.versionsBySong.get(row.songId) ?? [], chosen = chosenFor(row), favorite = index.favorites.get(row.songId);
       return <div className={'song-library-row' + (blocked(row) && disabledDisplay === 'dim' ? ' source-disabled' : '')} key={row.id}>
@@ -170,10 +183,21 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
         </details>}
       </div>;
     })}</div> : <div className="empty"><MusicNotesIcon size={36}/><h3>这里还没有匹配的歌曲</h3><button className="btn btn-secondary" onClick={() => onSearch()}>去搜索音乐</button></div>}</PagedList>
+    {!desktop&&mobileSheet&&<Modal title={mobileSheet==='playlists'?'选择歌单':'歌单管理'} className="mobile-actions-sheet" onClose={()=>setMobileSheet(undefined)}><div className="mobile-action-list">
+      {mobileSheet==='playlists'?<>
+        {[{id:songFavoritesId,name:'我的收藏',count:state.snapshot.favorites.length},...state.snapshot.playlists.map(item=>({id:item.id,name:item.name,count:item.entries.length}))].map(item=><button key={item.id} aria-pressed={selected===item.id} onClick={()=>{onSelect(item.id);setMobileSheet(undefined);setFilter('');}}><MusicNotesIcon size={23}/><span>{item.name}<small>{item.count} 首</small></span>{selected===item.id&&<CheckIcon size={22}/>}</button>)}
+      </>:<>
+        {playlist&&<button disabled={busy} onClick={()=>{setMobileSheet(undefined);setName(playlist.name);setCreating('rename');}}><PencilSimpleIcon size={22}/><span>歌单改名</span></button>}
+        <button onClick={()=>{setMobileSheet(undefined);setName('');setCreating('new');}}><PlusIcon size={22}/><span>新建歌单</span></button>
+        <button onClick={()=>{setMobileSheet(undefined);setMaintenance(true);}}><ListBulletsIcon size={22}/><span>资料库维护</span></button>
+        <button onClick={()=>{setMobileSheet(undefined);onBackup();}}><ArrowsDownUpIcon size={22}/><span>导入 / 导出</span></button>
+        {playlist&&<button className="danger-text" disabled={busy} onClick={()=>{setMobileSheet(undefined);setRemove(true);}}><TrashIcon size={22}/><span>删除歌单</span></button>}
+      </>}
+    </div></Modal>}
     {creating && <Modal title={creating === 'rename' ? '歌单改名' : '新建歌单'} onClose={() => setCreating(undefined)}><form onSubmit={event => { event.preventDefault(); changePlaylist([creating === 'rename' && playlist ? { type: 'rename-playlist', playlistId: playlist.id, name: name.trim() } : { type: 'create-playlist', name: name.trim() }], () => setCreating(undefined)); }}><label className="field"><span className="field-label">歌单名称</span><input className="input" aria-label="歌单名称" value={name} maxLength={200} required onChange={event => setName(event.target.value)}/></label>{desktop && playlistFormError && <p className="feedback" role="alert">{playlistFormError}</p>}<button className="btn btn-primary" disabled={busy || !name.trim()}>保存歌单</button></form></Modal>}
     {desktop && coverTarget === selected && (favorites || playlist) && <DesktopPlaylistCoverDialog key={selected} library={state} targetId={selected} songs={rows.map(row => row.song)} image={coverImage} busy={busy} commit={commit} onClose={() => setCoverTarget(undefined)}/>}
     {remove && playlist && <Modal title="删除歌单" onClose={() => setRemove(false)}><p>删除「{playlist.name}」及 {playlist.entries.length} 个成员，歌曲资料和当前队列保留。</p>{desktop && playlistFormError && <p className="feedback" role="alert">{playlistFormError}</p>}<button className="btn btn-danger" disabled={busy} onClick={() => changePlaylist([{ type: 'delete-playlist', playlistId: playlist.id }], () => setRemove(false))}>确认删除</button></Modal>}
-    {edited && <SongEditor key={edited.id} song={edited} state={state} commit={commit} onPlay={onPlay} onSearch={onSearch} onClose={() => setEditing(undefined)} onChange={onChange}/>}
+    {edited && <SongEditor key={edited.id} song={edited} state={state} commit={commit} onPlay={onPlay} onSearch={onSearch} onClose={() => setEditing(undefined)} onChange={onChange} versionPlayback={versionPlayback}/>}
     {maintenance && <SongMaintenancePanel library={state} onChange={onChange} onClose={() => setMaintenance(false)}/>}
     {(desktopContext || managing) && <DesktopSongDialog library={state} context={desktopContext} commit={(edits,revision)=>commit(edits,revision,true)} youtubeEnabled={youtubeEnabled} onChange={onChange} onPlay={onPlay} onSearch={onSearch} onClose={() => { setDesktopContext(undefined); setManaging(false); }}/>}
     {adding && <Modal title={'加入歌单 · ' + adding.title} className="form-modal" onClose={() => setAdding(undefined)}><form onSubmit={event => { event.preventDefault(); setAddError(''); void commit([{ type: 'add-entry', playlistId: destination, songId: adding.id }],undefined,true).then(saved => { if (saved) setAdding(undefined); else setAddError('未能添加，选择已保留，请重试。'); }).catch(issue => setAddError(errorText(issue))); }}><label className="field"><span className="field-label">选择目标歌单</span><select className="select" aria-label="添加目标歌单" data-autofocus="true" value={destination} disabled={busy} onChange={e => setDestination(e.target.value)}><option value="">选择歌单</option>{state.snapshot.playlists.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>{!state.snapshot.playlists.length && <p className="muted">还没有自建歌单，请先新建一个歌单。</p>}{addError && <p className="feedback" role="alert">{addError}</p>}<div className="modal-actions"><button className="btn btn-ghost" type="button" onClick={() => setAdding(undefined)}>取消</button><button className="btn btn-primary" disabled={busy || !destination}>添加歌曲</button></div></form></Modal>}

@@ -121,9 +121,14 @@ export function useLyrics(track: Track | null, duration: number | undefined, ver
     if (!signal.aborted) { setState(value); setOffset('0'); setMatched(false); setPreview(undefined); setSelector(false); }
   });
   const closeSettings = () => { if (busy !== '匹配' && busy !== '保存') cancel(); setSettings(false); setSelector(false); setOffset(String((state?.offsetMs ?? 0) / 1000)); };
+  const openSelector = () => {
+    setSelector(true); setSettings(true);
+    // A failed initial read has no revision yet. Recover it before a manual save.
+    if (!state || stale) void load(!!state);
+  };
   return {
     sourceKey, track, state, document: state?.document, durationSeconds, offsetMs, busy, error, stale, matched,
-    settings, selector, setSelector, openSettings: () => { setSelector(false); setSettings(true); }, closeSettings,
+    settings, selector, setSelector, openSelector, openSettings: () => { setSelector(false); setSettings(true); }, closeSettings,
     title, setTitle, artist, setArtist, text, setText, offset, setOffset, results, preview,
     bottom: display.bottom, translations: display.translations, updateDisplay,
     run, cancel, load, resolve, search, inspect, accept, importText, saveOffset, clear,

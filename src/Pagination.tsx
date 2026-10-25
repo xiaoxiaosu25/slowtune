@@ -57,7 +57,7 @@ export function Pagination({ label, page, size, total, busy = false, knownPages 
     setDraft(String(target));
     if (target !== page && submitted.current !== token) { submitted.current = token; onPage(target); }
   };
-  return <nav className="pagination" aria-label={label + '分页'} aria-busy={busy}>
+  return <nav className="pagination" aria-label={label + '分页'} aria-busy={busy} data-single-page={last===1||undefined}>
     <label className="pagination-size"><span>每页</span><select className="select select-sm" aria-label={label + '每页条数'} value={size} disabled={busy} onChange={event => onSize(Number(event.target.value))}>
       {pageSizes.map(value => <option key={value} value={value}>{value} 条</option>)}
     </select></label>

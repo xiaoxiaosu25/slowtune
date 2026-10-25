@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate, libraryAction } from '../scripts/browser-ui.mjs';
+import { navigate, libraryAction, selectPlaylist } from '../scripts/browser-ui.mjs';
 
 const sourceArtwork = 'https://i0.hdslb.com/catalog-source.jpg', directoryArtwork = 'https://p2.music.126.net/catalog-studio.jpg';
 const record = { provider: 'netease', id: '100', title: '晴天', artists: ['周杰伦'], album: '叶惠美', artwork: directoryArtwork, url: 'https://music.163.com/song?id=100' };
@@ -96,7 +96,7 @@ test('mobile does not start matching and retains source presentation even when d
   const browser = await chromium.launch({ channel: 'msedge', headless: true }); t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); page.setDefaultTimeout(10000); await route(page, f.origin);
   const requests = []; page.on('request', request => { if (request.url().includes('/catalog/')) requests.push(request.url()); });
-  await page.goto(f.origin); await navigate(page, '歌单');
+  await page.goto(f.origin); await navigate(page, '歌单');await selectPlaylist(page,'我的收藏');
   const row = page.locator('.song-library-row').filter({ has: page.getByRole('button', { name: '播放 【Hi-Res】周杰伦《晴天》', exact: true }) });
   await row.waitFor(); assert.equal(await row.locator('img').getAttribute('src'), sourceArtwork);
   await page.waitForTimeout(3500); assert.deepEqual(requests, []);

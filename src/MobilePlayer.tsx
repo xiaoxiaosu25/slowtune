@@ -16,7 +16,7 @@ export function MobilePlayer({ artwork, lyrics, title, artist, source, progress,
     const next = !lyricView; setLyricView(next);
     try { preferenceStorage().setItem(lyricViewKey, String(next)); } catch { /* Keep the current view usable when storage is unavailable. */ }
   };
-  const song = <div className="mobile-player-song"><div className="playing-title">{title}</div><div className="mobile-player-artist">{artist}</div><div className="mobile-player-source">{source}</div></div>;
+  const song = <div className="mobile-player-song"><div className="playing-title">{title}</div><div className="mobile-player-artist" title={typeof artist === 'string' ? artist : undefined}>{artist}</div>{source && <div className="mobile-player-source">{source}</div>}</div>;
   return <section className={'mobile-player' + (lyricView ? ' is-lyrics' : '')} aria-label="正在播放">
     {lyricView && song}
     <div className="mobile-player-visual">{lyricView ? lyrics : artwork}</div>

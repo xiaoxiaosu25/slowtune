@@ -75,11 +75,12 @@ export function BottomLyrics({ lyrics, playback, compact = false, desktop = fals
   </section>;
 }
 
-export function LyricsView({ lyrics, playback, onSeek }: { lyrics: LyricsController; playback: LyricPlayback; onSeek: (seconds: number) => void }) {
+export function LyricsView({ lyrics, playback, onSeek, recovery = false }: { lyrics: LyricsController; playback: LyricPlayback; onSeek: (seconds: number) => void; recovery?: boolean }) {
   const root = useRef<HTMLElement>(null), scroll = useRef<HTMLDivElement>(null), timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [follow, setFollow] = useState(true);
   const active = useLyricPlayback(lyrics.document, lyrics.offsetMs, playback, root);
   const document = lyrics.document;
+  const canRecover = recovery && !!lyrics.track && !document?.instrumental && !lyrics.busy;
   const resume = () => { clearTimeout(timer.current); setFollow(true); };
   const browse = () => {
     if (!document?.synced) return;
@@ -106,7 +107,12 @@ export function LyricsView({ lyrics, playback, onSeek }: { lyrics: LyricsControl
     return () => resize.disconnect();
   }, [active, follow, document, lyrics.translations]);
   return <section ref={root} className="lyrics-panel" aria-label="当前版本歌词">
-    {!document || document.instrumental || !document.lines.length ? <div className="lyrics-empty"><MusicNotesIcon size={32} weight="thin"/><p role="status">{statusText(lyrics)}</p></div> : <>
+    {!document || document.instrumental || !document.lines.length ? <div className="lyrics-empty"><MusicNotesIcon size={32} weight="thin"/><p role="status">{recovery && !lyrics.track ? '播放音乐后查看歌词' : statusText(lyrics)}</p>
+      {canRecover && <div className="lyrics-recovery-actions">
+        <button className="btn btn-secondary" onClick={lyrics.openSelector}>查找或导入歌词</button>
+        {lyrics.error && <button className="btn btn-ghost" onClick={() => void lyrics.resolve()}>重试读取歌词</button>}
+      </div>}
+    </div> : <>
       <div className="lyrics-scroll" ref={scroll} tabIndex={0} aria-label="歌词正文" onWheel={browse} onTouchStart={browse} onTouchMove={browse} onKeyDown={event => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) { browse(); event.stopPropagation(); } }}>
         <ol>{document.lines.map((line, index) => <li key={index} aria-current={active === index ? 'true' : undefined} className={(line.startMs === null ? 'unsynced ' : '') + (index < active ? 'is-past' : '')}>
           {line.startMs === null ? <span>{line.text}</span> : <button type="button" title={'跳转到 ' + time(Math.max(0, (line.startMs + lyrics.offsetMs) / 1000))} onClick={() => { resume(); onSeek(Math.max(0, (line.startMs! + lyrics.offsetMs) / 1000)); }}><LyricText line={line} index={index} current={active === index}/></button>}

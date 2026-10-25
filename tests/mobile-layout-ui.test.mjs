@@ -19,16 +19,17 @@ test('mobile navigation, player and direct lyrics keep one audio session and fit
   const primary = page.getByRole('navigation',{name:'手机导航',exact:true});
   await primary.waitFor();
   const miniPlay=await page.locator('.mobile-mini-transport .play-toggle').boundingBox();assert(miniPlay.width>=48&&miniPlay.height>=48,'mini-player playback has a 48px touch target');
-  assert.deepEqual(await primary.getByRole('button').allTextContents(),['发现','歌单','我的']);
+  assert.deepEqual(await primary.getByRole('button').allTextContents(),['发现','音乐库','我的']);
   await page.getByRole('navigation',{name:'发现栏目'}).getByRole('button',{name:'音乐榜单',exact:true}).click();
   await page.getByRole('heading',{name:'演示榜单',exact:true}).waitFor();
   assert.equal(await primary.getByRole('button',{name:'发现',exact:true}).getAttribute('aria-current'),'page');
   await primary.getByRole('button',{name:'我的',exact:true}).click();
   await page.getByRole('button',{name:'音乐来源 来源开关与状态',exact:true}).click();
   await page.locator('[data-settings-section="sources"]:visible').waitFor();
-  await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();
+  await page.getByRole('button',{name:'返回上一级',exact:true}).click();
   await page.getByRole('region',{name:'我的',exact:true}).waitFor();
-  await primary.getByRole('button',{name:'歌单',exact:true}).click();
+  await primary.getByRole('button',{name:'音乐库',exact:true}).click();
+  await page.locator('.mobile-library').getByRole('button',{name:'我的收藏 2 首歌曲',exact:true}).click();
   const firstSong = await page.locator('.song-library-row').first().boundingBox(), mini = await page.locator('.mobile-mini-player').boundingBox();
   assert(firstSong.y+firstSong.height<=mini.y,'the first library song is visible above the mini player without scrolling');
   assert.equal(await page.getByRole('textbox',{name:'搜索歌单内音乐'}).evaluate(e=>getComputedStyle(e).fontSize),'16px','mobile text inputs avoid focus zoom');
@@ -72,8 +73,8 @@ test('mobile navigation, player and direct lyrics keep one audio session and fit
   await page.getByRole('dialog',{name:'播放队列',exact:true}).waitFor({state:'detached'});
   await page.goBack(); await primary.waitFor();
   await page.getByRole('button',{name:'搜索歌曲或视频',exact:true}).click();
-  const search = page.getByRole('dialog',{name:'搜索音乐',exact:true});
-  await search.getByLabel('弹窗搜索关键词').fill('风从远方来'); await search.getByRole('button',{name:'搜索',exact:true}).click();
+  const search = page.getByRole('main',{name:'搜索音乐',exact:true});
+  await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('风从远方来'); await search.getByRole('button',{name:'搜索',exact:true}).click();
   await search.getByRole('button',{name:'播放 风从远方来',exact:true}).waitFor();
   const box = await search.boundingBox(); assert.equal(box.x,0); assert.equal(box.y,0); assert.equal(box.width,360); assert.equal(box.height,640);
   await page.setViewportSize({width:320,height:568});
@@ -159,6 +160,8 @@ test('short landscape keeps version selection separate from seeking and playback
     await queue.click();
     const drawer = page.getByRole('dialog',{name:'播放队列',exact:true});
     await drawer.waitFor();
+    assert.equal(Math.round((await drawer.boundingBox()).height),320,'short landscape uses the viewport height for the queue');
+    assert((await drawer.locator('.queue-content').boundingBox()).height>=100,'short landscape leaves space for queue songs and actions');
     await drawer.getByRole('button',{name:'关闭播放队列',exact:true}).click();
   }
 });
@@ -187,4 +190,76 @@ test('mobile Back skips replaced playback menus after lyrics settings close', {t
     assert.equal(await page.locator('dialog[open],[popover]:popover-open').count(),0,'Forward restores the player without its closed layers');
     await context.close();
   }
+});
+
+test('mobile song hierarchy keeps canonical metadata, source versions and queue edits usable on compact screens', {timeout:60000}, async t => {
+  const originalTitle='【现场完整收录】风从远方来 · 音乐会特别加长原始视频标题', artists=['名字很长的演唱者与另一位合作音乐人','还有一位一起演出的朋友'], label='音乐会特别现场录音与加长返场版本';
+  const fixture=await createMobileFixture({title:originalTitle,artists}), browser=await chromium.launch({headless:true});
+  t.after(async()=>{await browser.close();await fixture.close();});
+  const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,colorScheme:'light'});
+  await context.addInitScript(record=>localStorage.setItem('slow-listening:playback:v3',JSON.stringify(record)),queueRecord(fixture.tracks));
+  const page=await context.newPage(),errors=[],artifacts=join(developmentPaths().artifacts,'mobile-layout');page.setDefaultTimeout(8000);
+  page.on('pageerror',error=>errors.push(error.message));
+  let metadataAvailable=true;
+  await page.route('**/api/song-library',async route=>{
+    const response=await route.fetch(),state=await response.json();
+    if(metadataAvailable){state.snapshot.songs[0].title='风从远方来';state.snapshot.versions[0].label=label;}
+    else for(const field of ['songs','versions','favorites','playlists'])state.snapshot[field]=[];
+    await route.fulfill({json:state});
+  });
+  await page.goto(fixture.base);await page.getByRole('button',{name:'打开正在播放',exact:true}).click();
+  await page.getByRole('button',{name:'播放',exact:true}).click();
+  await page.waitForFunction(()=>{const audio=document.querySelector('audio');return audio&&!audio.paused&&audio.currentTime>.1;});
+  await page.evaluate(()=>{window.__hierarchyAudio=document.querySelector('audio');});
+  const preparations=fixture.preparations.length;
+  assert.equal(await page.locator('.mobile-player .playing-title-trigger').textContent(),'风从远方来');
+  assert.equal(await page.locator('.mobile-player-artist').textContent(),artists.join(' / '));
+  await page.locator('.mobile-player .playing-title-trigger').click();
+  const title=page.getByRole('dialog',{name:'完整标题',exact:true});
+  await title.getByText(originalTitle,{exact:true}).waitFor();
+  assert.equal(await title.locator('.mobile-track-details dd').nth(1).textContent(),artists.join(' / '));
+  assert.equal(await title.locator('.mobile-track-details dd').last().textContent(),'B站 · '+label);
+  await title.getByRole('button',{name:'关闭',exact:true}).click();
+  await page.getByRole('button',{name:'暂停',exact:true}).click();
+  const position=await page.locator('audio').evaluate(audio=>audio.currentTime);
+  for(const view of ['artwork','lyrics']) {
+    if(view==='lyrics')await page.getByRole('button',{name:'查看歌词',exact:true}).click();
+    for(const viewport of [{width:320,height:568},{width:360,height:640},{width:390,height:844},{width:430,height:932},{width:568,height:320},{width:667,height:375}]) {
+      await page.setViewportSize(viewport);
+      const layout=await page.evaluate(()=>{
+        const box=selector=>document.querySelector(selector).getBoundingClientRect().toJSON();
+        return {song:box('.mobile-player-song'),controls:box('.mobile-player-controls'),version:box('.mobile-player-version'),count:box('.mobile-version-count'),platform:box('.mobile-source-platform'),overflow:document.documentElement.scrollWidth>innerWidth};
+      });
+      assert.equal(layout.overflow,false);
+      assert(layout.platform.right<=layout.count.x,'platform and version action do not overlap');
+      assert(layout.count.right<=layout.version.right+1&&layout.version.height>=48);
+      assert(layout.controls.y>=layout.song.bottom,'metadata stays above playback controls');
+      await page.getByRole('button',{name:'选择播放版本 风从远方来',exact:true}).click();
+      const versions=page.getByRole('dialog',{name:'歌曲与版本',exact:true});await versions.waitFor();
+      assert.equal(await page.locator('audio').evaluate(audio=>audio.currentTime),position);
+      await versions.getByRole('button',{name:'关闭',exact:true}).click();
+      await page.getByRole('button',{name:'播放队列',exact:true}).scrollIntoViewIfNeeded();
+      await page.screenshot({path:join(artifacts,`metadata-${view}-${viewport.width}-${viewport.height}.png`)});
+    }
+  }
+  await page.getByRole('button',{name:'播放',exact:true}).click();
+  await page.getByRole('button',{name:'播放队列',exact:true}).click();
+  const queue=page.getByRole('dialog',{name:'播放队列',exact:true});await queue.waitFor();
+  assert((await queue.locator('.queue-content').boundingBox()).height>=100,'short landscape keeps a usable scrollable queue');
+  await queue.getByRole('button',{name:'队列操作 下一首 · 无封面测试',exact:true}).click();
+  await queue.locator('[popover]:popover-open').waitFor();
+  await page.waitForFunction(()=>document.querySelector('.queue-actions[data-open="true"]'));
+  await page.screenshot({path:join(artifacts,'metadata-queue-menu.png')});
+  await queue.getByRole('button',{name:'上移',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.queue-track-main')?.getAttribute('aria-label')==='播放队列歌曲 下一首 · 无封面测试');
+  await queue.getByRole('button',{name:'队列操作 下一首 · 无封面测试',exact:true}).click();
+  await queue.getByRole('button',{name:'移除',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('.queue-track').length===1);
+  await queue.getByRole('button',{name:'关闭播放队列',exact:true}).click();
+  assert.equal(await page.evaluate(()=>window.__hierarchyAudio===document.querySelector('audio')&&!window.__hierarchyAudio.paused),true);
+  assert.equal(fixture.preparations.length,preparations);
+  metadataAvailable=false;await page.reload();await page.locator('.mobile-player').waitFor();
+  assert.equal(await page.locator('.mobile-player .playing-title-trigger').textContent(),originalTitle,'missing song metadata retains the real original title');
+  assert.equal(await page.getByRole('button',{name:'查看当前来源',exact:true}).isVisible(),true);
+  assert.deepEqual(errors,[]);
 });

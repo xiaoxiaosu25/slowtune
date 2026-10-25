@@ -45,7 +45,9 @@ test('pagination: thousands of rows, first/last, jumps, sizes, filters, stable r
   await page.getByRole('textbox',{name:'搜索歌单内音乐',exact:true}).fill('分页歌曲 2300');
   assert.equal(await libraryRows.count(),1);assert.equal(await libraryRows.locator('.track-name').textContent(),'分页歌曲 2300');
   await page.getByRole('textbox',{name:'搜索歌单内音乐',exact:true}).fill('');
-  await library.getByRole('button',{name:'播放全部',exact:true}).click();await page.getByText(/播放队列最多支持 500 首/).waitFor();
+  await library.getByRole('button',{name:'播放全部',exact:true}).click();
+  await page.getByRole('button',{name:'播放失败，查看详情',exact:true}).click();
+  await page.getByText(/播放队列最多支持 500 首/).waitFor();await page.keyboard.press('Escape');
   await navigate(page,'关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();
   const feed=page.locator('.follow-feed-pages'),input=page.getByRole('textbox',{name:'最近更新页码',exact:true});
   await input.waitFor();await page.waitForFunction(()=>!document.querySelector('.follow-feed-pages [aria-busy="true"]'));
@@ -143,8 +145,10 @@ test('pagination: page changes keep the first row clear of desktop and mobile he
     assert(bounds.row>=bounds.header,`first chart row clears the fixed header at ${width}px: ${JSON.stringify(bounds)}`);
   }
   fixture.state.searchItems=Array.from({length:60},(_,index)=>({ref:{provider:'bilibili',kind:'video',id:'BV'+String(index+1).padStart(10,'0')},resourceId:'modal-'+index,title:'翻页歌曲 '+(index+1),url:'https://www.bilibili.com/video/BV'+String(index+1).padStart(10,'0')}));
-  await page.getByRole('textbox',{name:'搜索歌曲或视频',exact:true}).fill('翻页歌曲');await page.getByRole('button',{name:'开始搜索',exact:true}).click();
-  const search=page.getByRole('dialog',{name:'搜索音乐',exact:true});await search.locator('.track-row').first().waitFor();
+  await navigate(page,'搜索');
+  const search=page.getByRole('main',{name:'搜索音乐',exact:true});
+  await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('翻页歌曲');await search.getByRole('button',{name:'搜索',exact:true}).click();
+  await search.locator('.track-row').first().waitFor();
   await search.getByRole('button',{name:'B站搜索结果下一页',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('input[aria-label="B站搜索结果页码"]')?.value==='2');
   const bounds=await search.locator('.track-row').first().evaluate(element=>new Promise(resolve=>requestAnimationFrame(()=>resolve({row:element.getBoundingClientRect().top,container:document.querySelector('.search-results').getBoundingClientRect().top}))));

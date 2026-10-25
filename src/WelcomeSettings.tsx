@@ -18,9 +18,9 @@ async function prepareImage(file:File) {
   }finally{bitmap.close();}
 }
 
-export function WelcomeSettings() {
+export function WelcomeSettings({mobile=false}:{mobile?:boolean}) {
   const [state,setState]=useState<WelcomeState>(),[draft,setDraft]=useState<WelcomeOptions>(defaultWelcome),[image,setImage]=useState<string>();
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[device,setDevice]=useState<'desktop'|'mobile'>('desktop'),[previewLogin,setPreviewLogin]=useState(false),[previewTheme,setPreviewTheme]=useState<'light'|'dark'>('light');
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState(''),[device,setDevice]=useState<'desktop'|'mobile'>(mobile?'mobile':'desktop'),[previewLogin,setPreviewLogin]=useState(false),[previewTheme,setPreviewTheme]=useState<'light'|'dark'>('light');
   const [width,setWidth]=useState(0),host=useRef<HTMLDivElement>(null),serial=useRef(0),mounted=useRef(true),drag=useRef<{x:number;y:number;focus:{x:number;y:number}}|null>(null);
   const theme=useSyncExternalStore(subscribeTheme,getThemeState);
   const read=async()=>{setError('');try{const value=await request<WelcomeState>('/api/settings/welcome');if(!mounted.current)return;setState(value);setDraft(value.welcome);setImage(undefined);}catch(issue){if(mounted.current)setError(errorText(issue));}};

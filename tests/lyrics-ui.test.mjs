@@ -193,8 +193,8 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     const box = await panel.boundingBox(); assert.ok(box.height >= 100 && box.y + box.height <= viewport.height + 1);
     await page.screenshot({ animations: 'disabled', path: join(directory, 'lyrics-layout-' + viewport.width + '.png') });
-    const controls = await page.locator('.playing-detail').evaluate(element => { const bounds = element.getBoundingClientRect(), lyrics = document.querySelector('.lyrics-panel').getBoundingClientRect(); return { top: bounds.top, bottom: bounds.bottom, lyricBottom: lyrics.bottom }; });
-    assert.ok(controls.top >= controls.lyricBottom && controls.bottom <= viewport.height, 'short-screen controls and lyrics fit without overlap: ' + JSON.stringify({ viewport, controls }));
+    const controls = await page.locator('.playing-detail').evaluate(element => { const bounds = element.getBoundingClientRect(), lyrics = document.querySelector('.lyrics-panel').getBoundingClientRect(); return { top: bounds.top, bottom: bounds.bottom, overlaps:bounds.left<lyrics.right&&bounds.right>lyrics.left&&bounds.top<lyrics.bottom&&bounds.bottom>lyrics.top }; });
+    assert.ok(!controls.overlaps && controls.bottom <= viewport.height, 'short-screen controls and lyrics fit without overlap: ' + JSON.stringify({ viewport, controls }));
   }
   await page.setViewportSize({ width: 740, height: 1000 });
   await page.locator('audio').evaluate(audio => { audio.currentTime = 10; audio.dispatchEvent(new Event('timeupdate')); });
@@ -255,11 +255,11 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await page.reload(); await page.getByRole('button', { name: '播放', exact: true }).click();
   await page.waitForFunction(() => /part=901/.test(document.querySelector('audio').currentSrc) && !document.querySelector('audio').paused);
   await page.getByRole('button', { name: '暂停', exact: true }).click();
-  await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
+  if(!await page.locator('.mobile-player').count())await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await panel.getByRole('button', { name: '现场第一行', exact: true }).waitFor(); assert.equal(await page.locator('audio').evaluate(a => a.paused), true);
   assert.equal(await page.locator('.bottom-lyrics').count(), 0, 'reload keeps the desktop lyric preference out of mobile');
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
-  await page.getByRole('button',{name:'搜索歌曲或视频',exact:true}).click(); await page.getByLabel('弹窗搜索关键词').fill('未收藏来源'); await page.getByRole('button', { name: '搜索', exact: true }).click(); await page.getByRole('button', { name: '播放 未收藏来源', exact: true }).click();
+  await page.getByRole('button',{name:'搜索歌曲或视频',exact:true}).click(); await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('未收藏来源'); await page.getByRole('button', { name: '搜索', exact: true }).click(); await page.getByRole('button', { name: '播放 未收藏来源', exact: true }).click();
   await page.waitForFunction(() => /part=902/.test(document.querySelector('audio').currentSrc)); await page.getByRole('button', { name: '保持本 P', exact: true }).click(); await page.keyboard.press('Escape'); await page.getByRole('button', { name: '打开正在播放', exact: true }).click(); await openSettings(page); await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   dialog = page.getByRole('dialog', { name: '选择歌词', exact: true }); await dialog.getByText('导入或粘贴歌词', { exact: true }).click();
   await dialog.getByLabel('导入歌词文件').setInputFiles({ name: 'lyrics.lrc', mimeType: 'text/plain', buffer: Buffer.from('纯文本歌词\n第二行文本') });
@@ -275,7 +275,9 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await openSettings(page); await settings.getByRole('button', { name: '刷新当前歌词', exact: true }).click(); await reading;
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
-  await page.getByRole('navigation', { name: '手机导航', exact: true }).getByRole('button', { name: '歌单', exact: true }).click();
+  if(await page.locator('.mobile-search-page').count())await page.getByRole('button',{name:'关闭搜索',exact:true}).click();
+  await page.getByRole('navigation', { name: '手机导航', exact: true }).getByRole('button', { name: '音乐库', exact: true }).click();
+  await page.locator('.mobile-library').getByRole('button').filter({hasText:'我的收藏'}).click();
   await page.getByRole('button', { name: '选择播放版本 测试歌曲', exact: true }).click(); await page.getByRole('button', { name: '播放此版本', exact: true }).first().click(); await page.keyboard.press('Escape');
   await page.waitForFunction(() => /part=900/.test(document.querySelector('audio').currentSrc));
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
