@@ -9,6 +9,34 @@ import { navigate, selectPlaylist, libraryAction } from '../scripts/browser-ui.m
 
 const artifacts=join(developmentPaths().artifacts,'mobile-browse');
 
+test('mobile empty queue opens an interactive search page without retaining the drawer', {timeout:60000},async t=>{
+  const fixture=await createMobileFixture(),browser=await chromium.launch({headless:true});
+  t.after(async()=>{await browser.close();await fixture.close();});
+  for(const width of [320,390]){
+    const context=await browser.newContext({viewport:{width,height:844},hasTouch:true});
+    await context.route('https://i1.hdslb.com/fixture-artwork.png',route=>route.fulfill({contentType:'image/png',body:readFileSync(resolve('public/assets/coast.png'))}));
+    const page=await context.newPage();page.setDefaultTimeout(8000);
+    await page.goto(fixture.base);
+    await page.getByRole('button',{name:'打开播放队列',exact:true}).click();
+    const drawer=page.getByRole('dialog',{name:'播放队列',exact:true});
+    await drawer.getByRole('button',{name:'去搜索音乐',exact:true}).click();
+    await drawer.waitFor({state:'detached'});
+    const search=page.getByRole('main',{name:'搜索音乐',exact:true});
+    await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('风从远方来');
+    await search.getByRole('button',{name:'搜索',exact:true}).click();
+    await search.getByRole('button',{name:'播放 风从远方来',exact:true}).waitFor();
+    assert.equal(await page.locator('dialog[open]').count(),0,'search has no modal blocking its controls');
+    await page.goBack();
+    await page.getByRole('navigation',{name:'手机导航',exact:true}).waitFor();
+    assert.equal(await drawer.count(),0,'Back does not reopen the replaced queue');
+    await page.goForward();
+    await search.waitFor();
+    assert.equal(await drawer.count(),0,'Forward restores an interactive search without the queue');
+    await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('晚风');
+    await context.close();
+  }
+});
+
 test('mobile discovery, library details and search keep navigation context and one player', {timeout:120000},async t=>{
   const fixture=await createMobileFixture({preview:true,discovery:true}),browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});

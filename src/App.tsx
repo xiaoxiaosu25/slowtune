@@ -469,7 +469,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     }catch(e){if(active())setResults(old=>active()&&old[provider]?{...old,[provider]:{...old[provider],busy:false,error:e}}:old);}
     finally{if(provider==='youtube')c.signal.removeEventListener('abort',abort);}
   }
-  function revealSearch(){if(!desktop){if(page!=='search')searchOrigin.current=mobileRoute;setPage('search');}setSearchOpen(true);}
+  function revealSearch(){if(!desktop){setQueueOpen(false);if(page!=='search')searchOrigin.current=mobileRoute;setPage('search');}setSearchOpen(true);}
   function openSearch(){searchReturn.current?.();searchReturn.current=undefined;searchTarget.current={};authorWork.current?.abort();setAuthorBusy(false);search.current?.abort();setSearchSource('all');setQuery('');setSearched('');setSearchSong(undefined);setShowAllSearch(undefined);setLinkRef(undefined);setResults({});revealSearch();}
   function closeSearch(){search.current?.abort();actionWork.current?.abort();setActionBusy(false);setSearchOpen(false);if(!desktop&&page==='search')navigate(searchOrigin.current);setResults(old=>Object.fromEntries(Object.entries(old).map(([p,r])=>[p,{...r,busy:false}])));const back=searchReturn.current;searchReturn.current=undefined;back?.();}
   function groupSource(track:Track){if(!requireLibrary())return;closeSearch();setPopup(null);setGroupTrack(track);}
