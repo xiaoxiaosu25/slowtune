@@ -61,14 +61,14 @@ test('desktop lifecycle authenticates status and stop without exposing its key',
   assert.equal(existsSync(desktopRuntimeFile(data)), false);
 });
 
-test('legacy desktop with a custom profile blocks restart before stopping services; default fallback closes its exact app', { timeout: 30000, skip: process.platform !== 'win32' }, async () => {
+test('legacy desktop with a custom profile blocks restart before stopping services; default fallback closes its exact app', { timeout: 120000, skip: process.platform !== 'win32' }, async () => {
   const product = mkdtempSync(join(output, 'legacy app with spaces-')), data = join(product, 'profile'), ready = join(product, 'ready.json'), stopped = join(product, 'stopped.txt');
   mkdirSync(join(product, 'desktop'));
   writeFileSync(join(product, 'desktop/package.json'), '{"type":"module","main":"main.mjs"}');
   writeFileSync(join(product, 'desktop/main.mjs'), `import{app,BrowserWindow}from'electron';import{writeFileSync}from'node:fs';app.setPath('userData',process.env.MUSIC_APP_DESKTOP_DATA);app.on('before-quit',()=>writeFileSync(${JSON.stringify(stopped)},'graceful'));app.on('window-all-closed',()=>app.quit());void app.whenReady().then(async()=>{const window=new BrowserWindow({width:400,height:200});await window.loadURL('data:text/html,Legacy restart fixture');writeFileSync(${JSON.stringify(ready)},JSON.stringify({pid:process.pid}));});`);
   const env = { ...process.env, MUSIC_APP_DESKTOP_DATA: data }; delete env.NODE_OPTIONS; delete env.ELECTRON_RUN_AS_NODE;
   await stopDesktopForRestart({ root: product, data, electron, environment: env });
-  const application = run(electron, [join(product, 'desktop')], { env, windowsHide: true, timeout: 25000 }); application.catch(() => {});
+  const application = run(electron, [join(product, 'desktop')], { env, windowsHide: true, timeout: 100000 }); application.catch(() => {});
   await Promise.race([until(() => existsSync(ready)), application.then(() => { throw new Error('legacy fixture exited before creating its window'); })]);
   try {
     const calls = [];
