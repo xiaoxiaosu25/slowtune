@@ -12,7 +12,15 @@ const executablePath = process.env.MUSIC_APP_BROWSER;
 const mode = page => page.locator('.playing-art-switch');
 const media = page => page.locator('audio[data-product-media]');
 async function selectMode(page, target) {
-  for (let i = 0; i < 7 && await mode(page).getAttribute('data-visual-mode') !== target; i++) await mode(page).click();
+  await page.waitForFunction(()=>document.querySelector('.app')?.dataset.layout===(matchMedia('(max-width:760px)').matches?'mobile':'desktop'));
+  if(await page.locator('.app').getAttribute('data-layout')==='mobile') {
+    if(await mode(page).getAttribute('data-visual-mode')!==target){
+      await page.getByRole('button',{name:'更多播放选项',exact:true}).click();
+      const sheet=page.getByRole('dialog',{name:'更多播放选项',exact:true});
+      await sheet.getByRole('combobox',{name:'封面样式',exact:true}).selectOption(target);
+      await sheet.getByRole('button',{name:'关闭',exact:true}).click();
+    }
+  } else for (let i = 0; i < 7 && await mode(page).getAttribute('data-visual-mode') !== target; i++) await mode(page).click();
   assert.equal(await mode(page).getAttribute('data-visual-mode'), target);
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.playing-art-layer.is-active')).opacity === '1');
 }
@@ -238,8 +246,8 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
           await page.locator('.main-content').evaluate(element => { element.scrollTop = 0; });
         } else assert(measurement.fits, JSON.stringify(measurement));
         if (width <= 760) assert(measurement.boxes[0].width >= 44 && measurement.boxes[0].height >= 44, 'artwork retains a 44px touch target: ' + JSON.stringify(measurement));
-        const hint = await page.locator('.playing-art-hint').boundingBox();
-        assert(hint.x >= 0 && hint.x + hint.width <= width, 'mode hint fits the screen');
+        if(width>760){const hint = await page.locator('.playing-art-hint').boundingBox();assert(hint.x >= 0 && hint.x + hint.width <= width, 'mode hint fits the screen');}
+        else assert.equal(await page.locator('.playing-art-hint').count(),0,'mobile uses explicit style choices');
         assert.deepEqual(await page.locator('.playing-detail').boundingBox(), anchor);
         if (visual === 'square' || visual === 'disc') {
           const crop = await page.locator('.playing-art-layer.is-active .playing-art-frame').boundingBox();
@@ -279,6 +287,7 @@ test('unavailable analysis preserves native playback and invalid preferences rec
   await selectMode(page, 'spectrum');
   await page.getByText('当前环境暂不支持实时音波', { exact: true }).waitFor();
   await page.setViewportSize({ width: 320, height: 480 });
+  await selectMode(page,'spectrum');
   const failureBounds = await page.locator('.playing-spectrum-status').boundingBox(), detail = await page.locator('.playing-detail').boundingBox();
   assert(failureBounds.x >= 0 && failureBounds.x + failureBounds.width <= 320 && failureBounds.y + failureBounds.height <= detail.y, 'fallback explanation stays clear of the controls on short phones');
   await page.locator('.listening-transport .play-toggle').click();
@@ -405,7 +414,7 @@ test('mobile spectrum and halo keep following real audio regardless of system mo
   assert.equal(await media(page).evaluate(audio => audio.paused), false);
 });
 
-test('touch artwork hints stay hidden after tapping while pointer and keyboard cues remain available', { timeout: 60000 }, async t => {
+test('mobile artwork uses named style choices without changing desktop preferences; desktop pointer and keyboard cues remain available', { timeout: 60000 }, async t => {
   const fixture = await createPlayingArtworkFixture(), browser = await chromium.launch({ executablePath, headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
   const artifacts = join(developmentPaths().artifacts, 'playing-artwork'); mkdirSync(artifacts, { recursive: true });
@@ -416,12 +425,11 @@ test('touch artwork hints stay hidden after tapping while pointer and keyboard c
     const page = await context.newPage(); page.setDefaultTimeout(6000);
     await openPlaying(page, fixture.base);
     assert.equal(await page.evaluate(() => matchMedia('(pointer:coarse)').matches), true);
-    const opacity = () => page.locator('.playing-art-hint').evaluate(element => getComputedStyle(element).opacity);
-    assert.equal(await opacity(), '0', 'touch screens do not show a persistent switch hint');
-    await mode(page).tap();
-    assert.equal(await mode(page).getAttribute('data-visual-mode'), 'original', 'tapping the artwork still changes its style');
-    await page.waitForTimeout(220);
-    assert.equal(await opacity(), '0', 'touch hover does not leave the switch hint visible');
+    assert.equal(await page.locator('.playing-art-hint').count(),0,'mobile artwork has no hidden cycling instruction');
+    assert.equal(await mode(page).isDisabled(),true,'tapping the artwork does not change its style');
+    const desktopPreference=await page.evaluate(key=>localStorage.getItem(key),preference);
+    await selectMode(page,'original');
+    assert.equal(await page.evaluate(key=>localStorage.getItem(key),preference),desktopPreference,'mobile style changes leave desktop preferences intact');
     await selectMode(page, 'vinyl');
     await page.locator('.listening-transport .play-toggle').click();
     const angle = await page.locator('.vinyl-rotor').evaluate(element => getComputedStyle(element).transform);

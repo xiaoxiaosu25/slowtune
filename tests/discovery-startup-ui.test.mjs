@@ -53,18 +53,18 @@ test('fixed cover slots, container columns, artwork fit and shared follow views 
     await page.setViewportSize({width,height:900});await navigate(page,'发现');
     const measurement=await bili.locator('.cover-grid').evaluate(el=>({width:el.clientWidth,columns:getComputedStyle(el).gridTemplateColumns.split(' ').length,card:el.querySelector('.music-card').getBoundingClientRect().width}));
     if(width>760)assert.equal(measurement.columns,measurement.width>=800?4:measurement.width>=600?3:2,'desktop cover columns retain their container layout');
-    else assert(await bili.locator('.mobile-shelf-covers').evaluate(el=>el.scrollWidth>el.clientWidth),'mobile recommendations scroll horizontally inside the shelf');
+    else {assert.equal(measurement.columns,2,'mobile recommendations use two cover columns');assert.equal(await bili.locator('.music-card').count(),4);assert(await bili.locator('.mobile-shelf-covers').evaluate(el=>el.scrollWidth<=el.clientWidth),'mobile recommendations fit the shelf width');}
     await bili.locator('img').first().waitFor();const image=await bili.locator('.cover-button img').first().evaluate(el=>({ratio:el.getBoundingClientRect().width/el.getBoundingClientRect().height,fit:getComputedStyle(el).objectFit}));assert(Math.abs(image.ratio-1)<.02);assert.equal(image.fit,'cover');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.screenshot({path:join(directory,`discover-${width}.png`)});layouts.push({width,...measurement});
   }
-  await updates.getByRole('button',{name:'关注的最近更新栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'关注的最近更新栏目操作',exact:true}).getByRole('button',{name:'封面浏览',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),12);assert.equal(await updates.locator('time').count(),12);
+  await updates.getByRole('button',{name:'关注的最近更新栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'关注的最近更新栏目操作',exact:true}).getByRole('button',{name:'封面浏览',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),4);await updates.getByRole('button',{name:'查看全部 12 首',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),12);assert.equal(await updates.locator('time').count(),12);
   await navigate(page,'关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.locator('.follows-page .track-row').last().waitFor();await page.getByRole('button',{name:'关注的最近更新封面视图',exact:true}).click();await page.locator('.follows-page .music-card').last().waitFor();assert.equal(await page.locator('.follows-page .music-card').count(),30,'follow page is not capped to 12');
   assert.equal(await page.getByRole('button',{name:'关注的最近更新封面视图',exact:true}).getAttribute('aria-pressed'),'true');
   assert.equal(await page.locator('.follows-page time').count(),30);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.screenshot({path:join(directory,'follow-covers-320.png')});
   await page.getByRole('button',{name:'关注的最近更新列表视图',exact:true}).click();await page.locator('.follows-page .track-row').last().waitFor();assert.equal(await page.locator('.follows-page .track-row').count(),30);
-  await navigate(page,'发现');await updates.locator('.music-card').last().waitFor();assert.equal(await updates.locator('.music-card').count(),12,'the mobile shelf keeps its view separate from the full follow page');
+  await navigate(page,'发现');await updates.locator('.music-card').last().waitFor();assert.equal(await updates.locator('.music-card').count(),4,'the mobile shelf restores its cover preference as a compact preview, separate from the full follow page');
   await updates.getByRole('button',{name:'关注的最近更新栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'关注的最近更新栏目操作',exact:true}).getByRole('button',{name:'歌曲列表',exact:true}).click();
   await page.reload();await updates.locator('.track-row').last().waitFor();assert.equal(await updates.locator('.track-row').count(),4,'mobile list preference restores with a compact preview');
   assert.equal(surfaces.at(-1),null,'mobile keeps its existing recommendation request');

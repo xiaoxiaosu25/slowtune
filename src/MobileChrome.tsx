@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowLeftIcon, CaretDownIcon, CaretRightIcon, CompassIcon, DatabaseIcon, HeadphonesIcon, InfoIcon, LinkIcon, ListBulletsIcon, LockKeyIcon, MagnifyingGlassIcon, PaletteIcon, PlugsConnectedIcon, QueueIcon, SlidersHorizontalIcon, UserCircleIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, CaretDownIcon, CaretRightIcon, CompassIcon, DatabaseIcon, HeadphonesIcon, InfoIcon, LinkIcon, ListBulletsIcon, LockKeyIcon, MagnifyingGlassIcon, PaletteIcon, PlugsConnectedIcon, SlidersHorizontalIcon, UserCircleIcon } from '@phosphor-icons/react';
 import type { BilibiliAccountState } from './api';
 import { mobileSettingsTitles, type MobileSettingsSection } from './mobile-settings';
 
@@ -9,11 +9,15 @@ const destinations = [
   { id: 'profile', label: '我的', icon: UserCircleIcon },
 ];
 
-export function MobileHeader({ page, settingsSection, onSearch, onLink, onBack, options }: { page: string; settingsSection: MobileSettingsSection; onSearch: () => void; onLink: () => void; onBack: () => void; options: ReactNode }) {
-  return <header className={'topbar mobile-header' + (page === 'playing' ? ' listening-header' : ['settings','playlist'].includes(page) ? ' mobile-subpage-header' : '')}>
+export function MobileHeader({ page, settingsSection, onSearch, onLink, onBack, options, followDetail }: { page: string; settingsSection: MobileSettingsSection; onSearch: () => void; onLink: () => void; onBack: () => void; options: ReactNode; followDetail?: { title: string; backLabel: string; onBack: () => void } }) {
+  return <header className={'topbar mobile-header' + (page === 'playing' ? ' listening-header' : followDetail || ['settings','playlist'].includes(page) ? ' mobile-subpage-header' : '')}>
     {page === 'playing' ? <>
       <button className="btn btn-icon" aria-label="返回浏览音乐" onClick={onBack}><CaretDownIcon size={25}/></button>
       <h1>正在播放</h1>{options}
+    </> : followDetail ? <>
+      <button className="btn btn-icon" aria-label={followDetail.backLabel} onClick={followDetail.onBack}><ArrowLeftIcon size={24}/></button>
+      <h1>{followDetail.title}</h1>
+      <button className="btn btn-icon mobile-detail-search" aria-label="搜索歌曲或视频" onClick={onSearch}><MagnifyingGlassIcon size={23}/></button>
     </> : ['settings','playlist'].includes(page) ? <>
       <button className="btn btn-icon" aria-label={page==='playlist'?'返回音乐库':'返回上一级'} onClick={onBack}><ArrowLeftIcon size={24}/></button>
       <h1>{page==='playlist'?'歌单':mobileSettingsTitles[settingsSection]}</h1>
@@ -39,13 +43,12 @@ export function MobileDiscoveryNavigation({ page, onNavigate }: { page: string; 
   return <nav className="mobile-discovery-nav" aria-label="发现栏目">{[{id:'discover', label:'推荐'}, {id:'charts', label:'音乐榜单'}, {id:'follows', label:'关注'}].map(item => <button key={item.id} aria-current={page === item.id ? 'page' : undefined} className={page === item.id ? 'active' : ''} onClick={() => onNavigate(item.id)}>{item.label}</button>)}</nav>;
 }
 
-export function MobileMiniPlayer({ cover, title, artist, progress, transport, onOpen, onQueue, queueOpen }: { cover: ReactNode; title: string; artist: string; progress: number; transport: ReactNode; onOpen: () => void; onQueue: () => void; queueOpen: boolean }) {
+export function MobileMiniPlayer({ cover, title, artist, progress, transport, onOpen }: { cover: ReactNode; title: string; artist: string; progress: number; transport: ReactNode; onOpen: () => void }) {
   return <footer className="mobile-mini-player" aria-label="播放器">
     <div className="mobile-mini-progress" aria-hidden="true"><span style={{width:Math.min(100,Math.max(0,progress*100))+'%'}}/></div>
     <div className="mobile-mini-row">
       <button className="now-playing" aria-label="打开正在播放" onClick={onOpen}>{cover}<span><strong title={title}>{title}</strong><small>{artist}</small></span></button>
       <div className="mobile-mini-transport">{transport}</div>
-      <button className="btn btn-icon" aria-label="打开播放队列" aria-expanded={queueOpen} onClick={onQueue}><QueueIcon size={24}/></button>
     </div>
   </footer>;
 }

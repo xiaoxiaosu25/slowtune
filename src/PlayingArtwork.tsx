@@ -27,11 +27,12 @@ function VinylLabel() {
   </>;
 }
 
-export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allowLyrics = true, suspended = false, desktop = false }: {
-  artwork?: string; playing: boolean; muted: boolean; analysis: PlaybackAudioAnalysis | null; lyrics?: ReactNode; allowLyrics?: boolean; suspended?: boolean; desktop?: boolean;
+export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allowLyrics = true, suspended = false, desktop = false, visualMode, interactive = true }: {
+  artwork?: string; playing: boolean; muted: boolean; analysis: PlaybackAudioAnalysis | null; lyrics?: ReactNode; allowLyrics?: boolean; suspended?: boolean; desktop?: boolean; visualMode?: PlayingVisualMode; interactive?: boolean;
 }) {
   const [storedMode, setMode] = useState<PlayingVisualMode>(readMode);
-  const mode = !allowLyrics && storedMode === 'lyrics' ? 'vinyl' : storedMode;
+  const selectedMode = visualMode ?? storedMode;
+  const mode = !allowLyrics && selectedMode === 'lyrics' ? 'vinyl' : selectedMode;
   const [failed, setFailed] = useState('');
   const [dimensions, setDimensions] = useState({ url: '', ratio: 16 / 9 });
   const [visible, setVisible] = useState(() => !document.hidden);
@@ -70,7 +71,7 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
   </div>;
   return <div className="playing-art-slot">
     <button type="button" className="playing-art-switch" data-visual-mode={mode} data-analysis-state={state}
-      aria-label={`封面样式：${names[mode]}，点击切换为${names[next]}`} onClick={cycle}
+      disabled={!interactive} aria-label={interactive?`封面样式：${names[mode]}，点击切换为${names[next]}`:`封面样式：${names[mode]}`} onClick={interactive?cycle:undefined}
       style={{ '--artwork-ratio': ratio } as CSSProperties}>
       <span className={'playing-art-layer playing-art-vinyl' + (mode === 'vinyl' ? ' is-active' : '') + (mode === 'vinyl' && playing && visible ? ' is-playing' : '')} aria-hidden="true">
         <span className="vinyl-record"><span className="vinyl-rotor">
@@ -88,7 +89,7 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
         <PlayingSpectrum variant="halo" active={mode === 'halo' && !(desktop && suspended)} playing={playing} muted={muted} analysis={analysis} state={state}/>
         <span className="playing-halo-core"><VinylLabel/></span>
       </span>
-      <span className="playing-art-hint" aria-hidden="true">{names[mode]}<span className="playing-art-hint-cue"> · 点击切换</span><ArrowClockwiseIcon size={14}/></span>
+      {interactive&&<span className="playing-art-hint" aria-hidden="true">{names[mode]}<span className="playing-art-hint-cue"> · 点击切换</span><ArrowClockwiseIcon size={14}/></span>}
       {(mode === 'spectrum' || mode === 'halo') && message && <span className="playing-spectrum-status" role="status">{message}</span>}
     </button>
   </div>;

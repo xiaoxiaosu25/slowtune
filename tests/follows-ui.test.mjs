@@ -195,7 +195,7 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile content does not overflow horizontally');
     await page.screenshot({path:join(directory,'mobile-updates.png'),fullPage:true});
     await page.getByRole('button',{name:'查看 UP / 博主 · 博主最新发布',exact:true}).click();await page.getByRole('button',{name:'打开合集 测试博主 的合集',exact:true}).waitFor();assert.equal(state.creators.length,2);
-    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:join(directory,'mobile-author-preview.png'),fullPage:true});await nav('关注');
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.equal(await page.getByRole('navigation',{name:'发现栏目'}).count(),0,'author details use the dedicated mobile header');await page.screenshot({path:join(directory,'mobile-author-preview.png'),fullPage:true});await page.getByRole('button',{name:'返回关注',exact:true}).click();
     await page.getByRole('button',{name:'关注的 UP',exact:true}).click();await page.getByRole('button',{name:'取消关注 测试 UP',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.follow-creator-card').length===1);
     await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.follows-page .track-row').length===1);
     assert.equal(await page.locator('.follows-page .track-name').textContent(),'博主最新发布');assert.deepEqual(errors,[]);assert(avatarRequests.some(url=>url.includes('account-avatar')));assert(avatarRequests.some(url=>url.includes('up-avatar')));assert(avatarRequests.some(url=>url.includes('blogger-avatar')));

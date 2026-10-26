@@ -71,7 +71,7 @@ test('mobile navigation, player and direct lyrics keep one audio session and fit
   await page.getByRole('button',{name:'播放队列',exact:true}).click();
   await page.getByRole('dialog',{name:'播放队列',exact:true}).waitFor(); await page.goBack();
   await page.getByRole('dialog',{name:'播放队列',exact:true}).waitFor({state:'detached'});
-  await page.goBack(); await primary.waitFor();
+  await page.goBack(); await page.locator('.song-library-page').waitFor();
   await page.getByRole('button',{name:'搜索歌曲或视频',exact:true}).click();
   const search = page.getByRole('main',{name:'搜索音乐',exact:true});
   await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('风从远方来'); await search.getByRole('button',{name:'搜索',exact:true}).click();
@@ -82,10 +82,11 @@ test('mobile navigation, player and direct lyrics keep one audio session and fit
   assert(searchTitle.width>=110,'narrow search rows keep useful space for song titles');
   await page.goBack(); await search.waitFor({state:'detached'});
   assert.equal(await page.evaluate(()=>window.__mobileAudio===document.querySelector('audio')&&window.__mobileAudio.paused),true);
+  await page.getByRole('button',{name:'返回音乐库',exact:true}).click();
   await primary.getByRole('button',{name:'我的',exact:true}).click();
   await page.getByRole('region',{name:'我的',exact:true}).waitFor();
   await page.reload();await primary.waitFor();await page.goBack();
-  await page.locator('.song-library-page').waitFor();
+  await page.locator('.mobile-library').waitFor();
   assert.equal(await page.locator('audio').evaluate(audio=>audio.paused),true,'reload restores the queue without autoplay');
   await page.evaluate(()=>{window.__mobileAudio=document.querySelector('audio');});
   await primary.getByRole('button',{name:'我的',exact:true}).click();
@@ -152,7 +153,7 @@ test('short landscape keeps version selection separate from seeking and playback
     const versions = page.getByRole('dialog',{name:'歌曲与版本',exact:true});
     await versions.waitFor();
     assert.equal(await page.locator('audio').evaluate(audio=>audio.currentTime),position,'opening versions does not seek');
-    await versions.getByRole('button',{name:'关闭',exact:true}).click();
+    await versions.getByRole('button',{name:'返回上一级',exact:true}).click();
     const queue = page.getByRole('button',{name:'播放队列',exact:true});
     await queue.scrollIntoViewIfNeeded();
     const target = await queue.boundingBox();
@@ -179,7 +180,7 @@ test('mobile Back skips replaced playback menus after lyrics settings close', {t
     const settings = page.getByRole('dialog',{name:'歌词设置',exact:true});
     await settings.waitFor();
     if (closeWithBack) await page.goBack();
-    else await settings.getByRole('button',{name:'关闭',exact:true}).click();
+    else await settings.getByRole('button',{name:'返回上一级',exact:true}).click();
     await settings.waitFor({state:'detached'});
     assert.equal(await page.locator('.mobile-player').count(),1,'closing settings keeps the player open');
     assert.equal(await page.locator('[popover]:popover-open').count(),0,'Back does not recreate the replaced menu');
@@ -237,7 +238,7 @@ test('mobile song hierarchy keeps canonical metadata, source versions and queue 
       await page.getByRole('button',{name:'选择播放版本 风从远方来',exact:true}).click();
       const versions=page.getByRole('dialog',{name:'歌曲与版本',exact:true});await versions.waitFor();
       assert.equal(await page.locator('audio').evaluate(audio=>audio.currentTime),position);
-      await versions.getByRole('button',{name:'关闭',exact:true}).click();
+      await versions.getByRole('button',{name:'返回上一级',exact:true}).click();
       await page.getByRole('button',{name:'播放队列',exact:true}).scrollIntoViewIfNeeded();
       await page.screenshot({path:join(artifacts,`metadata-${view}-${viewport.width}-${viewport.height}.png`)});
     }

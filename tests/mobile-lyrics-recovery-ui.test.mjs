@@ -106,7 +106,7 @@ test('mobile failed lyric reads recover the revision for manual import and offer
   await dialog.getByText('导入或粘贴歌词', { exact:true }).click();
   await dialog.getByLabel('粘贴歌词正文').fill('[00:00]导入后第一行');
   assert.equal(await dialog.getByRole('button', { name:'使用导入歌词', exact:true }).isDisabled(), true, 'a missing revision cannot be saved');
-  await dialog.getByRole('button', { name:'关闭', exact:true }).click();
+  await dialog.getByRole('button', { name:'返回上一级', exact:true }).click();
   await dialog.waitFor({ state:'detached' });
   control.stateError = false;
   await panel.getByRole('button', { name:'查找或导入歌词', exact:true }).click();
@@ -153,7 +153,7 @@ test('mobile recovery of a failed first read restores the saved lyric timing wit
   await panel.getByRole('button', { name:'查找或导入歌词', exact:true }).click();
   const dialog = page.getByRole('dialog', { name:'选择歌词', exact:true });
   await dialog.getByRole('button', { name:'清除当前歌词选择', exact:true }).waitFor();
-  await dialog.getByRole('button', { name:'关闭', exact:true }).click();
+  await dialog.getByRole('button', { name:'返回上一级', exact:true }).click();
   await panel.getByRole('button', { name:'恢复后继续听', exact:true }).click();
   await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 1.25) < .05);
   assert.equal(await page.evaluate(() => window.__recoveryAudio === document.querySelector('audio') && window.__recoveryAudio.paused), true);

@@ -153,8 +153,8 @@ test('desktop song workspace stages edits, keeps exact members, returns from sea
   await editor.getByRole('button', { name: '预览影响', exact: true }).click(); await editor.getByRole('button', { name: '合并到《晴天 · 已整理》', exact: true }).click();
   await manager.waitFor(); assert(!snapshot().songs.some(s => s.id === 'duplicate')); await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '关闭播放队列', exact: true }).click();
-  await page.setViewportSize({ width: 390, height: 844 }); await libraryAction(page,'资料库维护');await page.getByRole('dialog',{name:'资料库维护',exact:true}).getByRole('button',{name:'关闭',exact:true}).click();
-  assert.equal(await page.getByRole('button', { name: '歌曲管理', exact: true }).count(), 0); await page.locator('.song-library-row').first().locator('summary').click();
+  await page.setViewportSize({ width: 390, height: 844 }); await libraryAction(page,'资料库维护');await page.getByRole('dialog',{name:'资料库维护',exact:true}).getByRole('button',{name:'返回上一级',exact:true}).click();
+  assert.equal(await page.getByRole('button', { name: '歌曲管理', exact: true }).count(), 0); await page.locator('.song-library-row').first().getByRole('button',{name:/^更多操作 /}).click();
   assert.equal(await page.getByRole('combobox', { name: '固定版本 晴天 · 已整理', exact: true }).count(), 1);
   for (const width of [390, 320]) { await page.setViewportSize({ width, height: 844 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); await page.screenshot({ path: join(artifacts, 'mobile-regression-' + width + '.png') }); }
   assert.deepEqual(errors, []);

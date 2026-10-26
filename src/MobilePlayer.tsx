@@ -8,8 +8,8 @@ function savedLyricView() {
   catch { return false; }
 }
 
-export function MobilePlayer({ artwork, lyrics, title, artist, source, progress, transport, mode, favorite, timer, queueOpen, queueCount, onQueue, empty }: {
-  artwork: ReactNode; lyrics: ReactNode; title: ReactNode; artist: ReactNode; source: ReactNode; progress: ReactNode; transport: ReactNode; mode: ReactNode; favorite: ReactNode; timer: ReactNode; queueOpen: boolean; queueCount: number; onQueue: () => void; empty?: ReactNode;
+export function MobilePlayer({ artwork, lyrics, title, artist, source, progress, transport, mode, favorite, timer, queueOpen, queueCount, onQueue, onLyricsSettings, onLyricsOffset, empty }: {
+  artwork: ReactNode; lyrics: ReactNode; title: ReactNode; artist: ReactNode; source: ReactNode; progress: ReactNode; transport: ReactNode; mode: ReactNode; favorite: ReactNode; timer: ReactNode; queueOpen: boolean; queueCount: number; onQueue: () => void; onLyricsSettings: () => void; onLyricsOffset?: () => void; empty?: ReactNode;
 }) {
   const [lyricView, setLyricView] = useState(savedLyricView);
   const toggleLyrics = () => {
@@ -19,7 +19,7 @@ export function MobilePlayer({ artwork, lyrics, title, artist, source, progress,
   const song = <div className="mobile-player-song"><div className="playing-title">{title}</div><div className="mobile-player-artist" title={typeof artist === 'string' ? artist : undefined}>{artist}</div>{source && <div className="mobile-player-source">{source}</div>}</div>;
   return <section className={'mobile-player' + (lyricView ? ' is-lyrics' : '')} aria-label="正在播放">
     {lyricView && song}
-    <div className="mobile-player-visual">{lyricView ? lyrics : artwork}</div>
+    <div className="mobile-player-visual">{lyricView ? <div className="mobile-player-lyrics"><div className="mobile-lyrics-tools"><button className="btn btn-ghost" onClick={onLyricsSettings}>更换歌词</button>{onLyricsOffset&&<button className="btn btn-ghost" onClick={onLyricsOffset}>校准时间</button>}</div>{lyrics}</div> : artwork}</div>
     {!lyricView && song}
     <div className="mobile-player-controls playing-detail">
       {progress}

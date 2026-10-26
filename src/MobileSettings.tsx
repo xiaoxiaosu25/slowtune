@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps } from 'react';
-import { CheckCircleIcon } from '@phosphor-icons/react';
+import { CaretDownIcon, CheckCircleIcon } from '@phosphor-icons/react';
 import type { SettingsPage } from './SettingsPage';
 import { BilibiliAccountControls } from './BilibiliAccountControls';
 import { SongSyncControls } from './SongSyncControls';
@@ -65,7 +65,7 @@ export function MobileSettings({ active, section, onSection, ...props }: Props) 
         {id === 'welcome' && <WelcomeSettings mobile/>}
         {id === 'sources' && <SourceSettings mobile state={props.sources} onChanged={props.onSourcesChanged} onOpenAbout={openAbout}/>}
         {id === 'account' && <><BilibiliAccountControls status={props.account} onChange={props.onAccountChange} onOpenAbout={openAbout}/><SongSyncControls key={props.account?.account?.id ?? props.account?.state} library={props.library} authenticated={props.account?.state === 'authenticated'} onChange={props.onLibraryChange}/></>}
-        {id === 'recommendation' && <><SearchPreferencesSettings onChanged={props.onSearchPreferencesChanged}/><RecommendationSettings onChanged={props.onRecommendationChanged} accountAuthenticated={props.account?.state === 'authenticated'} youtubeEnabled={youtubeEnabled}/></>}
+        {id === 'recommendation' && <><RecommendationSettings onChanged={props.onRecommendationChanged} accountAuthenticated={props.account?.state === 'authenticated'} youtubeEnabled={youtubeEnabled}/><details className="mobile-setting-details mobile-search-rules"><summary><span>搜索与自动选歌<small>筛选规则与优先版本</small></span><CaretDownIcon size={18}/></summary><SearchPreferencesSettings onChanged={props.onSearchPreferencesChanged}/></details></>}
         {id === 'access' && <AccessSettings onChanged={props.onReload}/>}
         {id === 'diagnostics' && <DiagnosticsPanel status={props.status} checkedAt={props.statusCheckedAt} account={props.account} library={props.library} onRefresh={props.onRefreshDiagnostics} onStopPlayback={props.onStopPlayback} onLogout={props.onLogout} onOpenBackup={props.onOpenBackup} onOpenSources={() => onSection('sources')} onOpenAccount={() => onSection('account')} onOpenAbout={openAbout}/>}
         {id === 'about' && <AboutPanel active={active && section === 'about'} status={props.status}/>}

@@ -150,7 +150,11 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   await open(page); await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => !document.querySelector('.desktop-lyrics-view'));
   assert.equal(await page.locator(selector).count(), 0); assert.equal(await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).count(), 0);
-  for (let i = 0; i < 6; i++) await mode.click(); assert.equal(await mode.getAttribute('data-visual-mode'), 'vinyl');
+  assert.equal(await mode.isDisabled(),true,'mobile artwork styles use the named selector');
+  await page.getByRole('button',{name:'更多播放选项',exact:true}).click();
+  const mobileOptions=page.getByRole('dialog',{name:'更多播放选项',exact:true});
+  for(const visual of ['original','square','disc','spectrum','halo','vinyl'])await mobileOptions.getByRole('combobox',{name:'封面样式',exact:true}).selectOption(visual);
+  await mobileOptions.getByRole('button',{name:'关闭',exact:true}).click();assert.equal(await mode.getAttribute('data-visual-mode'),'vinyl');
   await page.getByRole('button',{name:'查看歌词',exact:true}).click(); await page.locator('.mobile-player.is-lyrics').waitFor();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).waitFor();

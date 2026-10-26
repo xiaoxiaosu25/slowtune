@@ -40,15 +40,8 @@
 .song-version-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
 .song-version-details { margin-top:12px; font-size:13px; color:var(--muted); }
 .song-version-details>summary { cursor:pointer; padding:5px 0; }
-.song-row-options>summary { display:flex; width:36px; height:36px; margin-left:auto; list-style:none; cursor:pointer; }
-.song-row-options>summary::-webkit-details-marker { display:none; }
 .song-version-details[open]>summary { margin-bottom:12px; }
 .song-version-details>.field { margin-bottom:12px; }
-.song-row-options { font-size:12px; color:var(--muted); }
-.song-row-options[open] { flex:1 1 100%; }
-.song-row-options>.toolbar { margin:8px 0; }
-.song-row-options>.field { display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:12px; border-radius:10px; background:var(--bg); }
-.song-row-options>.field .select { flex:1; min-width:140px; }
 .song-organization { margin:0 0 20px; min-width:0; }
 .song-organization-content { padding:16px; border:1px solid var(--border); border-radius:12px; }
 .song-organization-content p { margin:8px 0; font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
@@ -59,7 +52,7 @@
 .song-organization-field>span { min-width:0; }
 .song-organization-field span>span { display:block; margin-top:4px; overflow-wrap:anywhere; }
 .song-organization-candidate>.btn { margin-top:12px; }
-@media(max-width:600px) { .song-library-row>.row-info { flex-basis:60px; } .song-version-link { min-height:44px; } .song-row-options>summary { width:44px; height:44px; } .song-group-fields { grid-template-columns:1fr; } .song-editor-heading { gap:12px; } .song-editor-heading>img,.song-editor-heading>.unknown-cover { width:48px; height:48px; } }
+@media(max-width:600px) { .song-library-row>.row-info { flex-basis:60px; } .song-version-link { min-height:44px; } .song-group-fields { grid-template-columns:1fr; } .song-editor-heading { gap:12px; } .song-editor-heading>img,.song-editor-heading>.unknown-cover { width:48px; height:48px; } }
 
 /* Desktop workspace: the dialog is the surface; its sections use space and rules. */
 @media(min-width:761px) {

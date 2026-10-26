@@ -12,7 +12,7 @@ export function RateControl({ value, onChange, labeled = false }: { value: numbe
       const anchor = trigger.current?.getBoundingClientRect();
       if (!anchor) return;
       const bounds = menu.getBoundingClientRect(), width = bounds.width || 196;
-      const height = bounds.height || menu.querySelectorAll('[role="menuitemradio"]').length * (window.innerWidth <= 760 ? 44 : 40) + 48;
+      const height = bounds.height || menu.querySelectorAll('[role="menuitemradio"]').length * (window.innerWidth <= 760 ? 48 : 40) + 48;
       const above = Math.max(0, anchor.top - 20), below = Math.max(0, window.innerHeight - anchor.bottom - 20);
       const useAbove = above >= height || (below < height && above >= below);
       menu.style.left = Math.max(12, Math.min(anchor.right - width, window.innerWidth - width - 12)) + 'px';

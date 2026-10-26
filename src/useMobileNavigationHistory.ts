@@ -2,8 +2,9 @@ import { useLayoutEffect, useRef } from 'react';
 import { mobileSettingsSection } from './mobile-settings';
 import { mobilePlaylistId } from './mobile-library';
 import { readMobileFollowView } from './mobile-follow';
+import { mobilePageSuspended, suspendMobilePages } from './mobile-pages';
 
-type Entry = { session: string; id: number; key: string; page: string; layers: number[]; scroll: number };
+type Entry = { session: string; id: number; key: string; page: string; layers: number[]; scroll: number; suspendedReaders?: number[]; readers?: string[] };
 const stateKey = 'slowTuneMobileNavigation';
 const pages = new Set(['discover', 'charts', 'follows', 'library', 'profile', 'settings', 'playing', 'search']);
 const validPage = (page: unknown): page is string => typeof page === 'string' && (pages.has(page) || !!mobileSettingsSection(page) || !!mobilePlaylistId(page) || !!readMobileFollowView(page));
@@ -29,7 +30,8 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
     const identity = (element: Element) => { if (!tokens.has(element)) tokens.set(element, ++token); return tokens.get(element)!; };
     const snapshot = (): Entry => {
       const open = layers().map(identity), currentPage = latest.current.page;
-      return { session, id: ++serial, key: JSON.stringify([currentPage, open]), page: currentPage, layers: open, scroll: window.scrollY };
+      const readerElements=Array.from(document.querySelectorAll<HTMLElement>('dialog.mobile-page[open]')),suspendedReaders=readerElements.filter(mobilePageSuspended).map(identity),readers=readerElements.map(element=>element.dataset.mobilePage!);
+      return { session, id: ++serial, key: JSON.stringify([currentPage, open, suspendedReaders]), page: currentPage, layers: open, scroll: window.scrollY, suspendedReaders, readers };
     };
     const write = (entry: Entry, replace: boolean) => {
       const state = history.state && typeof history.state === 'object' ? history.state : {};
@@ -69,7 +71,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
       let at = target.session === session ? entries.findIndex(entry => entry.id === target.id) : -1;
       if (at < 0) {
         // Reloads create a new session, but earlier page entries still belong to this app.
-        target = { session, id: ++serial, page: target.page, layers: [], key: JSON.stringify([target.page, []]), scroll: Number.isFinite(target.scroll) ? target.scroll : 0 };
+        target = { session, id: ++serial, page: target.page, layers: [], key: JSON.stringify([target.page, [], []]), scroll: Number.isFinite(target.scroll) ? target.scroll : 0 };
         entries.splice(0, entries.length, target); at = 0;
       }
       stopRestoring(); index = at;
@@ -79,6 +81,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
         pendingClose = undefined; write({ ...target, id: ++serial }, true); commit(); return;
       }
       pendingClose = undefined; restoring = true;
+      suspendMobilePages(true,layers().filter(element=>target.suspendedReaders?.includes(identity(element))));
       for (const element of layers().reverse()) {
         if (target.layers.includes(identity(element))) continue;
         if (element instanceof HTMLDialogElement) element.dispatchEvent(new Event('cancel', { cancelable: true }));
@@ -86,7 +89,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
       }
       if (latest.current.page !== target.page) latest.current.onRestore(target.page);
       const retainedLayers = layers().map(identity).filter(id => target.layers.includes(id));
-      const base = { ...target, id: ++serial, layers: retainedLayers, key: JSON.stringify([target.page, retainedLayers]) };
+      const base = { ...target, id: ++serial, layers: retainedLayers, key: JSON.stringify([target.page, retainedLayers, target.suspendedReaders??[]]) };
       cancelAnimationFrame(frame);
       const finish = () => {
         if (disposed) return;
@@ -127,7 +130,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
       } else fallback();
     };
     const observer = new MutationObserver(commit);
-    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open','hidden'] });
     window.addEventListener('popstate', pop);
     window.addEventListener('scroll', scroll, { passive: true });
     document.addEventListener('toggle', commit, true);

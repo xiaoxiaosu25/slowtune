@@ -145,7 +145,7 @@ test('mobile backup and source imports preview, cancel, retry and confirm withou
   await backup.getByRole('button',{name:'校验并预览影响',exact:true}).click();await backup.getByRole('button',{name:'确认导入',exact:true}).waitFor();
   fixture.setFailWrite(true);await backup.getByRole('button',{name:'确认导入',exact:true}).click();await backup.getByRole('alert').waitFor();
   assert.equal(await backup.getByRole('textbox',{name:'新资料库快照内容',exact:true}).inputValue(),snapshot);
-  fixture.setFailWrite(false);await backup.getByRole('button',{name:'确认导入',exact:true}).click();await backup.getByText('资料已导入，当前播放与队列保留。',{exact:true}).waitFor();await backup.getByRole('button',{name:'关闭',exact:true}).click();
+  fixture.setFailWrite(false);await backup.getByRole('button',{name:'确认导入',exact:true}).click();await backup.getByText('资料已导入，当前播放与队列保留。',{exact:true}).waitFor();await backup.getByRole('button',{name:'返回上一级',exact:true}).click();
   await mobileNav(page).getByRole('button',{name:'发现',exact:true}).click();await discoverNav(page).getByRole('button',{name:'关注',exact:true}).click();
   await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.locator('.follow-feed-pages .track-row').first().waitFor();
   await page.locator('.follow-toolbar').getByRole('button',{name:'加入歌单',exact:true}).click();
@@ -159,7 +159,7 @@ test('mobile backup and source imports preview, cancel, retry and confirm withou
     await page.setViewportSize(viewport);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
     assert(await source.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
-    const close=await source.getByRole('button',{name:'关闭',exact:true}).boundingBox();assert(close.x>=0&&close.x+close.width<=viewport.width);
+    const close=await source.getByRole('button',{name:'返回上一级',exact:true}).boundingBox();assert(close.x>=0&&close.x+close.width<=viewport.width);
   }
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(artifacts,'08-source-import-390.png')});
   await source.getByRole('button',{name:'重试添加',exact:true}).click();await source.waitFor({state:'detached'});
@@ -178,7 +178,7 @@ test('secondary screens reflow at phone and landscape sizes with readable long c
   const {fixture,page,errors}=await setup(t);
   const sizes=[{width:320,height:568},{width:360,height:640},{width:390,height:844},{width:430,height:932},{width:568,height:320},{width:667,height:375}];
   const fits=async()=>assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  const dialogFits=async dialog=>{assert(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1));const rect=await dialog.getByRole('button',{name:'关闭',exact:true}).boundingBox();assert(rect&&rect.x>=0&&rect.y>=0&&rect.x+rect.width<=page.viewportSize().width&&rect.y+rect.height<=page.viewportSize().height);};
+  const dialogFits=async dialog=>{assert(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1));const rect=await dialog.getByRole('button',{name:'返回上一级',exact:true}).boundingBox();assert(rect&&rect.x>=0&&rect.y>=0&&rect.x+rect.width<=page.viewportSize().width&&rect.y+rect.height<=page.viewportSize().height);};
   for(const theme of ['light','dark'])for(const size of sizes){
     await page.setViewportSize(size);await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
     await mobileNav(page).getByRole('button',{name:'发现',exact:true}).click();await discoverNav(page).getByRole('button',{name:'音乐榜单',exact:true}).click();await page.locator('.chart-song').first().waitFor();await fits();
@@ -189,13 +189,13 @@ test('secondary screens reflow at phone and landscape sizes with readable long c
     await page.getByRole('button',{name:'关注的 UP',exact:true}).click();await page.getByRole('button',{name:'查看 '+fixture.creators[0].name+' 的合集',exact:true}).click();
     await page.getByRole('button',{name:'打开合集 '+fixture.collections[0].title,exact:true}).waitFor();await fits();
     if(theme==='light'&&size.width===320)await page.screenshot({path:join(artifacts,'12-author-320.png')});
-    await mobileNav(page).getByRole('button',{name:'音乐库',exact:true}).click();await page.getByRole('button',{name:'我的收藏 1 首歌曲',exact:true}).click();await page.getByRole('button',{name:'选择播放版本 '+fixture.longTitle,exact:true}).click();
+    await page.getByRole('button',{name:'返回关注',exact:true}).click();await mobileNav(page).getByRole('button',{name:'音乐库',exact:true}).click();await page.getByRole('button',{name:'我的收藏 1 首歌曲',exact:true}).click();await page.getByRole('button',{name:'选择播放版本 '+fixture.longTitle,exact:true}).click();
     const versions=page.getByRole('dialog',{name:'歌曲与版本',exact:true});await dialogFits(versions);await fits();
     if(theme==='light'&&size.width===568)await page.screenshot({path:join(artifacts,'13-versions-landscape.png')});
-    await versions.getByRole('button',{name:'关闭',exact:true}).click();await page.getByRole('button',{name:'返回音乐库',exact:true}).click();await page.getByRole('button',{name:'音乐库管理',exact:true}).click();await page.getByRole('button',{name:'导入 / 导出',exact:true}).click();
+    await versions.getByRole('button',{name:'返回上一级',exact:true}).click();await page.getByRole('button',{name:'返回音乐库',exact:true}).click();await page.getByRole('button',{name:'音乐库管理',exact:true}).click();await page.getByRole('button',{name:'导入 / 导出',exact:true}).click();
     const backup=page.getByRole('dialog',{name:'备份与恢复',exact:true});await dialogFits(backup);await fits();
     await backup.getByRole('textbox',{name:'新资料库快照内容',exact:true}).fill('x'.repeat(500));assert.equal(await backup.getByRole('textbox',{name:'新资料库快照内容',exact:true}).evaluate(el=>getComputedStyle(el).fontSize),'16px');
-    await backup.getByRole('button',{name:'关闭',exact:true}).click();
+    await backup.getByRole('button',{name:'返回上一级',exact:true}).click();
   }
   assert.deepEqual(errors,[]);
 });

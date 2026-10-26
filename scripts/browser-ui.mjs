@@ -13,6 +13,14 @@ async function leaveMobileSettings(page) {
   }
 }
 
+async function leaveMobileDetails(page) {
+  for(let depth=0;depth<8;depth++) {
+    const back=page.locator('.mobile-header').getByRole('button',{name:/^(返回音乐库|返回关注|返回作者合集)$/});
+    if(!await back.isVisible())break;
+    await back.click();
+  }
+}
+
 export async function selectRate(container, rate) {
   await container.getByRole('button', { name: '播放速度', exact: true }).click();
   const menu = container.getByRole('menu', { name: '播放速度', exact: true });
@@ -27,7 +35,7 @@ export async function navigate(page, name) {
   if(await page.locator('.mobile-search-page').count())await page.getByRole('button',{name:'关闭搜索',exact:true}).click();
   if(name==='搜索'){await page.getByRole('button',{name:await page.locator('.app').getAttribute('data-layout')==='mobile'?'搜索歌曲或视频':'开始搜索',exact:true}).click();return;}
   if(name==='收藏'){await navigate(page,'歌单');await selectPlaylist(page,'我的收藏');return;}
-  if(await page.locator('.app').getAttribute('data-layout')==='mobile')await leaveMobileSettings(page);
+  if(await page.locator('.app').getAttribute('data-layout')==='mobile'){await leaveMobileSettings(page);await leaveMobileDetails(page);}
   const targetName=name==='歌单'&&await page.locator('.app').getAttribute('data-layout')==='mobile'?'音乐库':name;
   const button = page.locator('nav:visible').getByRole('button', { name:targetName, exact: true });
   if (!await button.count()) {
@@ -47,6 +55,7 @@ export async function createPlaylist(page, name) {
 }
 
 export async function libraryAction(page, name) {
+  await settleLayout(page);
   if(await page.locator('.mobile-library').isVisible()) {
     const direct=page.locator('.mobile-library').getByRole('button',{name,exact:true});
     if(await direct.isVisible()){await direct.click();return;}
@@ -54,7 +63,7 @@ export async function libraryAction(page, name) {
     await page.getByRole('dialog',{name:'音乐库管理',exact:true}).getByRole('button',{name,exact:true}).click();return;
   }
   const library = page.locator('.song-library-page');
-  const action = library.getByRole('button', { name, exact: true });
+  const action = (await page.locator('.app').getAttribute('data-layout')==='mobile'?page:library).getByRole('button', { name, exact: true });
   if (!await action.isVisible()) await library.getByRole('button', { name: '歌单管理', exact: true }).click();
   await action.click();
 }
@@ -91,6 +100,7 @@ export async function openSettingsPage(page, section = '外观') {
   if(await page.locator('.app').getAttribute('data-layout')==='mobile'){
     await leaveMobileSettings(page);
     const back=page.getByRole('button',{name:'返回浏览音乐',exact:true});if(await back.isVisible())await back.click();
+    await leaveMobileDetails(page);
     await page.locator('.mobile-nav').getByRole('button',{name:'我的',exact:true}).click();
     const profile=page.getByRole('region',{name:'我的',exact:true});
     if(section==='B站账号')await profile.locator('.mobile-profile-account').click();

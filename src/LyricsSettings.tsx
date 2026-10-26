@@ -60,7 +60,7 @@ export function LyricsSettings({ lyrics, desktopImmersive = false, nativeDesktop
       {!lyrics.track && <p className="muted">播放音乐后自动查找适合当前版本的歌词。</p>}
       {embedded && lyrics.track && !document && <p className="muted">当前版本尚未选择歌词，可以查找或导入。</p>}
       {feedback}
-      {document?.synced && <details className="lyrics-offset" open={embedded || undefined}><summary>调整歌词时间{offsetMs !== state?.offsetMs ? ' · 未保存' : state?.offsetMs ? ` · ${state.offsetMs / 1000} 秒` : ''}</summary>
+      {document?.synced && <details className="lyrics-offset" open={embedded || !desktopImmersive && window.matchMedia('(max-width:760px)').matches || undefined}><summary>调整歌词时间{offsetMs !== state?.offsetMs ? ' · 未保存' : state?.offsetMs ? ` · ${state.offsetMs / 1000} 秒` : ''}</summary>
         <p className="muted">让歌词与当前版本对齐，正数表示延后。</p>
         <div className="lyrics-offset-buttons"><button className="btn btn-secondary" onClick={() => setOffset(String(Math.max(-600, offsetMs / 1000 - .5)))}>提前 0.5 秒</button><button className="btn btn-secondary" onClick={() => setOffset(String(Math.min(600, offsetMs / 1000 + .5)))}>延后 0.5 秒</button></div>
         {embedded && <p className="lyrics-offset-preview" role="status">{offsetMs === 0 ? '使用原始时间' : `已${offsetMs > 0 ? '延后' : '提前'} ${Math.abs(offsetMs / 1000).toFixed(1)} 秒`}{offsetMs !== state?.offsetMs ? ' · 正在预览，尚未保存' : ' · 已保存'}<br/>歌词早了请延后，歌词晚了请提前。越播偏差越大时，请更换匹配的歌词。</p>}
@@ -71,5 +71,5 @@ export function LyricsSettings({ lyrics, desktopImmersive = false, nativeDesktop
       <div className="lyrics-settings-actions"><button className="btn btn-secondary" disabled={!state || !!busy} onClick={() => setSelector(true)}>更换或导入歌词</button><button className="btn btn-ghost" disabled={!lyrics.track || !!busy} onClick={() => void resolve()}><ArrowsClockwiseIcon size={16}/>{document ? '刷新当前歌词' : '重新匹配'}</button></div>
     </>}
   </>;
-  return embedded ? <section className="embedded-lyrics-settings" aria-label="当前版本歌词管理">{content}</section> : <Modal title={selector ? '选择歌词' : '歌词设置'} className={selector ? 'lyrics-dialog' : 'lyrics-settings-dialog'} onClose={lyrics.closeSettings}>{content}</Modal>;
+  return embedded ? <section className="embedded-lyrics-settings" aria-label="当前版本歌词管理">{content}</section> : <Modal mobilePage={!desktopImmersive} title={selector ? '选择歌词' : '歌词设置'} className={selector ? 'lyrics-dialog' : 'lyrics-settings-dialog'} onClose={lyrics.closeSettings}>{content}</Modal>;
 }

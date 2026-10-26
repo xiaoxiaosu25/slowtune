@@ -27,6 +27,10 @@ async function openSettings(page) {
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('button', { name: '歌词设置', exact: true }).click();
 }
+async function openOffset(settings) {
+  const offset = settings.locator('.lyrics-offset');
+  if (!await offset.evaluate(element => element.open)) await offset.locator('summary').click();
+}
 async function bottomToggle(page, enabled) {
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('checkbox', { name: '底部歌词', exact: true }).setChecked(enabled);
@@ -112,7 +116,9 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await panel.getByLabel('歌词正文').dispatchEvent('scroll');
   assert.equal(await page.getByRole('button', { name: '歌词设置', exact: true }).isVisible(), true, 'lyric auto-scroll leaves a stationary playback menu open');
   await page.evaluate(() => document.dispatchEvent(new Event('scroll')));
-  assert.equal(await page.getByRole('button', { name: '歌词设置', exact: true }).isVisible(), false, 'ancestor scrolling still dismisses the menu');
+  const optionsSheet = page.getByRole('dialog', { name: '更多播放选项', exact: true });
+  assert.equal(await optionsSheet.isVisible(), true, 'background scroll does not dismiss the modal playback sheet');
+  await optionsSheet.getByRole('button', { name: '关闭', exact: true }).click();
   await openSettings(page);
   await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '选择歌词', exact: true });
@@ -133,10 +139,10 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await openSettings(page);
   const settings = page.getByRole('dialog', { name: '歌词设置', exact: true });
   assert.equal(await settings.getByRole('checkbox', { name: '显示底部歌词', exact: true }).count(), 0);
-  await settings.getByText('调整歌词时间', { exact: true }).click(); await settings.getByLabel('歌词延后秒数').fill('1'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
+  await openOffset(settings); await settings.getByLabel('歌词延后秒数').fill('1'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('1 秒'));
   assert.equal(lyrics.read(ref).offsetMs, 1000);
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await panel.getByRole('button', { name: '第二行', exact: true }).click();
   await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 4) < .2);
   await page.waitForFunction(() => document.querySelector('.lyrics-scroll [aria-current="true"]')?.textContent === '第二行');
@@ -151,6 +157,7 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await panel.getByLabel('歌词正文').dispatchEvent('scroll');
   assert.equal(await page.getByRole('menu', { name: '播放速度', exact: true }).isVisible(), true, 'lyric auto-scroll leaves the speed menu usable');
   await page.getByRole('menuitemradio', { name: '1.5×', exact: true }).click();
+  await optionsSheet.getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio').currentTime > 7.1); assert.equal(await page.locator('audio').evaluate(a => a.playbackRate), 1.5);
   assert.equal(await panel.locator('[aria-current="true"]').innerText(), '第三行');
@@ -160,13 +167,13 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await panel.getByLabel('歌词正文').dispatchEvent('wheel');
   await panel.getByRole('button', { name: '回到当前行', exact: true }).waitFor();
   await page.waitForFunction(() => !document.querySelector('.lyrics-resume'), null, { timeout: 7000 });
-  await openSettings(page); await settings.locator('.lyrics-offset summary').click();
+  await openSettings(page); await openOffset(settings);
   await settings.getByLabel('歌词延后秒数').fill('2');
   lyrics.update(ref, lyrics.read(ref).revision, state => { state.offsetMs = 1500; }, new AbortController().signal);
   await settings.getByRole('button', { name: '保存偏移', exact: true }).click(); await settings.getByRole('button', { name: '重读当前歌词', exact: true }).click();
   assert.equal(await settings.getByLabel('歌词延后秒数').inputValue(), '2'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('2 秒')); assert.equal(lyrics.read(ref).offsetMs, 2000);
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   for (const width of [740, 390, 320]) {
     await page.setViewportSize({ width, height: width === 740 ? 1000 : 844 });
@@ -179,12 +186,12 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
     assert.ok(layout.lyrics.bottom <= layout.player.top, 'mobile lyrics occupy the original cover location');
     assert.ok(layout.player.bottom <= layout.height, 'playback controls remain in the viewport');
     if (width === 320) {
-      await openSettings(page); await settings.locator('.lyrics-offset summary').click();
+      await openSettings(page); await openOffset(settings);
       await settings.getByLabel('歌词延后秒数').fill('2.5'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
       await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('2.5 秒'));
       await settings.getByLabel('歌词延后秒数').fill('2'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
       await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('2 秒'));
-      await settings.getByRole('button', { name: '关闭', exact: true }).click();
+      await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
     }
   }
   for (const viewport of [{ width: 740, height: 500 }]) {
@@ -211,7 +218,7 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await page.evaluate(() => { document.documentElement.dataset.palette = 'paper'; document.documentElement.dataset.theme = 'dark'; });
   lyrics.update(ref, lyrics.read(ref).revision, state => { state.document.lines[2].words = [{ startMs: 6000, endMs: 7000, text: '第' }, { startMs: 7000, endMs: 8000, text: '三' }, { startMs: 8000, endMs: 9000, text: '行' }]; }, new AbortController().signal);
   await openSettings(page); await settings.getByRole('button', { name: '刷新当前歌词', exact: true }).click();
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await panel.getByRole('button', { name: '第三行', exact: true }).click();
   await page.locator('audio').evaluate(audio => { audio.currentTime = 9.5; audio.dispatchEvent(new Event('timeupdate')); });
   await page.waitForFunction(() => [...document.querySelectorAll('.lyric-text.is-current [data-word-index="1"]')].length === 1 && [...document.querySelectorAll('.lyric-text.is-current [data-word-index="1"]')].every(ink => Math.abs(parseFloat(ink.style.getPropertyValue('--lyric-fill')) - 50) < 1));
@@ -273,7 +280,7 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
     started(); await late; await route.fulfill({ json: oldState }).catch(() => {});
   });
   await openSettings(page); await settings.getByRole('button', { name: '刷新当前歌词', exact: true }).click(); await reading;
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
   if(await page.locator('.mobile-search-page').count())await page.getByRole('button',{name:'关闭搜索',exact:true}).click();
   await page.getByRole('navigation', { name: '手机导航', exact: true }).getByRole('button', { name: '音乐库', exact: true }).click();

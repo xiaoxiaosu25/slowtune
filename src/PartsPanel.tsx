@@ -7,6 +7,7 @@ import { PagedList } from './Pagination';
 
 export type PartBatchAction = 'favorite' | 'unfavorite' | 'add-entries' | 'create-playlist';
 interface Props {
+  mobile?: boolean;
   track: MusicEntry; parts: MusicEntry[]; playlists: Playlist[]; busy: boolean; loading: boolean;
   intent: MusicActionIntent; targetId?: string; anchorId?: string; step?:number; decisionStale: boolean; preference?: PartPlaybackMode;
   intro: ReactNode; more: ReactNode; feedback: ReactNode;
@@ -19,7 +20,7 @@ interface Props {
 type View = MusicActionIntent | 'destination';
 
 /** Selection, destination and scroll survive every step within the same media dialog. */
-export function PartsPanel({ track, parts, playlists, busy, loading, intent, targetId, anchorId, step, decisionStale, preference, intro, more, feedback, isFavorite, renderRow, playSingle, addSingle, favoriteSingle, play, add, save, choose, changePreference }: Props) {
+export function PartsPanel({ track, parts, playlists, busy, loading, intent, targetId, anchorId, step, decisionStale, preference, intro, more, feedback, isFavorite, renderRow, playSingle, addSingle, favoriteSingle, play, add, save, choose, changePreference, mobile = false }: Props) {
   const [view, setView] = useState<View>(intent), [custom, setCustom] = useState(false);
   const [selected, setSelected] = useState<string[]>(track.ref.part ? [track.ref.part] : []);
   const selectionInitialized=useRef(!!track.ref.part);
@@ -40,9 +41,11 @@ export function PartsPanel({ track, parts, playlists, busy, loading, intent, tar
   const commit = (entries: MusicEntry[]) => view === 'favorite' ? save('favorite', entries) : view === 'enqueue' ? add(entries) : savePlaylist(entries);
   const actionName = view === 'favorite' ? '收藏' : view === 'enqueue' ? '加入队列' : '添加';
   const disabled = busy || loading, playlistInvalid = view === 'playlist' && (target === 'new' ? !name.trim() : !playlists.some(playlist => playlist.id === target));
+  const quickActions=<div className="music-action-grid"><button className="btn btn-primary" disabled={disabled} onClick={() => void playSingle()}><PlayIcon size={18} weight="fill"/>立即播放</button><button className="btn btn-secondary" disabled={disabled} onClick={() => void addSingle()}><QueueIcon size={18}/>加入队列</button><button className="btn btn-secondary" disabled={disabled} aria-pressed={isFavorite(track)} onClick={favoriteSingle}><HeartIcon size={18} weight={isFavorite(track) ? 'fill' : 'regular'}/>{isFavorite(track) ? '取消收藏' : '收藏'}</button><button className="btn btn-secondary" disabled={disabled} onClick={() => { setCustom(false); switchView('playlist'); }}><ListBulletsIcon size={18}/>加入歌单</button></div>;
   return <>
     <div className="music-action-content" ref={body}>
       {intro}
+      {mobile&&view==='overview'&&quickActions}
       {loading && <p className="muted" role="status">正在读取分 P 信息…</p>}
       {view !== 'overview' && view !== 'play-choice' && <button className="btn btn-ghost btn-sm action-back" disabled={busy} onClick={() => switchView('overview')}>返回歌曲操作</button>}
       {view === 'play-choice' && <div className="part-play-decision"><p>这个视频包含 <strong>{all.length} 个分 P</strong>，是否接着播放整组？</p><p className="muted">整组按原顺序入队，当前歌曲继续播放；选择会记住到这个视频。</p>{decisionStale && <p className="error-text" role="status">当前歌曲已切换，请重新点播后选择。</p>}</div>}
@@ -64,13 +67,13 @@ export function PartsPanel({ track, parts, playlists, busy, loading, intent, tar
       </section>}
       {feedback}
     </div>
-    <div className="music-action-footer">
+    {(!mobile||view!=='overview')&&<div className="music-action-footer">
       {view==='playlist'&&<p className="action-target" role="status">添加到「{target==='new'?name.trim()||'新建歌单':playlists.find(playlist=>playlist.id===target)?.name??'请选择歌单'}」</p>}
       {view==='destination'&&<button className="btn btn-secondary" onClick={()=>switchView('parts')}>返回分 P 列表</button>}
-      {view === 'overview' && <div className="music-action-grid"><button className="btn btn-primary" disabled={disabled} onClick={() => void playSingle()}><PlayIcon size={18} weight="fill"/>立即播放</button><button className="btn btn-secondary" disabled={disabled} onClick={() => void addSingle()}><QueueIcon size={18}/>加入队列</button><button className="btn btn-secondary" disabled={disabled} aria-pressed={isFavorite(track)} onClick={favoriteSingle}><HeartIcon size={18} weight={isFavorite(track) ? 'fill' : 'regular'}/>{isFavorite(track) ? '取消收藏' : '收藏'}</button><button className="btn btn-secondary" disabled={disabled} onClick={() => { setCustom(false); switchView('playlist'); }}><ListBulletsIcon size={18}/>加入歌单</button></div>}
+      {view === 'overview' && quickActions}
       {view === 'play-choice' && <div className="music-action-grid"><button className="btn btn-primary" disabled={disabled || decisionStale} onClick={() => void choose('all')}>播放整组 {all.length} 首</button><button className="btn btn-secondary" disabled={disabled || decisionStale} onClick={() => void choose('single')}>保持本 P</button></div>}
       {view === 'parts' && <div className="music-action-grid"><button className="btn btn-primary" disabled={disabled || !chosen.length} onClick={() => void play(chosen)}>播放所选 {chosen.length} 首</button><button className="btn btn-secondary" disabled={disabled || !chosen.length} onClick={() => { setCustom(true); switchView('destination'); }}>添加所选 {chosen.length} 首</button></div>}
       {['favorite', 'playlist', 'enqueue'].includes(view) && <div className="music-action-grid">{custom ? <><button className="btn btn-primary" disabled={disabled || playlistInvalid || !chosen.length} onClick={() => void finished(commit(chosen))}>{actionName}选中 {chosen.length} 首</button>{view === 'favorite' && <button className="btn btn-secondary" disabled={disabled || !chosen.some(isFavorite)} onClick={() => void finished(save('unfavorite', chosen))}>取消收藏选中</button>}</> : <><button className="btn btn-primary" disabled={disabled || playlistInvalid} onClick={() => void finished(view === 'favorite' && isFavorite(single) ? save('unfavorite', [single]) : commit([single]))}>{view === 'favorite' && isFavorite(single) ? '取消收藏' : actionName}{multiple ? '本 P' : '本首'}</button>{multiple && <button className="btn btn-secondary" disabled={disabled || playlistInvalid} onClick={() => void finished(commit(all))}>{actionName}全部 {all.length} 首</button>}</>}</div>}
-    </div>
+    </div>}
   </>;
 }

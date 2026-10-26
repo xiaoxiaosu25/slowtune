@@ -59,7 +59,7 @@ export function SongListImportPanel({ client, input, library, onChange, onClose,
       if (!controller.signal.aborted) { onChange(result); onSaved(`已加入 ${result.summary.changed} 首，跳过 ${result.summary.unchanged} 首`); onClose(); }
     } catch (issue) { if (!cancelled(issue)) {setError(errorText(issue));if((issue as {code?:string}).code==='conflict'){try{const current=await request<SongLibraryState>('/api/song-library',undefined,controller.signal);if(!controller.signal.aborted)onChange(current);}catch{}}} } finally { if (work.current === controller) setBusy(false); }
   };
-  return <Modal title={'添加歌曲 · ' + input.title} className="backup-modal song-list-import-modal" onClose={() => { work.current?.abort(); onClose(); }}>
+  return <Modal mobilePage title={'添加歌曲 · ' + input.title} className="backup-modal song-list-import-modal" onClose={() => { work.current?.abort(); onClose(); }}>
     <label className="choice"><input type="checkbox" checked={expand} disabled={busy} onChange={event => {setExpand(event.target.checked);setRefs([]);setSelected(new Set());setFailures([]);setError('');setLimited(false);setIncomplete(false);setNarrowed(false);setCancelledRead(false);}}/>展开视频的全部分 P</label><button className="btn btn-secondary" disabled={busy} onClick={() => void read()}>读取并预览来源</button>
     {busy && <p role="status">{phase==='read'?'正在读取来源…':'正在添加歌曲…'} {phase==='read'&&<button className="btn btn-ghost" onClick={() => { work.current?.abort(); setBusy(false);setCancelledRead(true); }}>取消读取</button>}</p>}
     {cancelledRead&&<p role="status">读取已取消，可重新读取；尚未添加歌曲。</p>}
