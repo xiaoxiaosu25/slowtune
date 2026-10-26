@@ -76,8 +76,12 @@ test('mobile secondary navigation retains chart choice, author depth, pagination
   await page.getByRole('button',{name:'作者内容下一页',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('input[aria-label="作者内容页码"]')?.value==='2');
   const uploadsScroll=await readAt(page,650);
+  let finishRead;
+  const delayedRead=new Promise(done=>{finishRead=done;});t.after(()=>finishRead());
+  await page.route('**/api/follows',async route=>{await delayedRead;await route.continue();});
   await page.getByRole('button',{name:'打开正在播放',exact:true}).click();await page.locator('.mobile-player').waitFor();
   await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();
+  await page.locator('.follows-page>.loading').waitFor();finishRead();
   await page.locator('.follows-page .track-row').first().waitFor();
   assert.equal(await page.getByRole('textbox',{name:'作者内容页码',exact:true}).inputValue(),'2');await assertPosition(page,uploadsScroll);
   await page.setViewportSize({width:1280,height:800});await page.getByRole('heading',{name:'散步的音乐人 35',exact:true}).waitFor();

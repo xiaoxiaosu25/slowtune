@@ -107,11 +107,17 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
       // A remounted long list may arrive after the first paint. Do not clamp its
       // saved position to the loading placeholder or overwrite it with that clamp.
       let timeout:ReturnType<typeof setTimeout>;
-      const observer = new ResizeObserver(() => attempt());
-      const cleanup = () => {observer.disconnect();clearTimeout(timeout);window.removeEventListener('touchstart',cancel);window.removeEventListener('wheel',cancel);window.removeEventListener('keydown',cancel);};
+      let readyFrames = 0, previousHeight = -1;
+      const observer = new ResizeObserver(() => { readyFrames = 0; });
+      const cleanup = () => {observer.disconnect();clearTimeout(timeout);cancelAnimationFrame(frame);window.removeEventListener('touchstart',cancel);window.removeEventListener('wheel',cancel);window.removeEventListener('keydown',cancel);};
       const cancel = () => {cleanup();restoring=false;scroll();};
       const attempt = () => {
-        if (layers().length || document.documentElement.scrollHeight - innerHeight >= target.scroll - 1) {cleanup();finish();}
+        const height = document.documentElement.scrollHeight;
+        const loading = Array.from(document.querySelectorAll('.main-content .loading')).some(element => element.getClientRects().length);
+        readyFrames = !loading && height - innerHeight >= target.scroll - 1 && height === previousHeight ? readyFrames + 1 : 0;
+        previousHeight = height;
+        if (layers().length || readyFrames >= 2) {cleanup();finish();}
+        else frame = requestAnimationFrame(attempt);
       };
       stopRestoring=cleanup;
       observer.observe(document.body);
