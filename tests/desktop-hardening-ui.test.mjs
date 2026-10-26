@@ -49,6 +49,7 @@ test('desktop disclosures, native diagnostic copy, failed save recovery and imme
   const copied = await application.evaluate(({ clipboard }) => clipboard.readText());
   const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
   assert(copied.includes('应用版本：' + version)); assert.match(copied, /Electron：\d/); assert.match(copied, /Windows ·/);
+  assert(copied.includes('内部服务版本：' + version));
   assert(!copied.includes(data)); assert.doesNotMatch(copied, /[A-Z]:[\\/]|music_session|accessKey|signature=|X-Control/);
   await page.screenshot({ path: join(data, 'runtime.png') });
   await page.route('**/api/status', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'network', message: 'PRIVATE-secret C:\\Users\\PRIVATE https://media.invalid/?signature=PRIVATE' } }) }));

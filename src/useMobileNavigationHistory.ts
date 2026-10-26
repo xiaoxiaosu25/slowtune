@@ -22,7 +22,11 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
   useLayoutEffect(() => {
     if (!enabled) return;
     const previousScrollRestoration = history.scrollRestoration;
+    const root = document.documentElement, previousOverflowAnchor = root.style.overflowAnchor;
     history.scrollRestoration = 'manual';
+    // Loading indicators can disappear after a cached page has been restored.
+    // Browser anchoring must not move the position owned by this history entry.
+    root.style.overflowAnchor = 'none';
     const session = 'mobile-' + Date.now() + '-' + Math.random();
     const tokens = new WeakMap<Element, number>(); let token = 0, serial = 0, restoring = false, disposed = false;
     let pendingClose: string | undefined, frame = 0;
@@ -136,7 +140,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
     window.addEventListener('popstate', pop);
     window.addEventListener('scroll', scroll, { passive: true });
     document.addEventListener('toggle', commit, true);
-    return () => { disposed = true; stopRestoring(); observer.disconnect(); cancelAnimationFrame(frame); window.removeEventListener('popstate', pop); window.removeEventListener('scroll', scroll); document.removeEventListener('toggle', commit, true); history.scrollRestoration = previousScrollRestoration; refresh.current = () => {}; back.current = (_page, fallback) => fallback(); };
+    return () => { disposed = true; stopRestoring(); observer.disconnect(); cancelAnimationFrame(frame); window.removeEventListener('popstate', pop); window.removeEventListener('scroll', scroll); document.removeEventListener('toggle', commit, true); history.scrollRestoration = previousScrollRestoration; root.style.overflowAnchor = previousOverflowAnchor; refresh.current = () => {}; back.current = (_page, fallback) => fallback(); };
   }, [enabled]);
   useLayoutEffect(() => { refresh.current(); }, [enabled, page]);
   return (targetPage: BackTarget, fallback: () => void) => back.current(targetPage, fallback);

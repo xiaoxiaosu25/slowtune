@@ -20,7 +20,14 @@ const mobileNav=page=>page.getByRole('navigation',{name:'手机导航',exact:tru
 const position=page=>page.evaluate(()=>scrollY);
 const queue=page=>page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
 const queueItems=record=>record.items.map(({instanceId,selection})=>({instanceId,selection:selection.kind==='source'?{kind:selection.kind,ref:selection.ref}:selection}));
-async function assertPosition(page,saved) {await page.waitForFunction(y=>Math.abs(scrollY-y)<3,saved);}
+async function assertPosition(page,saved) {
+  await page.waitForFunction(()=>![...document.querySelectorAll('.main-content .loading')].some(element=>element.getClientRects().length));
+  try {await page.waitForFunction(y=>Math.abs(scrollY-y)<3,saved);}
+  catch(error) {
+    const actual=await page.evaluate(()=>({scroll:scrollY,height:document.documentElement.scrollHeight,viewport:innerHeight,history:history.state?.slowTuneMobileNavigation,focused:document.activeElement?.getAttribute('aria-label')}));
+    throw new Error('Scroll restoration did not retain '+saved+': '+JSON.stringify(actual),{cause:error});
+  }
+}
 async function readAt(page,y,action) {await page.evaluate(y=>scrollTo(0,y),y);if(action)await action.scrollIntoViewIfNeeded();const saved=await position(page);await page.waitForFunction(y=>history.state?.slowTuneMobileNavigation?.scroll===y,saved);return saved;}
 async function startAudio(page) {
   await page.locator('.mobile-mini-player').getByRole('button',{name:'播放',exact:true}).click();
@@ -30,6 +37,7 @@ async function startAudio(page) {
 
 test('mobile secondary navigation retains chart choice, author depth, pagination and scroll without touching playback',{timeout:120000},async t=>{
   const {fixture,page,errors}=await setup(t,{withYoutube:true}),audio=await startAudio(page);
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).overflowAnchor),'none');
   // Loop the controlled media so long browsing cannot naturally advance the queue.
   await audio.evaluate(a=>a.loop=true);
   const original=await queue(page),preparations=fixture.preparations.length;
@@ -73,6 +81,7 @@ test('mobile secondary navigation retains chart choice, author depth, pagination
   await page.locator('.follows-page .track-row').first().waitFor();
   assert.equal(await page.getByRole('textbox',{name:'作者内容页码',exact:true}).inputValue(),'2');await assertPosition(page,uploadsScroll);
   await page.setViewportSize({width:1280,height:800});await page.getByRole('heading',{name:'散步的音乐人 35',exact:true}).waitFor();
+  await page.waitForFunction(()=>history.scrollRestoration==='auto'&&document.documentElement.style.overflowAnchor==='');
   await page.setViewportSize({width:390,height:844});await page.getByRole('heading',{name:'散步的音乐人 35',exact:true}).waitFor();assert.equal(await page.getByRole('textbox',{name:'作者内容页码',exact:true}).inputValue(),'2');
   assert(await audio.evaluate(a=>a===document.querySelector('audio')&&!a.paused));
   assert.equal(fixture.preparations.length,preparations);assert.deepEqual(queueItems(await queue(page)),queueItems(original));
