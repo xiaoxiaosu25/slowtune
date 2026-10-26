@@ -109,9 +109,9 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
     await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'重复条目歌单'}).first().click();await page.getByLabel('搜索歌单内音乐').fill('匹配');await playAndCheck(all,[a.title,a.title]);const queue=await storage();assert.equal(new Set(queue.items.map(x=>x.instanceId)).size,2);assert.equal(queue.items[0].selection.songId,queue.items[1].selection.songId);
     await page.getByLabel('搜索歌单内音乐').fill('');await playAndCheck(all,[a.title,a.title,c.title]);
   });
-  await t.test('shortcut search leaves both inputs empty; source switches, retries and pagination use the submitted term',async()=>{
+  await t.test('shortcut search fills both editable inputs; source switches, retries and pagination use the submitted term',async()=>{
     await nav('音乐榜单');await page.getByLabel('搜索歌曲或视频').fill('旧输入');await page.getByRole('button',{name:'搜索 快捷歌名',exact:true}).click();await dialog.locator('.track-row').nth(3).waitFor();
-    assert.equal(await page.getByLabel('搜索歌曲或视频').inputValue(),'');assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'');assert(searches.slice(-2).every(x=>x.query==='快捷歌名'));assert.match(await dialog.locator('.search-description').textContent(),/快捷歌名/);
+    assert.equal(await page.getByLabel('搜索歌曲或视频').inputValue(),'快捷歌名');assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'快捷歌名');assert(searches.slice(-2).every(x=>x.query==='快捷歌名'));assert.match(await dialog.locator('.search-description').textContent(),/快捷歌名/);
     const bili=dialog.locator('.catalog').filter({has:page.getByRole('heading',{name:'B站',exact:true})});await playAndCheck(bili.locator('.play-all'),['快捷歌名 · bilibili 600','快捷歌名 · bilibili 601','快捷歌名 · bilibili 602','快捷歌名 · bilibili 603']);
     await dialog.getByLabel('弹窗搜索关键词').fill('未提交草稿');await dialog.getByRole('button',{name:'YouTube 视频',exact:true}).click();await dialog.locator('.track-row').nth(1).waitFor();assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'未提交草稿');assert.equal(searches.at(-1).query,'快捷歌名');
     await page.waitForFunction(()=>document.querySelectorAll('.search-modal .track-row').length===4);assert.equal(searches.at(-1).query,'快捷歌名');assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'未提交草稿');
