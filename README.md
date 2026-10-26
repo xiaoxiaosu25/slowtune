@@ -5,13 +5,14 @@
 <p align="center">一款面向 Windows 的个人音乐播放器，支持 B站搜索、歌单整理、歌曲多版本与沉浸歌词。</p>
 
 <p align="center">
-  <a href="https://github.com/xiaoxiaosu25/slowtune/releases"><img alt="最新开发预览版" src="https://img.shields.io/github/v/release/xiaoxiaosu25/slowtune?include_prereleases&amp;label=preview&amp;color=a92e32"></a>
+  <a href="https://github.com/xiaoxiaosu25/slowtune/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/xiaoxiaosu25/slowtune?label=version&amp;color=a92e32"></a>
   <a href="https://github.com/xiaoxiaosu25/slowtune/releases"><img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-365e8d"></a>
   <a href="LICENSE"><img alt="AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-60734b"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/xiaoxiaosu25/slowtune/releases"><strong>下载 Windows 预览版</strong></a> ·
+  <a href="https://github.com/xiaoxiaosu25/slowtune/releases/download/v0.1.32/SlowTune-0.1.32-windows-x64.zip"><strong>下载 Windows x64</strong></a> ·
+  <a href="https://github.com/xiaoxiaosu25/slowtune/releases">所有版本与更新记录</a> ·
   <a href="#界面预览">界面预览</a> ·
   <a href="#功能">功能</a> ·
   <a href="#源码启动">源码启动</a> ·
@@ -22,7 +23,7 @@
 
 <p align="center"><em>《松烟入墨》· Winky诗，真实 B站来源播放画面。</em></p>
 
-**当前为开发预览版，主要维护 Windows x64。** [下载与启动](#下载-windows-版) · [支持范围与当前限制](docs/产品/当前限制.md)
+**主要维护 Windows x64。** [下载与启动](#下载-windows-版) · [支持范围与当前限制](docs/产品/当前限制.md)
 
 ## 功能
 
@@ -70,8 +71,8 @@
 
 ## 下载 Windows 版
 
-1. 打开 [Releases](https://github.com/xiaoxiaosu25/slowtune/releases)，选择标记为 **Pre-release** 的版本。
-2. 下载 `SlowTune-<版本>-windows-x64.zip`，完整解压到当前用户可写的目录。
+1. [下载 Windows x64 ZIP](https://github.com/xiaoxiaosu25/slowtune/releases/download/v0.1.32/SlowTune-0.1.32-windows-x64.zip)；其他版本及更新说明见 [Releases](https://github.com/xiaoxiaosu25/slowtune/releases)。
+2. 将 `SlowTune-<版本>-windows-x64.zip` 完整解压到当前用户可写的目录。
 3. 双击 `SlowTune.exe`，欢迎页结束后即可进入，无需另装 Node.js。
 
 请保留完整解压目录。GitHub 自动生成的 `Source code.zip` 是源码，不能直接作为程序运行。
