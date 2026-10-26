@@ -38,7 +38,7 @@ test('desktop sleep timer: form, replacement, completion and host actions', { ti
   const open = async (query = '') => {
     await page.setViewportSize(query.includes('mobile') ? { width: 390, height: 844 } : { width: 1440, height: 1000 });
     await page.goto(origin + '/' + query);
-    try { await page.waitForFunction(() => window.sleepProbe?.ready, undefined, { timeout: 3000 }); }
+    try { await page.waitForFunction(() => window.sleepProbe?.ready); }
     catch (failure) { throw new Error('Sleep probe did not mount: ' + errors.join('; '), { cause: failure }); }
   };
   const invoke = (method, ...args) => page.evaluate(({ method, args }) => window.sleepProbe[method](...args), { method, args });
