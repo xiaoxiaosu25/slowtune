@@ -32,8 +32,7 @@ test('desktop song search includes artists while manual text and mobile requests
     await search.getByRole('button',{name:'搜索',exact:true}).click();await manual;
     assert.equal(fixture.state.searchQueries.at(-1).request.query,'恋人 现场');
     await search.getByRole('button',{name:width===1440?'关闭':'关闭搜索',exact:true}).click();
-    const resolved=page.waitForResponse(response=>response.url().endsWith('/api/song-library/playback'));
-    await page.getByRole('button',{name:'直接播放 恋人',exact:true}).click();assert.equal((await resolved).status(),200);
+    const [resolved]=await Promise.all([page.waitForResponse(response=>response.url().endsWith('/api/song-library/playback')),page.getByRole('button',{name:width===1440?'直接播放 恋人':'播放 恋人',exact:true}).click()]);assert.equal(resolved.status(),200);
     assert.equal(requests.at(-1).searchMode,width===1440?'title-artists':undefined);
     assert.equal(requests.at(-1).selection.kind,'chart');assert.equal(requests.at(-1).selection.context.title,song.title);assert.deepEqual(requests.at(-1).selection.context.artists,song.artists);
     await page.waitForFunction(()=>document.querySelector('.now-playing strong')?.textContent==='恋人'&&!document.querySelector('audio').paused);

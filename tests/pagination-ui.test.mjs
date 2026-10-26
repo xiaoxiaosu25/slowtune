@@ -118,14 +118,21 @@ test('pagination: returning to a cursor list beyond the bounded refill keeps loa
   const before=reads.length;
   await page.getByRole('button',{name:'合集',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.follows-page .pagination')?.getAttribute('aria-label')==='作者合集分页'&&document.querySelector('.follows-page .pagination')?.getAttribute('aria-busy')==='false');
-  assert.deepEqual(reads.slice(before),[1,2,3,4],'restoration keeps the source read budget bounded');
-  assert.equal(await input.inputValue(),'2','a remembered page beyond loaded content falls back to a complete available page');
+  assert.deepEqual(reads.slice(before),[],'switching views reuses loaded cursor pages');
+  assert.equal(await input.inputValue(),'6');
+  assert.match(await page.locator('.follow-collection-card').first().innerText(),/分页合集 151/);
+  const refreshReads=reads.length;await page.locator('.follow-toolbar').getByRole('button',{name:'刷新',exact:true}).click();
+  await page.waitForFunction(()=>Number(document.querySelector('input[aria-label="作者合集页码"]')?.value)<=2&&document.querySelector('.follows-page .pagination')?.getAttribute('aria-busy')==='false'&&document.querySelectorAll('.follow-collection-card').length===30);
+  const refill=reads.slice(refreshReads);assert(refill.length>=2&&refill.length<=4,'refresh keeps source reads bounded');
+  assert.deepEqual(refill,Array.from({length:refill.length},(_,index)=>index+1));
+  const availablePage=Math.floor(refill.length*20/30);
+  assert.equal(await input.inputValue(),String(availablePage),'a remembered page beyond refreshed content falls back to a complete available page');
   assert.equal(await page.locator('.follow-collection-card').count(),30);
   assert.equal(await page.getByText('作者还没有公开合集',{exact:true}).count(),0);
-  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(3);
-  assert.match(await page.locator('.follow-collection-card').first().innerText(),/分页合集 61/);
-  assert.match(await page.locator('.follow-collection-card').last().innerText(),/分页合集 90/,'the next read fills the unfinished page without skipping later arrivals');
-  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(4);
+  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(availablePage+1);
+  await page.locator('.follow-collection-card').first().getByText('分页合集 '+(availablePage*30+1),{exact:true}).waitFor();
+  await page.locator('.follow-collection-card').last().getByText('分页合集 '+((availablePage+1)*30),{exact:true}).waitFor();
+  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(availablePage+2);
   assert.equal(await page.locator('.follow-collection-card').count(),30,'reading can continue after the bounded fallback');
 });
 

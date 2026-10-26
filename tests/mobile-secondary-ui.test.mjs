@@ -21,7 +21,7 @@ const position=page=>page.evaluate(()=>scrollY);
 const queue=page=>page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
 const queueItems=record=>record.items.map(({instanceId,selection})=>({instanceId,selection:selection.kind==='source'?{kind:selection.kind,ref:selection.ref}:selection}));
 async function assertPosition(page,saved) {await page.waitForFunction(y=>Math.abs(scrollY-y)<3,saved);}
-async function readAt(page,y) {await page.evaluate(y=>scrollTo(0,y),y);const saved=await position(page);await page.waitForFunction(y=>history.state?.slowTuneMobileNavigation?.scroll===y,saved);return saved;}
+async function readAt(page,y,action) {await page.evaluate(y=>scrollTo(0,y),y);if(action)await action.scrollIntoViewIfNeeded();const saved=await position(page);await page.waitForFunction(y=>history.state?.slowTuneMobileNavigation?.scroll===y,saved);return saved;}
 async function startAudio(page) {
   await page.locator('.mobile-mini-player').getByRole('button',{name:'播放',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>0);
@@ -37,7 +37,7 @@ test('mobile secondary navigation retains chart choice, author depth, pagination
   await page.getByRole('tab',{name:'QQ',exact:true}).click();
   await page.getByRole('button',{name:'榜单歌曲下一页',exact:true}).click();
   await page.getByRole('textbox',{name:'榜单歌曲页码',exact:true}).waitFor();
-  const chartsScroll=await readAt(page,650);
+  const chartsScroll=await readAt(page,650,page.getByRole('button',{name:'搜索 海岸第 38 首',exact:true}));
   await page.getByRole('button',{name:'搜索 海岸第 38 首',exact:true}).click();
   await page.getByRole('main',{name:'搜索音乐',exact:true}).waitFor();await page.goBack();
   await page.getByRole('tab',{name:'QQ',exact:true}).waitFor();
@@ -47,11 +47,11 @@ test('mobile secondary navigation retains chart choice, author depth, pagination
   await discoverNav(page).getByRole('button',{name:'关注',exact:true}).click();
   await page.locator('.source-tabs').getByRole('button',{name:'B站',exact:true}).click();
   await page.getByRole('button',{name:'关注作者下一页',exact:true}).click();
-  const authorsScroll=await readAt(page,420);
+  const authorsScroll=await readAt(page,420,page.getByRole('button',{name:'查看 散步的音乐人 35 的合集',exact:true}));
   await page.getByRole('button',{name:'查看 散步的音乐人 35 的合集',exact:true}).click();
   await page.getByRole('button',{name:'打开合集 散步歌单 2 · 合集',exact:true}).waitFor();
   await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();
-  const collectionsScroll=await readAt(page,500);
+  const collectionsScroll=await readAt(page,500,page.getByRole('button',{name:'打开合集 散步歌单 36 · 合集',exact:true}));
   await page.getByRole('button',{name:'打开合集 散步歌单 36 · 合集',exact:true}).click();
   await page.locator('.follows-page .track-row').first().waitFor();
   await page.getByRole('button',{name:'作者内容下一页',exact:true}).click();

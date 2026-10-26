@@ -55,14 +55,16 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   t.after(async () => { release?.(); await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); store.close(); });
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } }), errors = [], external = []; page.setDefaultTimeout(10000);
   const editSong=async title=>{
+    const search=page.getByRole('main',{name:'搜索音乐',exact:true});
+    if(await search.isVisible())await search.getByRole('button',{name:'关闭搜索',exact:true}).click();
+    if(await page.getByRole('dialog',{name:'歌曲与版本',exact:true}).isVisible())return;
     const row=page.locator('.song-library-row').filter({has:page.getByRole('button',{name:title,exact:true})}).first();
     if(await row.locator('.song-row-menu').count()){
       await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
       await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();return;
     }
-    const options=row.locator('.song-row-options');
-    if(!await options.evaluate(element=>element.open))await options.locator('summary').click();
-    await row.getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();
+    await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
+    await page.getByRole('dialog',{name:'歌曲操作',exact:true}).getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();
   };
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => { if (new URL(route.request().url()).origin !== origin) { external.push(route.request().url()); return route.abort(); } return route.continue(); });
@@ -227,8 +229,8 @@ test('product uses one new library for songs, repeated playlist members, edits, 
         await listening.locator('.song-library-row').first().evaluate(element=>element.scrollIntoView({block:'center',behavior:'instant'}));
         await listening.screenshot({path:join(directory,'library-'+width+'.png')});
       }
-      const more=listening.locator('.song-library-row').first().locator('.song-row-options');
-      await more.locator('summary').click();
+      await listening.locator('.song-library-row').first().getByRole('button',{name:'更多操作 其他页面的新歌名',exact:true}).click();
+      const more=listening.getByRole('dialog',{name:'歌曲操作',exact:true});
       assert.equal(await more.getByRole('button',{name:'编辑歌曲 其他页面的新歌名',exact:true}).isVisible(),true);
       assert.equal(await listening.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
       await more.evaluate(element=>element.scrollIntoView({block:'center',behavior:'instant'}));

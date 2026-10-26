@@ -17,7 +17,7 @@ async function setup(t, width = 1280) {
   const snapshot = () => fixture.library.read().snapshot;
   const edit = commands => fixture.library.execute(fixture.library.read().revision, commands);
   edit([{ type: 'remove-favorite', favoriteId: snapshot().favorites.find(f => f.songId === 'duplicate').favoriteId }]);
-  await page.goto(fixture.origin); await navigate(page, '歌单');
+  await page.goto(fixture.origin); await navigate(page, '收藏');
   const refresh = () => Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/api/song-library'),
     page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))),

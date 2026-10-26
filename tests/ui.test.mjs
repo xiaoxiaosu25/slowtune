@@ -713,11 +713,9 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await refresh.click();await recommended.getByText('B站本次返回相同的音乐',{exact:false}).waitFor();
     assert.equal(chartCalls.length,chartBefore);assert.equal(await page.locator('[data-shelf-id="hot-chart"],[data-shelf-id="new-music"]').count(),0);
     await setViewport({width:320,height:740});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-    await recommended.getByRole('button',{name:'栏目 0栏目操作',exact:true}).click();
-    const menu=page.getByRole('dialog',{name:'栏目 0栏目操作',exact:true});
-    assert((await menu.getByRole('button',{name:'换一批音乐',exact:true}).boundingBox()).height>=48);
-    await menu.getByRole('button',{name:'换一批音乐',exact:true}).click();
-    await menu.waitFor({state:'detached'});await setViewport({width:1440,height:1000});
+    const mobileRefresh=recommended.getByRole('button',{name:'换一批音乐',exact:true});
+    assert((await mobileRefresh.boundingBox()).height>=48);
+    await mobileRefresh.click();await setViewport({width:1440,height:1000});
     discoveryMode='same';await page.reload();await page.locator('.music-card').first().waitFor();
   });
 
@@ -760,7 +758,8 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await setViewport({ width: 390, height: 844 });
     await selectPlaylist(page, '失效歌曲歌单');
     await navigate(page, '发现');
-    const queueOpener=page.getByRole('button',{name:'打开播放队列',exact:true});
+    await page.getByRole('button',{name:'打开正在播放',exact:true}).click();
+    const queueOpener=page.getByRole('button',{name:'播放队列',exact:true});
     await queueOpener.click();
     assert(await page.locator('.queue-panel').isVisible());
     const drawer=page.getByRole('dialog',{name:'播放队列',exact:true});
@@ -772,6 +771,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('.queue-panel').isVisible(), false);
     assert.equal(await queueOpener.evaluate(el=>el===document.activeElement),true,'closing the modal restores focus to its opener');
+    await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();
   });
   await t.test('the player fits phones, tablets and desktops; queue dialogs trap focus and options stay reachable',async()=>{
     for(const width of [320,390,768,1024,1260,1440]){
@@ -1038,7 +1038,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     const artifacts=join(root,'test-results/youtube-discovery');mkdirSync(artifacts,{recursive:true});
     await page.screenshot({path:join(artifacts,'phone-320.png')});
-    for(const name of ['换一批音乐','封面浏览','歌曲列表']){
+    for(const name of ['加入歌单','封面浏览','歌曲列表']){
       const button=menu.getByRole('button',{name,exact:true});
       assert(await button.isVisible(),'mobile column actions have visible labels');
       const bounds=await button.boundingBox();assert(bounds.height>=48&&bounds.width>=48,'mobile column actions keep a 48px touch target');
