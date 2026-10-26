@@ -47,6 +47,11 @@
     "react-dom": "19.2.0",
     "youtubei.js": "18.2.0"
   },
+  "overrides": {
+    "@studio/music-sources": {
+      "youtubei.js": "$youtubei.js"
+    }
+  },
   "devDependencies": {
     "@electron/packager": "20.3.0",
     "@types/node": "24.10.1",
@@ -54,7 +59,7 @@
     "@types/react": "19.2.0",
     "@types/react-dom": "19.2.0",
     "@vitejs/plugin-react": "5.0.4",
-    "electron": "44.9.0",
+    "electron": "44.9.3",
     "github-slugger": "2.0.0",
     "markdown-it": "15.0.3",
     "playwright-core": "1.58.2",
