@@ -1,51 +1,40 @@
 # 参与贡献
 
-欢迎提交问题反馈、功能建议、代码修复和文档改进。目前主要维护 Windows 桌面版，并迭代现有移动 Web 的界面与交互；原生手机客户端另行确定范围。
+目前维护 Windows 桌面和现有移动 Web，欢迎反馈问题、提出建议或提交代码与文档。
 
 ## 反馈问题
 
-请先搜索已有 [Issues](https://github.com/xiaoxiaosu25/slowtune/issues)。提交问题时，提供应用版本、Windows 版本、复现步骤，以及预期和实际结果。运行故障可附上应用内“运行信息 → 复制诊断信息”的内容。
+先搜索 [Issues](https://github.com/xiaoxiaosu25/slowtune/issues)。提供应用版本、使用端、系统／浏览器版本、复现步骤及预期／实际结果；布局问题附窗口尺寸。Windows 运行故障可附「运行信息 → 复制诊断信息」。
 
-公开附件应去除 Cookie、访问码、控制密钥、账号二维码、媒体签名地址和其他凭据；不要上传完整资料目录、私人配置或未脱敏日志。
+附件去除凭据、账号二维码、私人路径和媒体签名地址，不上传完整资料目录、私人配置或原始日志。
 
 ## 本地开发
 
-按 [README](README.md#源码启动) 安装依赖、构建并启动应用。项目使用 Electron、React、TypeScript 和 Node.js。
-
-修改源码后，执行以下命令重建并重新打开桌面应用：
-
-```powershell
-npm run desktop:restart
-```
-
-依赖或锁文件变更后先执行 `npm ci`。构建输出与应用资料位置见[运行维护](docs/运维/运行维护.md#windows-桌面运行)。
-
-## 代码目录
+按 [README](README.md#源码启动)安装、构建和启动。依赖变更后执行 `npm ci`，源码修改后用 `npm run desktop:restart` 重建并打开。目录与资料位置见[运行维护](docs/运维/运行维护.md)。
 
 | 目录 | 内容 |
 | --- | --- |
-| `src/` | React 界面、播放器交互和样式 |
-| `desktop/` | Electron 窗口、生命周期、本地存储和桌面歌词 |
-| `server/` | 音乐来源接入、歌曲资料库和本地 HTTP 服务 |
-| `scripts/` | 启动、构建、文档和维护脚本 |
-| `tests/` | 单元测试、服务测试和界面回归 |
-| `vendor/` | 三个自有依赖包的安装包与对应源码归档 |
-| `docs/` | 产品、开发与运行文档 |
+| `src/` | React 界面和播放交互 |
+| `desktop/` | Electron 窗口、宿主、歌词与本地状态 |
+| `server/` | 来源、资料与 HTTP 服务 |
+| `scripts/`、`tests/` | 维护工具和回归 |
+| `vendor/` | 三个自有公共包及对应源码 |
+| `docs/` | 公开文档 |
 
-三个 `@studio/*` 包当前通过 `vendor/` 中的本地安装包引用，源码以归档形式提供。日常应用开发按 README 安装和构建即可。需要修改这些包时，解压对应源码，并在 PR 中附上基于该版本的源码补丁；维护者合入包源码后更新依赖版本。具体步骤见 [vendor/README.md](vendor/README.md)。
+公共包按固定制品安装；修改时基于随附源码提交补丁，由维护者合入并更新版本，见 [vendor/README](vendor/README.md)。
 
 ## 提交修改
 
-从 Fork 创建分支，完成修改后向本仓库提交 Pull Request。较大的功能或结构调整，建议先通过 Issue 说明要解决的问题。
+从 Fork 创建分支并提交 PR，较大功能先用 Issue 确认范围。提交围绕一个可验证目的，标题说明结果，可用 `fix:`、`feat:`、`test:`、`docs:`、`ci:` 或 `chore:`。
 
-每个提交围绕一个可独立验证、回退的目的；依赖升级、业务修改和大范围文档整理尽量分开。标题说明具体结果，建议使用 `fix:`、`feat:`、`test:`、`docs:`、`ci:` 或 `chore:` 前缀，例如 `fix: 保留重启前的播放进度`。中英文均可，避免只有“更新”或“修复问题”的标题。
+PR 写明原因、行为变化、影响与实际验证。提交前运行 `npm run source:check`；纯文档运行 `npm run docs:check`，代码按[验证规范](docs/开发/验证规范.md)构建和测试。合入前 `Source checks` 的 source、desktop 检查成功，审查讨论解决。
 
-PR 请说明修改原因、影响范围和验证结果，未执行的检查如实标明。纯文档修改运行 `npm run docs:check`；代码修改按影响范围构建并运行相关测试，命令及环境要求见[验证规范](docs/开发/验证规范.md)。不要提交应用资料、凭据、日志、构建输出或分发包。
+依赖更新同步包清单、锁文件、生成文档及许可材料，并执行 `npm audit --audit-level=high`。Dependabot 每周检查 npm／Actions；固定公共包人工更新。告警按实际运行入口评估。
 
-合入主分支前，`Source checks` 中的 `source` 和 `desktop` 检查必须成功，并解决审查讨论。依赖更新需同步包清单、锁文件、自动生成文档和许可材料，再执行 `npm audit --audit-level=high`；告警应按实际调用入口评估，不能因为根包标为开发依赖就忽略传递运行依赖。
+源码、测试及公开文档在产品仓库提交；私人计划与机器维护资料独立保存。测试输出用脱敏 CI 附件，程序用 Releases 分发。原创贡献按 [AGPL-3.0-only](LICENSE) 提供。
 
-Dependabot 每周检查 npm 与 GitHub Actions 更新；自动提出的依赖 PR 仍需补齐生成文档、许可材料与验证结果。三个固定的 `@studio/*` 包继续按源码及制品交付流程人工更新。
+## 修改文档
 
-提交前运行 `npm run source:check` 核对 Git 跟踪范围。源码、有效测试、公开文档与通用脚本在本仓库提交；个人执行计划和机器维护记录放在独立的本地或私有资料仓库。测试报告可作为脱敏后的 CI 附件，正式程序使用 Releases 分发。
+从[文档导航](docs/文档导航.md)找到主题正文，按当前源码直接修订，不累积历史过程。生成区块用 `npm run docs:generate` 更新；新增／改名同步导航、引用和 [public-source.mjs](scripts/public-source.mjs)。
 
-详细开发规则见[开发约定](docs/开发/开发约定.md)，依赖维护与源码分发说明见[开源与协作](docs/开发/开源与协作.md)。提交的原创代码按本项目的 [AGPL-3.0-only](LICENSE) 许可证提供。
+文档工具或导出范围变化时运行相关用例。详细规则见[开发约定](docs/开发/开发约定.md)，依赖及源码交付见[开源与协作](docs/开发/开源与协作.md)。
