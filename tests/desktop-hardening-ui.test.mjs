@@ -47,7 +47,8 @@ test('desktop disclosures, native diagnostic copy, failed save recovery and imme
   await panel.getByRole('button', { name: '复制诊断信息', exact: true }).click();
   await panel.getByText('诊断信息已复制。', { exact: true }).waitFor();
   const copied = await application.evaluate(({ clipboard }) => clipboard.readText());
-  assert.match(copied, /应用版本：0\.1\.30/); assert.match(copied, /Electron：\d/); assert.match(copied, /Windows ·/);
+  const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+  assert(copied.includes('应用版本：' + version)); assert.match(copied, /Electron：\d/); assert.match(copied, /Windows ·/);
   assert(!copied.includes(data)); assert.doesNotMatch(copied, /[A-Z]:[\\/]|music_session|accessKey|signature=|X-Control/);
   await page.screenshot({ path: join(data, 'runtime.png') });
   await page.route('**/api/status', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'network', message: 'PRIVATE-secret C:\\Users\\PRIVATE https://media.invalid/?signature=PRIVATE' } }) }));
