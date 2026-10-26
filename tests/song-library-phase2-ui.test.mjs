@@ -8,7 +8,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { chromium } from './helpers/browser.mjs';
 import { songServices, ref, entry, loadSongModule } from './helpers/song-services.mjs';
 import { startupFixture } from './helpers/startup-fixture.mjs';
-import { navigate, openSettingsPage, closeSettingsPage } from '../scripts/browser-ui.mjs';
+import { navigate, openSettingsPage, closeSettingsPage, libraryAction } from '../scripts/browser-ui.mjs';
 const { createSongLibraryRouter } = await loadSongModule('song-library-http');
 
 test('phase 2 product: partial source preview, explicit mappings, maintenance impact, CAS and mobile controls', {timeout:90000}, async t => {
@@ -37,7 +37,7 @@ test('phase 2 product: partial source preview, explicit mappings, maintenance im
   await sync.getByRole('button',{name:'预览新关联'}).click();await sync.getByRole('region',{name:'同步影响预览'}).waitFor();assert.equal(f.state.changes.length,0);
   await sync.getByLabel('同步版本 2',{exact:true}).selectOption('');assert(await sync.getByRole('button',{name:'确认映射并启用同步'}).isDisabled());
   await sync.getByRole('button',{name:'重新计算映射预览'}).click();await sync.getByRole('button',{name:'确认映射并启用同步'}).click();await sync.getByRole('button',{name:'立即同步'}).waitFor();assert.equal(f.state.changes.length,1);assert.equal(f.store.read().document.syncMappings.length,1);
-  await closeSettingsPage(page);await navigate(page,'歌单');await page.getByRole('button',{name:'歌曲管理',exact:true}).click();
+  await closeSettingsPage(page);await navigate(page,'歌单');await libraryAction(page, '歌曲管理');
   await page.getByRole('button',{name:'管理歌曲 '+a.title,exact:true}).click();const maintenance=page.getByRole('dialog',{name:'歌曲与版本',exact:true});
   await maintenance.getByRole('tab',{name:'歌曲资料',exact:true}).click();await maintenance.getByRole('button',{name:'合并到另一首歌曲',exact:true}).click();
   await maintenance.locator('.song-target-option').filter({hasText:b.title}).getByRole('radio').check();await maintenance.getByRole('button',{name:'预览影响',exact:true}).click();
@@ -47,7 +47,7 @@ test('phase 2 product: partial source preview, explicit mappings, maintenance im
   f.edit([{type:'edit-song',songId:c.id,title:'并发资料'}]);await maintenance.getByRole('button',{name:'移到《'+c.title+'》',exact:true}).click();await maintenance.getByRole('alert').first().waitFor();assert.equal(f.library.read().snapshot.versions.find(v=>v.id===a.defaultVersionId).songId,b.id);
   await maintenance.getByRole('button',{name:'重新预览影响',exact:true}).click();await maintenance.getByRole('button',{name:'移到《并发资料》',exact:true}).click();await maintenance.getByText('操作已完成。',{exact:true}).waitFor();assert.equal(f.store.read().document.syncMappings.length,0);
   assert(f.library.read().snapshot.playlists[0].entries.every(e=>e.pinnedVersionId===null));await f.sync.run();assert.equal(f.state.changes.filter(c=>!c.add).length,1);
-  await page.keyboard.press('Escape');await page.setViewportSize({width:320,height:844});await page.getByRole('button',{name:'资料库维护',exact:true}).click();const mobileMaintenance=page.getByRole('dialog',{name:'资料库维护',exact:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await mobileMaintenance.evaluate(el=>el.scrollWidth>el.clientWidth),false);
+  await page.keyboard.press('Escape');await page.setViewportSize({width:320,height:844});await libraryAction(page,'资料库维护');const mobileMaintenance=page.getByRole('dialog',{name:'资料库维护',exact:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await mobileMaintenance.evaluate(el=>el.scrollWidth>el.clientWidth),false);
   const artifacts=resolve('local/verification/song-library-phase2');mkdirSync(artifacts,{recursive:true});await page.screenshot({path:join(artifacts,'maintenance-mobile.png')});
   await page.keyboard.press('Escape');await openSettingsPage(page,'B站账号');await sync.getByRole('button',{name:'读取 B站收藏夹和关联'}).click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:join(artifacts,'sync-mobile.png'),fullPage:true});assert.deepEqual(errors,[]);
 });

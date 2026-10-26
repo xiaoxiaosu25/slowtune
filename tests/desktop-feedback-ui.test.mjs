@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate } from '../scripts/browser-ui.mjs';
+import { navigate, libraryAction } from '../scripts/browser-ui.mjs';
 
 test('desktop feedback stays in the player or active dialog and preserves recovery actions', { timeout: 90000 }, async t => {
   const fixture = await startSongManagementFixture(); t.after(fixture.close);
@@ -79,7 +79,7 @@ test('desktop feedback stays in the player or active dialog and preserves recove
   assert.equal(await issueButton().count(), 1);
   await page.getByRole('button', { name: '关闭沉浸歌词', exact: true }).click();
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
-  await page.getByRole('button', { name: '歌曲管理', exact: true }).click();
+  await libraryAction(page, '歌曲管理');
   const manager = page.getByRole('dialog', { name: '歌曲管理', exact: true });
   await page.screenshot({ path: resolve(artifacts, 'manager-player-feedback.png') });
   await manager.getByRole('button', { name: '播放失败，查看详情', exact: true }).click();
@@ -113,7 +113,7 @@ test('desktop feedback stays in the player or active dialog and preserves recove
   await page.waitForFunction(() => document.querySelector('.play-toggle')?.getAttribute('aria-busy') === 'false');
   await search.getByRole('button', { name: '关闭', exact: true }).click();
 
-  await page.locator('.page-heading').getByRole('button', { name: '新建歌单', exact: true }).click();
+  await libraryAction(page, '新建歌单');
   const create = page.getByRole('dialog', { name: '新建歌单', exact: true });
   await create.getByLabel('歌单名称', { exact: true }).fill('保留失败的歌单草稿'); failWrite = true;
   await create.getByRole('button', { name: '保存歌单', exact: true }).click(); await create.getByRole('alert').waitFor();

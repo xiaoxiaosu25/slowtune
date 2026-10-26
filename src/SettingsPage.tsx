@@ -28,9 +28,9 @@ const sections = [
   { id: 'about', label: '关于与声明', icon: InfoIcon },
 ] as const;
 type SectionId = typeof sections[number]['id'];
-
-export function SettingsPage({ desktopLyricsRequest = 0, status, statusCheckedAt, onRefreshDiagnostics, sources, onSourcesChanged, account, library, onLibraryChange, onAccountChange, onRecommendationChanged, onSearchPreferencesChanged, onReload, onBack, onOpenBackup, onStopPlayback, onLogout }: {
+export function SettingsPage({ desktopLyricsRequest = 0, onSectionChanged, status, statusCheckedAt, onRefreshDiagnostics, sources, onSourcesChanged, account, library, onLibraryChange, onAccountChange, onRecommendationChanged, onSearchPreferencesChanged, onReload, onBack, onOpenBackup, onStopPlayback, onLogout }: {
   desktopLyricsRequest?: number;
+  onSectionChanged?: (section: SectionId) => void;
   onSearchPreferencesChanged?:(state:SearchSettings)=>void;
   sources?:SourceSettingsState;
   onSourcesChanged:(value:SourceSettingsState)=>void;
@@ -49,6 +49,8 @@ export function SettingsPage({ desktopLyricsRequest = 0, status, statusCheckedAt
   onLogout: () => Promise<void>;
 }) {
   const [section, setSection] = useState<SectionId>(desktopLyricsRequest ? 'desktop-lyrics' : 'appearance');
+  const reportSection = useRef(onSectionChanged); reportSection.current = onSectionChanged;
+  useEffect(() => { reportSection.current?.(section); }, [section]);
   const navigation = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!desktopLyricsRequest) return;

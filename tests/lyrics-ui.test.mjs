@@ -13,8 +13,12 @@ const { SongLibraryStore } = await loadSongModule('song-library-store'), { SongL
 const { LyricsStore } = await loadSongModule('lyrics-store'), { LyricProviders } = await loadSongModule('lyrics-providers'), { createLyricsRouter } = await loadSongModule('lyrics-http');
 const root = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
 async function visual(page, target) {
-  // Desktop lyrics now have a dedicated view. This regression protects the unchanged mobile surface.
-  if (target === 'lyrics') await page.setViewportSize({ width: 740, height: 1000 });
+  if (target === 'lyrics') {
+    await page.setViewportSize({ width: 740, height: 1000 });
+    await page.locator('.mobile-player').waitFor();
+    if(!await page.locator('.mobile-player.is-lyrics').count())await page.getByRole('button',{name:'查看歌词',exact:true}).click();
+    return;
+  }
   const control = page.locator('.playing-art-switch');
   for (let index = 0; index < 7 && await control.getAttribute('data-visual-mode') !== target; index++) await control.click();
   assert.equal(await control.getAttribute('data-visual-mode'), target);
@@ -23,13 +27,17 @@ async function openSettings(page) {
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('button', { name: '歌词设置', exact: true }).click();
 }
+async function openOffset(settings) {
+  const offset = settings.locator('.lyrics-offset');
+  if (!await offset.evaluate(element => element.open)) await offset.locator('summary').click();
+}
 async function bottomToggle(page, enabled) {
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('checkbox', { name: '底部歌词', exact: true }).setChecked(enabled);
   await page.keyboard.press('Escape');
 }
 
-test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and preserve playback/settings', { timeout: 120000 }, async t => {
+test('direct mobile lyrics isolate versions, share the media clock and preserve playback/settings', { timeout: 120000 }, async t => {
   const parent = resolve('local/lyrics-ui'); mkdirSync(parent, { recursive: true }); const directory = mkdtempSync(join(parent, 'run-'));
   const store = new SongLibraryStore(join(directory, 'songs.sqlite'), 'ui'), library = new SongLibraryService(store), lyrics = new LyricsStore(join(directory, 'lyrics.sqlite'), 'ui');
   const ref = { provider: 'bilibili', kind: 'video', id: 'BV1tX4y1W7Xm', part: '900' };
@@ -81,28 +89,36 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
   const panel = page.getByRole('region', { name: '当前版本歌词', exact: true });
   await panel.getByRole('button', { name: '第一行', exact: true }).waitFor();
   assert.equal(await page.locator('.bottom-lyrics').count(), 0);
-  await bottomToggle(page, true);
-  assert.equal(await page.getByRole('region', { name: '底部歌词', exact: true }).isVisible(), true);
-  assert.equal(await page.locator('.playing-art-switch').getAttribute('data-visual-mode'), 'lyrics');
+  await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
+  assert.equal(await page.getByRole('checkbox', { name: '底部歌词', exact: true }).count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.bottom-lyrics').count(), 0, 'mobile lyrics use only the dedicated reading area');
+  assert.equal(await page.locator('.mobile-player.is-lyrics').count(), 1);
   assert.equal(await panel.locator('button').filter({ hasText: /设置|更换|匹配|导入/ }).count(), 0);
   assert.equal(requests.length, lyricReads, 'display changes reuse one lyric session');
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
-  assert.equal(await page.locator('.bottom-lyrics.is-compact').isVisible(), true);
+  assert.equal(await page.locator('.bottom-lyrics').count(), 0, 'mobile mini-player does not show lyrics');
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   assert.equal(requests.length, lyricReads, 'navigation reuses the current lyric selection');
   const peer = await page.context().newPage(); await peer.goto(origin);
   await peer.evaluate(() => localStorage.setItem('slow-listening:lyrics-display:v1', JSON.stringify({ bottom: false, translations: true })));
   await page.waitForFunction(() => !document.querySelector('.bottom-lyrics'));
-  assert.equal(await page.locator('.playing-art-switch').getAttribute('data-visual-mode'), 'lyrics');
+  assert.equal(await page.locator('.mobile-player.is-lyrics').count(), 1);
+  await page.getByRole('button',{name:'返回唱片',exact:true}).click();
+  assert.equal(await page.locator('.bottom-lyrics').count(),0);
   await peer.evaluate(() => localStorage.setItem('slow-listening:lyrics-display:v1', JSON.stringify({ bottom: true, translations: true })));
-  await page.getByRole('region', { name: '底部歌词', exact: true }).waitFor(); await peer.close();
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('slow-listening:lyrics-display:v1')).bottom === true);
+  assert.equal(await page.locator('.bottom-lyrics').count(),0,'a desktop lyric preference cannot add a mobile dock'); await peer.close();
+  await page.getByRole('button',{name:'查看歌词',exact:true}).click();
   assert.equal(lyrics.read(ref).document.id, '123');
   assert.equal(await page.locator('.vinyl-record').count(), 0, 'lyrics replace the cover slot');
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await panel.getByLabel('歌词正文').dispatchEvent('scroll');
   assert.equal(await page.getByRole('button', { name: '歌词设置', exact: true }).isVisible(), true, 'lyric auto-scroll leaves a stationary playback menu open');
   await page.evaluate(() => document.dispatchEvent(new Event('scroll')));
-  assert.equal(await page.getByRole('button', { name: '歌词设置', exact: true }).isVisible(), false, 'ancestor scrolling still dismisses the menu');
+  const optionsSheet = page.getByRole('dialog', { name: '更多播放选项', exact: true });
+  assert.equal(await optionsSheet.isVisible(), true, 'background scroll does not dismiss the modal playback sheet');
+  await optionsSheet.getByRole('button', { name: '关闭', exact: true }).click();
   await openSettings(page);
   await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '选择歌词', exact: true });
@@ -122,23 +138,26 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   await openSettings(page);
   const settings = page.getByRole('dialog', { name: '歌词设置', exact: true });
-  await settings.getByText('调整歌词时间', { exact: true }).click(); await settings.getByLabel('歌词延后秒数').fill('1'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
+  assert.equal(await settings.getByRole('checkbox', { name: '显示底部歌词', exact: true }).count(), 0);
+  await openOffset(settings); await settings.getByLabel('歌词延后秒数').fill('1'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('1 秒'));
   assert.equal(lyrics.read(ref).offsetMs, 1000);
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await panel.getByRole('button', { name: '第二行', exact: true }).click();
   await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 4) < .2);
   await page.waitForFunction(() => document.querySelector('.lyrics-scroll [aria-current="true"]')?.textContent === '第二行');
   assert.equal(await panel.locator('[aria-current="true"]').innerText(), '第二行'); assert.equal(await page.locator('audio').evaluate(a => a.paused), true);
   await page.locator('audio').evaluate(audio => { audio.currentTime = 5.5; audio.dispatchEvent(new Event('timeupdate')); });
-  await page.waitForFunction(() => [...document.querySelectorAll('.lyric-text.is-current .lyric-ink')].length === 2 && [...document.querySelectorAll('.lyric-text.is-current .lyric-ink')].every(ink => Math.abs(parseFloat(ink.style.getPropertyValue('--lyric-fill')) - 50) < 1));
+  await page.waitForFunction(() => [...document.querySelectorAll('.lyric-text.is-current .lyric-ink')].length === 1 && [...document.querySelectorAll('.lyric-text.is-current .lyric-ink')].every(ink => Math.abs(parseFloat(ink.style.getPropertyValue('--lyric-fill')) - 50) < 1));
   const pausedFill = await panel.locator('.lyric-text.is-current .lyric-ink').getAttribute('style');
   await page.waitForTimeout(180);
   assert.equal(await panel.locator('.lyric-text.is-current .lyric-ink').getAttribute('style'), pausedFill, 'paused media freezes both lyric sweeps');
+  await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('button', { name: '播放速度', exact: true }).click();
   await panel.getByLabel('歌词正文').dispatchEvent('scroll');
   assert.equal(await page.getByRole('menu', { name: '播放速度', exact: true }).isVisible(), true, 'lyric auto-scroll leaves the speed menu usable');
   await page.getByRole('menuitemradio', { name: '1.5×', exact: true }).click();
+  await optionsSheet.getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio').currentTime > 7.1); assert.equal(await page.locator('audio').evaluate(a => a.playbackRate), 1.5);
   assert.equal(await panel.locator('[aria-current="true"]').innerText(), '第三行');
@@ -148,31 +167,31 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
   await panel.getByLabel('歌词正文').dispatchEvent('wheel');
   await panel.getByRole('button', { name: '回到当前行', exact: true }).waitFor();
   await page.waitForFunction(() => !document.querySelector('.lyrics-resume'), null, { timeout: 7000 });
-  await openSettings(page); await settings.locator('.lyrics-offset summary').click();
+  await openSettings(page); await openOffset(settings);
   await settings.getByLabel('歌词延后秒数').fill('2');
   lyrics.update(ref, lyrics.read(ref).revision, state => { state.offsetMs = 1500; }, new AbortController().signal);
   await settings.getByRole('button', { name: '保存偏移', exact: true }).click(); await settings.getByRole('button', { name: '重读当前歌词', exact: true }).click();
   assert.equal(await settings.getByLabel('歌词延后秒数').inputValue(), '2'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('2 秒')); assert.equal(lyrics.read(ref).offsetMs, 2000);
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   for (const width of [740, 390, 320]) {
     await page.setViewportSize({ width, height: width === 740 ? 1000 : 844 });
     await page.waitForFunction(() => { const container = document.querySelector('.lyrics-scroll'), line = container?.querySelector('[aria-current="true"]'); if (!line) return false; const outer = container.getBoundingClientRect(), inner = line.getBoundingClientRect(); const center = (inner.top + inner.bottom) / 2; return center >= outer.top && center <= outer.bottom; });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-    const layout = await page.evaluate(() => { const player = document.querySelector('.playing-detail').getBoundingClientRect(), lyrics = document.querySelector('.lyrics-panel').getBoundingClientRect(), scroll = document.querySelector('.lyrics-scroll').getBoundingClientRect(), bottom = document.querySelector('.bottom-lyrics').getBoundingClientRect(); return { player: { left: player.left, top: player.top, bottom: player.bottom }, lyrics: { right: lyrics.right, top: lyrics.top, bottom: lyrics.bottom }, bottom: { top: bottom.top, bottom: bottom.bottom }, scrollHeight: scroll.height, height: innerHeight }; });
+    const layout = await page.evaluate(() => { const player = document.querySelector('.playing-detail').getBoundingClientRect(), lyrics = document.querySelector('.lyrics-panel').getBoundingClientRect(), scroll = document.querySelector('.lyrics-scroll').getBoundingClientRect(); return { player: { left: player.left, top: player.top, bottom: player.bottom }, lyrics: { right: lyrics.right, top: lyrics.top, bottom: lyrics.bottom }, scrollHeight: scroll.height, height: innerHeight }; });
     await page.screenshot({ animations: 'disabled', path: join(directory, 'lyrics-' + width + '.png') });
     assert.ok(layout.scrollHeight >= 100, 'lyrics retain a usable reading area: ' + JSON.stringify({ width, ...layout }));
     assert.ok(layout.lyrics.bottom <= layout.height + 1, 'lyrics remain inside the viewport');
     assert.ok(layout.lyrics.bottom <= layout.player.top, 'mobile lyrics occupy the original cover location');
-    assert.ok(layout.bottom.top >= layout.player.bottom && layout.bottom.bottom <= layout.height, 'independent bottom lyrics do not overlap controls');
+    assert.ok(layout.player.bottom <= layout.height, 'playback controls remain in the viewport');
     if (width === 320) {
-      await openSettings(page); await settings.locator('.lyrics-offset summary').click();
+      await openSettings(page); await openOffset(settings);
       await settings.getByLabel('歌词延后秒数').fill('2.5'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
       await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('2.5 秒'));
       await settings.getByLabel('歌词延后秒数').fill('2'); await settings.getByRole('button', { name: '保存偏移', exact: true }).click();
       await page.waitForFunction(() => document.querySelector('.lyrics-offset summary')?.textContent.includes('2 秒'));
-      await settings.getByRole('button', { name: '关闭', exact: true }).click();
+      await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
     }
   }
   for (const viewport of [{ width: 740, height: 500 }]) {
@@ -181,17 +200,17 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     const box = await panel.boundingBox(); assert.ok(box.height >= 100 && box.y + box.height <= viewport.height + 1);
     await page.screenshot({ animations: 'disabled', path: join(directory, 'lyrics-layout-' + viewport.width + '.png') });
-    const controls = await page.locator('.playing-detail').evaluate(element => { const bounds = element.getBoundingClientRect(), lyrics = document.querySelector('.bottom-lyrics').getBoundingClientRect(); return { top: bounds.top, bottom: bounds.bottom, lyricTop: lyrics.top }; });
-    assert.ok(controls.top >= 0 && controls.bottom <= controls.lyricTop + 1, 'short-screen controls fit above the bottom lyrics: ' + JSON.stringify({ viewport, controls }));
+    const controls = await page.locator('.playing-detail').evaluate(element => { const bounds = element.getBoundingClientRect(), lyrics = document.querySelector('.lyrics-panel').getBoundingClientRect(); return { top: bounds.top, bottom: bounds.bottom, overlaps:bounds.left<lyrics.right&&bounds.right>lyrics.left&&bounds.top<lyrics.bottom&&bounds.bottom>lyrics.top }; });
+    assert.ok(!controls.overlaps && controls.bottom <= viewport.height, 'short-screen controls and lyrics fit without overlap: ' + JSON.stringify({ viewport, controls }));
   }
   await page.setViewportSize({ width: 740, height: 1000 });
   await page.locator('audio').evaluate(audio => { audio.currentTime = 10; audio.dispatchEvent(new Event('timeupdate')); });
   await page.waitForFunction(() => parseFloat(document.querySelector('.lyrics-scroll .lyric-text.is-current .lyric-ink')?.style.getPropertyValue('--lyric-fill')) > 20);
   await page.mouse.move(0, 0);
-  await page.getByRole('button', { name: '切换为浅色', exact: true }).click();
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.lyrics-scroll [aria-current="true"] .lyric-ink')).backgroundImage.includes('gradient'));
   await page.screenshot({ animations: 'disabled', path: join(directory, 'lyrics-light.png') });
-  await page.getByRole('button', { name: '切换为深色', exact: true }).click();
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   for (const palette of ['paper', 'mint', 'ocean', 'plum']) for (const theme of ['light', 'dark']) {
     await page.evaluate(({ palette, theme }) => { document.documentElement.dataset.palette = palette; document.documentElement.dataset.theme = theme; }, { palette, theme });
     await page.screenshot({ animations: 'disabled', path: join(directory, `lyrics-${palette}-${theme}.png`) });
@@ -199,10 +218,10 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
   await page.evaluate(() => { document.documentElement.dataset.palette = 'paper'; document.documentElement.dataset.theme = 'dark'; });
   lyrics.update(ref, lyrics.read(ref).revision, state => { state.document.lines[2].words = [{ startMs: 6000, endMs: 7000, text: '第' }, { startMs: 7000, endMs: 8000, text: '三' }, { startMs: 8000, endMs: 9000, text: '行' }]; }, new AbortController().signal);
   await openSettings(page); await settings.getByRole('button', { name: '刷新当前歌词', exact: true }).click();
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await panel.getByRole('button', { name: '第三行', exact: true }).click();
   await page.locator('audio').evaluate(audio => { audio.currentTime = 9.5; audio.dispatchEvent(new Event('timeupdate')); });
-  await page.waitForFunction(() => [...document.querySelectorAll('.lyric-text.is-current [data-word-index="1"]')].length === 2 && [...document.querySelectorAll('.lyric-text.is-current [data-word-index="1"]')].every(ink => Math.abs(parseFloat(ink.style.getPropertyValue('--lyric-fill')) - 50) < 1));
+  await page.waitForFunction(() => [...document.querySelectorAll('.lyric-text.is-current [data-word-index="1"]')].length === 1 && [...document.querySelectorAll('.lyric-text.is-current [data-word-index="1"]')].every(ink => Math.abs(parseFloat(ink.style.getPropertyValue('--lyric-fill')) - 50) < 1));
   await page.screenshot({ animations: 'disabled', path: join(directory, 'lyrics-word-timing.png') });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await panel.locator('.lyric-text.is-current .lyric-ink').first().evaluate(element => getComputedStyle(element).backgroundImage), 'none');
@@ -240,16 +259,14 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
   await page.evaluate(() => { window.ResizeObserver = window.__originalLyricResizeObserver; delete window.__originalLyricResizeObserver; delete window.__lyricInitialResizeSkipped; });
   await page.screenshot({ animations: 'disabled', path: join(directory, 'lyrics-intro-320.png') }); await page.setViewportSize({ width: 740, height: 1000 });
   assert.equal(lyrics.read({ ...ref, part: '901' }).document.provider, 'local'); assert.equal(lyrics.read(ref).offsetMs, 2000);
-  await bottomToggle(page, false);
   await page.reload(); await page.getByRole('button', { name: '播放', exact: true }).click();
   await page.waitForFunction(() => /part=901/.test(document.querySelector('audio').currentSrc) && !document.querySelector('audio').paused);
   await page.getByRole('button', { name: '暂停', exact: true }).click();
-  await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
+  if(!await page.locator('.mobile-player').count())await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await panel.getByRole('button', { name: '现场第一行', exact: true }).waitFor(); assert.equal(await page.locator('audio').evaluate(a => a.paused), true);
-  assert.equal(await page.locator('.bottom-lyrics').count(), 0, 'bottom preference survives reload independently of the lyric visual');
-  await bottomToggle(page, true);
+  assert.equal(await page.locator('.bottom-lyrics').count(), 0, 'reload keeps the desktop lyric preference out of mobile');
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
-  await page.getByLabel('搜索歌曲或视频', { exact: true }).fill('未收藏来源'); await page.getByRole('button', { name: '开始搜索', exact: true }).click(); await page.getByRole('button', { name: '播放 未收藏来源', exact: true }).click();
+  await page.getByRole('button',{name:'搜索歌曲或视频',exact:true}).click(); await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('未收藏来源'); await page.getByRole('button', { name: '搜索', exact: true }).click(); await page.getByRole('button', { name: '播放 未收藏来源', exact: true }).click();
   await page.waitForFunction(() => /part=902/.test(document.querySelector('audio').currentSrc)); await page.getByRole('button', { name: '保持本 P', exact: true }).click(); await page.keyboard.press('Escape'); await page.getByRole('button', { name: '打开正在播放', exact: true }).click(); await openSettings(page); await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   dialog = page.getByRole('dialog', { name: '选择歌词', exact: true }); await dialog.getByText('导入或粘贴歌词', { exact: true }).click();
   await dialog.getByLabel('导入歌词文件').setInputFiles({ name: 'lyrics.lrc', mimeType: 'text/plain', buffer: Buffer.from('纯文本歌词\n第二行文本') });
@@ -263,9 +280,11 @@ test('legacy mobile lyrics share bottom/artwork surfaces, isolate versions and p
     started(); await late; await route.fulfill({ json: oldState }).catch(() => {});
   });
   await openSettings(page); await settings.getByRole('button', { name: '刷新当前歌词', exact: true }).click(); await reading;
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settings.getByRole('button', { name: '返回上一级', exact: true }).click();
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
-  await page.getByRole('navigation', { name: '手机导航', exact: true }).getByRole('button', { name: '歌单', exact: true }).click();
+  if(await page.locator('.mobile-search-page').count())await page.getByRole('button',{name:'关闭搜索',exact:true}).click();
+  await page.getByRole('navigation', { name: '手机导航', exact: true }).getByRole('button', { name: '音乐库', exact: true }).click();
+  await page.locator('.mobile-library').getByRole('button').filter({hasText:'我的收藏'}).click();
   await page.getByRole('button', { name: '选择播放版本 测试歌曲', exact: true }).click(); await page.getByRole('button', { name: '播放此版本', exact: true }).first().click(); await page.keyboard.press('Escape');
   await page.waitForFunction(() => /part=900/.test(document.querySelector('audio').currentSrc));
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click();

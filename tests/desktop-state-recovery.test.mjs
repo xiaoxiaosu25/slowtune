@@ -12,16 +12,17 @@ async function fixture(t) {
   mkdirSync(output, { recursive: true }); const data = mkdtempSync(join(output, 'isolated-'));
   const env = { ...process.env, MUSIC_APP_DESKTOP_DATA: data, MUSIC_APP_DESKTOP_ROOT: resolve(process.env.MUSIC_APP_TEST_BUILD ?? desktopBuildDirectory()), MUSIC_APP_NODE: process.execPath };
   delete env.ELECTRON_RUN_AS_NODE; delete env.NODE_OPTIONS;
-  let application; const cleanup = [];
+  let application, pid; const cleanup = [];
   const launch = async () => {
     application = await _electron.launch({ executablePath: electron, args: [join(resolve('.'), 'desktop')], env, timeout: 25000 });
+    pid = await application.evaluate(() => process.pid);
     const page = await application.firstWindow(); page.setDefaultTimeout(15000);
     await page.route(/^https?:\/\/(?!127\.0\.0\.1[:/]|localhost[:/])/, route => route.abort());
     await application.evaluate(({ dialog }) => { globalThis.quitErrors = []; dialog.showErrorBox = (title, message) => globalThis.quitErrors.push({ title, message }); });
     return page;
   };
-  t.after(async () => { for (const repair of cleanup) await repair(); if (application) await closeDesktop(application); rmSync(data, { recursive: true, force: true }); });
-  return { data, cleanup, launch, app: () => application, close: async () => { await closeDesktop(application); application = undefined; } };
+  t.after(async () => { for (const repair of cleanup) await repair(); if (application) await closeDesktop(application, { pid }); rmSync(data, { recursive: true, force: true }); });
+  return { data, cleanup, launch, app: () => application, close: async () => { await closeDesktop(application, { pid }); application = undefined; } };
 }
 async function ready(page) {
   try { await page.getByRole('button', { name: '打开正在播放', exact: true }).waitFor({ timeout: 35000 }); }

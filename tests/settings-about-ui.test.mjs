@@ -9,6 +9,7 @@ import {queueRecord,seedSongs} from './helpers/song-fixture.mjs';
 
 test('Settings: offline notices, honest diagnostic states and reviewed backup recovery',{timeout:120000},async t=>{
   const fixture=await createSettingsFixture(),{state,base}=fixture;
+  const youtubeVersion=JSON.parse(readFileSync(resolve('package.json'),'utf8')).dependencies['youtubei.js'];
   const artifacts=resolve('local/verification/settings-about');mkdirSync(artifacts,{recursive:true});
   const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();await fixture.close();});
@@ -23,14 +24,14 @@ test('Settings: offline notices, honest diagnostic states and reviewed backup re
     state.failNotices=true;
     await openSettingsPage(page,'音乐来源');
     await page.getByRole('button',{name:'查看来源与许可说明',exact:true}).click();
-    const about=page.locator('[data-settings-section="about"]');
+    const about=page.locator('[data-settings-section="about"]:visible');
     await about.getByRole('alert').waitFor();
     assert.equal(await page.locator('[data-about-heading]').evaluate(el=>document.activeElement===el),true,'the disclosure shortcut moves keyboard focus to the destination');
     state.failNotices=false;await about.getByRole('button',{name:'重新读取许可清单',exact:true}).click();
     await about.locator('.license-list>summary').click();
     const youtube=about.locator('.license-list li').filter({has:page.locator('summary strong',{hasText:/^youtubei\.js$/})});
     await youtube.locator('summary').click();
-    assert.match(await youtube.innerText(),/18\.1\.0/);assert.match(await youtube.locator('pre').innerText(),/Copyright \(c\) 2021 LuanRT/);
+    assert((await youtube.innerText()).includes(youtubeVersion));assert.match(await youtube.locator('pre').innerText(),/Copyright \(c\) 2021 LuanRT/);
     const protobuf=about.locator('.license-list li').filter({has:page.locator('summary strong',{hasText:/^@bufbuild\/protobuf$/})});
     await protobuf.locator('summary').click();assert.equal(await protobuf.locator('pre').count(),2);assert.match(await protobuf.innerText(),/Copyright 2008 Google Inc/);
     await about.getByText('账号与数据保存',{exact:true}).waitFor();
@@ -41,7 +42,7 @@ test('Settings: offline notices, honest diagnostic states and reviewed backup re
     assert.equal(await about.getByRole('link',{name:'bili-music',exact:true}).getAttribute('href'),'https://github.com/YOUYUDAWANG/bili-music/blob/main/ARCHITECTURE.md');
     for(const link of await about.locator('a[target="_blank"]').all())assert.equal(await link.getAttribute('rel'),'noreferrer');
     const [download]=await Promise.all([page.waitForEvent('download'),about.getByRole('link',{name:'下载第三方许可全文',exact:true}).click()]);
-    const text=readFileSync(await download.path(),'utf8');assert.match(text,/youtubei\.js — 18\.1\.0/);assert.doesNotMatch(text,/[CD]:\\|runtimeDirectory|\.dpapi\.json|@studio\//);
+    const text=readFileSync(await download.path(),'utf8');assert(text.includes('youtubei.js — '+youtubeVersion));assert.doesNotMatch(text,/[CD]:\\|runtimeDirectory|\.dpapi\.json|@studio\//);
     const manifest=await page.request.get(base+'/legal/notices.json').then(response=>response.json());
     assert(manifest.entries.every(entry=>!entry.name.startsWith('@studio/')),'internal packages are excluded from downloadable JSON too');
     await about.locator('.license-list>summary').click();
@@ -52,21 +53,24 @@ test('Settings: offline notices, honest diagnostic states and reviewed backup re
     for(const theme of ['light','dark'])for(const width of [1440,320]){
       await page.evaluate(theme=>{localStorage.setItem('slow-listening:theme',theme);document.documentElement.dataset.theme=theme;},theme);
       await page.setViewportSize({width,height:900});
-      await page.waitForFunction(()=>{const nav=document.querySelector('.settings-nav'),current=nav.querySelector('[aria-current="true"]'),a=current.getBoundingClientRect(),b=nav.getBoundingClientRect();return nav.scrollWidth<=nav.clientWidth || a.left>=b.left-1&&a.right<=b.right+1;});
+      await openSettingsPage(page,'关于与声明');
+      if(width>760)await page.waitForFunction(()=>{const nav=document.querySelector('.settings-nav'),current=nav?.querySelector('[aria-current="true"]');if(!current)return false;const a=current.getBoundingClientRect(),b=nav.getBoundingClientRect();return nav.scrollWidth<=nav.clientWidth || a.left>=b.left-1&&a.right<=b.right+1;});
+      else await page.locator('.mobile-settings [data-settings-section="about"]:visible').waitFor();
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth),false);
       await page.evaluate(()=>window.scrollTo(0,0));
       await page.screenshot({path:join(artifacts,`about-${theme}-${width}.png`),fullPage:true});
     }
-    const about=page.locator('[data-settings-section="about"]');
+    const about=page.locator('[data-settings-section="about"]:visible');
     await about.locator('.license-list>summary').click();
     const youtube=about.locator('.license-list li').filter({has:page.locator('summary strong',{hasText:/^youtubei\.js$/})});
+    if(!await youtube.locator('details').evaluate(element=>element.open))await youtube.locator('summary').click();
     await youtube.locator('pre').waitFor();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth),false,'license text wraps on a narrow phone');
     await about.locator('.license-list>summary').click();
   });
 
   await t.test('diagnostic failure preserves the last result; refresh only reads status and can recover',async()=>{
-    await openSettingsPage(page,'诊断与数据');const panel=page.locator('[data-settings-section="diagnostics"]');
+    await openSettingsPage(page,'诊断与数据');const panel=page.locator('[data-settings-section="diagnostics"]:visible');
     assert.equal(await panel.locator('.diagnostics-advanced').getAttribute('open'),null);
     const libraryReads=state.libraryReads;
     state.failStatus=true;await panel.getByRole('button',{name:'刷新诊断',exact:true}).click();
@@ -78,7 +82,7 @@ test('Settings: offline notices, honest diagnostic states and reviewed backup re
     await panel.getByText('已停止当前播放器并释放播放资源，队列保留。',{exact:true}).waitFor();
     await panel.locator('.diagnostics-advanced>summary').click();assert.match(await panel.locator('.diagnostics').innerText(),/包含其他设备/);
     await page.screenshot({path:join(artifacts,'diagnostics-dark-320.png'),fullPage:true});
-    await page.setViewportSize({width:1440,height:1000});await panel.locator('.diagnostics-advanced>summary').click();
+    await page.setViewportSize({width:1440,height:1000});await openSettingsPage(page,'诊断与数据');await panel.locator('.diagnostics-advanced>summary').click();
     await page.evaluate(()=>window.scrollTo(0,0));
     await page.screenshot({path:join(artifacts,'diagnostics-dark-1440.png'),fullPage:true});
   });
@@ -107,10 +111,10 @@ test('Settings: offline notices, honest diagnostic states and reviewed backup re
   });
 
   await t.test('logout reports a failure and remains retryable',async()=>{
-    const panel=page.locator('[data-settings-section="diagnostics"]');state.failLogout=true;
+    const panel=page.locator('[data-settings-section="diagnostics"]:visible');state.failLogout=true;
     await panel.getByRole('button',{name:'退出当前浏览器登录',exact:true}).click();await panel.getByRole('alert').waitFor();
     assert(await panel.getByRole('button',{name:'退出当前浏览器登录',exact:true}).isEnabled());
-    await page.locator('.playbar').getByRole('button',{name:'播放',exact:true}).click();
+    await page.locator('.playbar:visible,.mobile-mini-player:visible').getByRole('button',{name:'播放',exact:true}).click();
     await page.waitForFunction(()=>{const audio=document.querySelector('audio[data-product-media]');return audio&&!audio.paused&&audio.currentTime>0;}).catch(async()=>assert.fail(JSON.stringify({feedback:await page.locator('.feedback').allTextContents(),playbar:await page.locator('.playbar').innerText()})));
     state.failLogout=false;await panel.getByRole('button',{name:'退出当前浏览器登录',exact:true}).click();await page.getByRole('textbox',{name:'服务访问码',exact:true}).waitFor();
   });

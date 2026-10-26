@@ -6,7 +6,7 @@ import { resolve, join, extname } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import {queueRecord} from './helpers/song-fixture.mjs';
 
-test('single-screen player and read-only comments: sort, pagination, replies, failures and mobile drawers', async t => {
+test('desktop player and read-only comments: sort, pagination, replies, failures and mobile drawers', async t => {
   const root = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.'), artifacts = resolve(process.env.MUSIC_APP_TEST_ARTIFACTS ?? 'local/verification/comments-player-2026-10-13'); mkdirSync(artifacts, { recursive: true });
   const track = { ref: { provider: 'bilibili', kind: 'video', id: 'BV1tX4y1W7Xm', part: '900' }, resourceId: 'bilibili-test', title: '【孙燕姿】精选歌单合集《尚好的青春》《我怀念的》《180度》《雨还是不停地落下》《绿光》完整音乐视频', artwork: 'https://i1.hdslb.com/fixture-cover.png', uploader: { name: 'Music_精选合集' }, durationSeconds: 2654 };
   const second = { ...track, ref: { provider: 'youtube', kind: 'video', id: 'kK0CRZ0wvvc' }, resourceId: 'youtube-test', title: 'YouTube 音乐视频' };
@@ -45,20 +45,15 @@ test('single-screen player and read-only comments: sort, pagination, replies, fa
   await page.goto('http://127.0.0.1:' + server.address().port); await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   assert.equal(calls.length, 0, 'comments only load on opening');
   const measurements = [];
-  for (const [width, height] of [[1920,880],[1440,900],[1100,768],[1024,600],[800,600],[390,844],[390,667],[320,568],[844,390],[320,480]]) {
+  for (const [width, height] of [[1920,880],[1440,900],[1100,768],[1024,600],[800,600]]) {
     await page.setViewportSize({ width, height });
-    await page.waitForFunction(() => !!document.querySelector(innerWidth > 760 ? '.desktop-tools' : '.topbar-actions'));
+    await page.locator('.listening-stage').waitFor();
     const bounds = await page.evaluate(() => {
       const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height }; };
-      return { width: innerWidth, height: innerHeight, docHeight: document.documentElement.scrollHeight, docWidth: document.documentElement.scrollWidth, stage: rect(document.querySelector('.listening-stage')), controls: rect(document.querySelector('.stage-controls')), title: rect(document.querySelector('.playing-title')), transport: rect(document.querySelector('.listening-transport')), art: rect(document.querySelector('.playing-art-frame')), header: rect(document.querySelector('.listening-header')), tools: [...document.querySelectorAll('.topbar-actions button,.desktop-tools button')].map(rect), headerTitle: rect(document.querySelector('.listening-header-title')) };
+      return { width: innerWidth, height: innerHeight, docHeight: document.documentElement.scrollHeight, docWidth: document.documentElement.scrollWidth, stage: rect(document.querySelector('.listening-stage')), controls: rect(document.querySelector('.stage-controls')), title: rect(document.querySelector('.playing-title')), transport: rect(document.querySelector('.listening-transport')), art: rect(document.querySelector('.playing-art-frame')), header: rect(document.querySelector('.listening-header')) };
     });
     assert(bounds.docHeight <= height + 1 && bounds.docWidth <= width + 1, JSON.stringify(bounds));
     for (const name of ['controls','title','transport','art']) assert(bounds[name].top >= bounds.stage.top && bounds[name].bottom <= bounds.stage.bottom + 1 && bounds[name].left >= 0 && bounds[name].right <= width, name + ': ' + JSON.stringify(bounds));
-    for (const tool of bounds.tools) {
-      if (width <= 760) assert(tool.left >= bounds.headerTitle.right && tool.right <= width && tool.top >= 0 && tool.bottom <= bounds.header.bottom, 'mobile tools fit the listening header: ' + JSON.stringify(bounds));
-      else assert(tool.left >= 20 && tool.right <= 180 && tool.top >= height - 70 && tool.bottom <= height, 'desktop tools stay at the bottom left: ' + JSON.stringify(bounds));
-      assert(tool.right - tool.left >= (width <= 760 ? 44 : 40) && tool.height >= (width <= 760 ? 44 : 40));
-    }
     await page.screenshot({ path: join(artifacts, `player-${width}x${height}.png`) });
     const options = page.locator('.listening-stage .player-options');
     await options.getByRole('button', { name: '更多播放选项', exact: true }).click();
@@ -81,9 +76,12 @@ test('single-screen player and read-only comments: sort, pagination, replies, fa
     await page.keyboard.press('Escape'); await menu.waitFor({ state: 'hidden' });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('.desktop-tools').waitFor();
+  await page.locator('.listening-header').waitFor();
   assert.equal(await page.locator('.listening-header button').count(), 1, 'the desktop header keeps the back button');
-  assert.equal(await page.locator('.desktop-tools button').count(), 3, 'global tools remain reachable at the bottom left');
+  await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
+  await page.locator('.desktop-tools').waitFor();
+  assert.equal(await page.locator('.desktop-tools button').count(), 3, 'returning to browsing exposes the global tools');
+  await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await page.getByRole('button', { name: '播放队列', exact: true }).click();
   await page.locator('.listening-panel-tabs').getByRole('button', { name: '评论', exact: true }).click();
   const panel = page.getByRole('complementary', { name: '视频评论', exact: true }); await panel.locator('.comment-thread').first().waitFor();

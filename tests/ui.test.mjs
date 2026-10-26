@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from './helpers/browser.mjs';
 import { fromMusicRef,queueRecord,installSongFixture } from './helpers/song-fixture.mjs';
 import { DEFAULT_CONFIG, execute } from '@studio/recommendation';
-import { navigate, createPlaylist, selectPlaylist, openTrackMenu, queueTrackMenu, verifyDefaultDiscovery, selectRate } from '../scripts/browser-ui.mjs';
+import { navigate, createPlaylist, selectPlaylist, openTrackMenu, queueTrackMenu, verifyDefaultDiscovery, selectRate, openSettingsPage, closeSettingsPage } from '../scripts/browser-ui.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const buildRoot = process.env.MUSIC_APP_TEST_BUILD ?? root;
@@ -117,17 +117,19 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
   t.after(() => browser.close());
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
+  const setViewport = async viewport => {
+    await page.setViewportSize(viewport);
+    await page.waitForFunction(mobile => document.querySelector('.app')?.dataset.layout === (mobile ? 'mobile' : 'desktop'), viewport.width <= 760);
+  };
   await page.clock.setFixedTime(new Date(2026, 9, 15, 12));
   page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  const openSettings = async (section = '外观') => {
-    await page.getByRole('button', { name: '设置', exact: true }).click();
-    await page.locator('.settings-view').waitFor();
-    if (section !== '外观') await page.locator('.settings-nav').getByRole('button', { name: section, exact: true }).click();
-  };
+  const settingsPanel = section => page.locator(':is(.settings-view,.mobile-settings:not([hidden])) [data-settings-section="'+section+'"]');
+  const openSettings = (section = '外观') => openSettingsPage(page, section);
   const closeSettings = async () => {
-    await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
-    await page.locator('.settings-view').waitFor({ state: 'detached' });
+    const mobile = await page.locator('.app').getAttribute('data-layout') === 'mobile';
+    await closeSettingsPage(page);
+    if (mobile) await navigate(page, '发现');
   };
   await page.route('https://i1.hdslb.com/bfs/archive/fixture-cover.png',route=>route.fulfill({contentType:'image/gif',body:Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64')}));
   await page.addInitScript(record => localStorage.setItem('slow-listening:playback:v3', JSON.stringify(record)),queueRecord([part,second]));
@@ -155,7 +157,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert.equal(saved.current,part.resourceId);
   });
 
-  await t.test('desktop tools stay at the bottom left and mobile tools stay at the top right, preserving link and theme actions', async () => {
+  await t.test('desktop tools stay at the bottom left and mobile header and profile keep link and theme actions reachable', async () => {
     const artifacts = join(root, 'test-results/topbar-tools');
     mkdirSync(artifacts, { recursive: true });
     const originalPlaylists = snapshot.playlists;
@@ -170,7 +172,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       assert.equal(await tools.locator('button').first().getAttribute('aria-label'), '粘贴链接');
       assert.equal(await tools.locator('button').last().getAttribute('aria-label'), '设置');
       for (const width of [768, 1050, 1051, 1250, 1440, 1775, 1776, 1920, 2560]) {
-        await page.setViewportSize({ width, height: 640 });
+        await setViewport({ width, height: 640 });
         assert.equal(await page.locator('.topbar button:visible').count(), 1, 'only the search submit remains in the desktop header');
         const bounds = await page.locator('.sidebar').evaluate(sidebar => {
           const rect = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, height: r.height, width: r.width }; };
@@ -194,7 +196,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
         await page.evaluate(() => window.scrollTo(0, 0));
         await page.screenshot({ path: join(artifacts, `desktop-${width}.png`) });
       }
-      await page.setViewportSize({ width: 1440, height: 1000 });
+      await setViewport({ width: 1440, height: 1000 });
       const position = await tools.boundingBox();
       for (const name of ['发现', '音乐榜单', '关注', '歌单']) {
         await navigate(page, name);
@@ -205,12 +207,10 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       await closeSettings();
       await navigate(page, '发现');
       await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
-      const listeningTools = await tools.boundingBox();
-      assert(listeningTools.x <= 24 && listeningTools.y > 900 && listeningTools.y + listeningTools.height <= 1000, 'the listening page keeps the tools at the bottom left');
-      await openSettings();
-      await closeSettings();
-      assert(await page.locator('.listening-stage').isVisible(), 'settings opened from the listening page returns there');
+      await page.locator('.listening-stage').waitFor();
+      assert.equal(await tools.count(), 0, 'desktop listening uses the sidebar tools after returning to browsing');
       await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
+      await tools.waitFor();
       await tools.getByRole('button', { name: '粘贴链接', exact: true }).click();
       const link = page.getByRole('dialog', { name: '粘贴链接', exact: true });
       await link.waitFor();
@@ -241,19 +241,32 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
       await closeSettings();
       for (const width of [320, 390]) {
-        await page.setViewportSize({ width, height: 844 });
-        for (const name of ['设置', '粘贴链接', '切换为浅色']) {
-          const button = tools.getByRole('button', { name, exact: true });
-          assert(await button.isVisible(), 'phone tools stay reachable');
+        await setViewport({ width, height: 844 });
+        const header = page.locator('.mobile-header');
+        await header.waitFor();
+        for (const name of ['搜索歌曲或视频', '粘贴链接']) {
+          const button = header.getByRole('button', { name, exact: true });
+          assert(await button.isVisible(), 'phone header actions stay reachable');
           const bounds = await button.boundingBox();
-          assert(bounds.width >= 44 && bounds.height >= 44 && bounds.x >= 0 && bounds.x + bounds.width <= width);
+          assert(bounds.width >= 48 && bounds.height >= 48 && bounds.x >= 0 && bounds.x + bounds.width <= width);
         }
+        await header.getByRole('button', { name: '粘贴链接', exact: true }).click();
+        await link.getByLabel('视频或歌单链接').fill('BV1tX4y1W7Xm');
+        assert(await link.getByRole('button', { name: '读取真实元信息', exact: true }).isEnabled());
+        await link.getByRole('button', { name: '关闭', exact: true }).click();
+        await openSettings();
+        const mobileMode = settingsPanel('appearance').getByRole('group', { name: '明暗模式', exact: true });
+        await mobileMode.getByRole('button', { name: '白天', exact: true }).click();
+        assert.equal(await page.locator('html').getAttribute('data-theme-preference'), 'light');
+        await mobileMode.getByRole('button', { name: '黑夜', exact: true }).click();
+        assert.equal(await page.locator('html').getAttribute('data-theme-preference'), 'dark');
+        await closeSettings();
         await page.screenshot({ path: join(artifacts, `phone-${width}.png`) });
       }
     } finally {
       snapshot.playlists = originalPlaylists;
       libraryFixture.reset(snapshot);
-      await page.setViewportSize({ width: 1440, height: 1000 });
+      await setViewport({ width: 1440, height: 1000 });
       await page.reload();
       await page.locator('.music-card').first().waitFor();
     }
@@ -263,7 +276,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     const opener = page.locator('.playbar button[aria-label="打开播放队列"]');
     assert.equal(await page.locator('.queue-panel').count(), 0);
     assert.equal(await opener.getAttribute('aria-expanded'), 'false');
-    await page.setViewportSize({ width: 2560, height: 1000 });
+    await setViewport({ width: 2560, height: 1000 });
     for (const opened of [false, true]) {
       if (opened) await opener.click();
       for (const name of ['发现', '音乐榜单', '关注', '歌单', '设置']) {
@@ -285,7 +298,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert(await page.locator('.queue-panel').isVisible(), 'entering the listening page preserves an open queue');
     await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
     for (const width of [1051, 1050, 768, 1440]) {
-      await page.setViewportSize({ width, height: 1000 });
+      await setViewport({ width, height: 1000 });
       await page.locator('.queue-panel').waitFor();
       if (width <= 1050) await page.getByRole('dialog', { name: '播放队列', exact: true }).waitFor();
       else await page.locator('.queue-drawer').waitFor({ state: 'detached' });
@@ -302,7 +315,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await opener.waitFor();
     assert.equal(await page.locator('.queue-panel').count(), 0, 'refresh closes the panel');
     assert.equal(await page.locator('.now-playing strong').getAttribute('title'), part.title, 'saved queue content still restores');
-    await page.setViewportSize({ width: 768, height: 1000 });
+    await setViewport({ width: 768, height: 1000 });
     await opener.click();
     const drawer = page.getByRole('dialog', { name: '播放队列', exact: true });
     await drawer.waitFor();
@@ -314,7 +327,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await drawer.waitFor();
     await page.mouse.click(1, 1);
     await drawer.waitFor({ state: 'detached' });
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 1440, height: 1000 });
     assert.equal(await opener.getAttribute('aria-expanded'), 'false', 'a dismissed drawer stays closed on desktop');
   });
 
@@ -326,10 +339,10 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     for (const theme of ['dark', 'light']) {
       await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
       for (const width of [320, 390, 768, 1050, 1051, 1250, 1251, 1440, 1920, 2560]) {
-        await page.setViewportSize({ width, height: 1000 });
-        const bounds = await page.locator('.playbar').evaluate(element => {
+        await setViewport({ width, height: 1000 });
+        const bounds = await page.locator(width > 760 ? '.playbar' : '.mobile-mini-player').evaluate(element => {
           const rect = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
-          return { viewport: document.documentElement.clientWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, dock: rect(element), play: rect(element.querySelector('.play-toggle')), groups: [...element.querySelector('.playbar-inner').children].filter(child => child.getClientRects().length).map(child => ({ ...rect(child), controls: [...child.querySelectorAll('button,input')].filter(control => control.getClientRects().length && !control.closest('[popover]')).map(rect) })) };
+          return { viewport: document.documentElement.clientWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, dock: rect(element), play: rect(element.querySelector('.play-toggle')), groups: [...element.querySelector('.playbar-inner,.mobile-mini-row').children].filter(child => child.getClientRects().length).map(child => ({ ...rect(child), controls: [...child.querySelectorAll('button,input')].filter(control => control.getClientRects().length && !control.closest('[popover]')).map(rect) })) };
         });
         assert.equal(bounds.overflow, false, JSON.stringify({ width, theme, ...bounds }));
         if (width > 760) {
@@ -343,8 +356,12 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
           }
           assert(await page.getByRole('button', { name: '打开播放队列', exact: true }).isVisible());
         } else {
-          assert.equal(bounds.dock.width, bounds.viewport);
-          assert.equal(bounds.dock.height, 76);
+          assert.equal(bounds.dock.width, bounds.viewport - 24);
+          assert.equal(bounds.dock.left, 12);
+          assert.equal(bounds.dock.height, 72);
+          assert(bounds.play.width >= 48 && bounds.play.height >= 48);
+          const nav = await page.locator('.mobile-nav').boundingBox();
+          assert(bounds.dock.bottom <= nav.y, 'the mini player clears mobile navigation');
         }
         await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
         const last = await page.locator('.discovery-shelf').last().boundingBox();
@@ -354,7 +371,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       }
     }
     await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 1440, height: 1000 });
     const empty = await browser.newPage({ viewport: { width: 2560, height: 1000 } });
     try {
       await empty.goto('http://127.0.0.1:' + server.address().port);
@@ -381,7 +398,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     for (const theme of ['light', 'dark']) {
       await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
       for (const width of [768, 1050, 1051, 1250, 1251, 1440, 1775, 1776, 1920, 2031, 2032, 2560]) {
-        await page.setViewportSize({ width, height: 1000 });
+        await setViewport({ width, height: 1000 });
         if (width > 1050) await dock.getByRole('button', { name: '打开播放队列', exact: true }).click();
         let floating;
         for (const [label, value] of [['悬浮播放岛', 'floating'], ['底部长条', 'bar']]) {
@@ -417,10 +434,13 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await page.reload();
     await dock.waitFor();
     assert.equal(await page.locator('.app').getAttribute('data-player-style'), 'bar', 'refresh remembers the shell');
-    await page.setViewportSize({ width: 390, height: 844 });
-    assert.equal((await dock.boundingBox()).width, 390, 'the phone keeps its full-width mobile player');
-    assert.equal((await dock.boundingBox()).height, 76);
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 390, height: 844 });
+    const mini = page.locator('.mobile-mini-player');
+    await mini.waitFor();
+    assert.equal((await mini.boundingBox()).width, 366, 'the phone keeps its inset mini player');
+    assert.equal((await mini.boundingBox()).height, 72);
+    assert.equal(await dock.count(), 0, 'desktop shell choices do not render the desktop dock on phones');
+    await setViewport({ width: 1440, height: 1000 });
     assert.equal((await dock.boundingBox()).height, 104, 'returning to desktop keeps the saved choice');
     const other = await page.context().newPage();
     try {
@@ -466,7 +486,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     mkdirSync(artifacts,{recursive:true});
     for (const palette of palettes) for (const mode of ['light', 'dark']) {
       await openSettings();
-      const panel = page.locator('[data-settings-section="appearance"]');
+      const panel = settingsPanel('appearance');
       await panel.getByRole('button', { name: palette.label, exact: true }).click();
       await panel.getByRole('group', { name: '明暗模式', exact: true }).getByRole('button', { name: mode === 'light' ? '白天' : '黑夜', exact: true }).click();
       assert.equal(await panel.getByRole('group', { name: '明暗模式', exact: true }).getByRole('button', { name: mode === 'light' ? '白天' : '黑夜', exact: true }).getAttribute('aria-pressed'), 'true');
@@ -524,36 +544,38 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       assert.equal(await page.locator('html').getAttribute('data-theme'), mode, 'manual appearance ignores system changes');
     }
     await openSettings();
-    await page.locator('[data-settings-section="appearance"]').getByRole('button', { name: '跟随系统', exact: true }).click();
+    await settingsPanel('appearance').getByRole('button', { name: '跟随系统', exact: true }).click();
     const automatic=await page.evaluate(()=>{const hour=new Date().getHours();return hour>=18||hour<6?'dark':'light';});
     assert.equal(await page.locator('html').getAttribute('data-theme'), automatic, 'following a light system still darkens at night');
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
     assert.equal(await page.locator('html').getAttribute('data-palette'), 'plum', 'system changes preserve the palette');
-    await page.setViewportSize({ width: 320, height: 740 });
-    assert.equal(await page.locator('[data-settings-section="appearance"]').evaluate(el => el.scrollWidth > el.clientWidth), false, 'appearance options fit a narrow phone');
-    assert(await page.locator('.theme-options button').evaluateAll(elements => elements.every(el => el.getBoundingClientRect().height >= 44)));
-    assert(await page.locator('.theme-mode-options button').evaluateAll(elements => elements.every(el => el.getBoundingClientRect().height >= 44)));
+    await setViewport({ width: 320, height: 740 });
+    await page.locator('.mobile-settings:not([hidden])').waitFor();
+    assert.equal(await settingsPanel('appearance').evaluate(el => el.scrollWidth > el.clientWidth), false, 'appearance options fit a narrow phone');
+    assert.equal(await page.locator('.mobile-theme-options button').count(), 4);
+    assert(await page.locator('.mobile-theme-options button').evaluateAll(elements => elements.every(el => el.getBoundingClientRect().height >= 48)));
+    assert(await page.locator('.mobile-theme-modes button').evaluateAll(elements => elements.every(el => el.getBoundingClientRect().height >= 48)));
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false, 'no horizontal scrolling on the settings page at 320px');
-    assert.equal(await page.locator('.settings-nav button.active').evaluate(el => getComputedStyle(el).boxShadow), 'none', 'the phone chip strip drops the desktop accent bar');
+    assert.equal(await page.locator('.mobile-header h1').textContent(), '外观与主题', 'phone settings use a dedicated section header');
     await page.screenshot({path:join(artifacts,'phone-320.png'),fullPage:true});
     await closeSettings();
     await navigate(page, '歌单');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false, 'no horizontal scrolling at 320px');
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 1440, height: 1000 });
   });
 
   await t.test('settings sections keep their state: an unsaved recommendation draft and the diagnostics panel survive switching', async () => {
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 1440, height: 1000 });
     await openSettings();
     const nav = page.locator('.settings-nav');
-    const rules = page.locator('[data-settings-section="recommendation"]');
+    const rules = settingsPanel('recommendation');
     await nav.getByRole('button', { name: '推荐偏好', exact: true }).click();
     await rules.locator('.recommendation-advanced>summary').click();
     await rules.getByLabel('包含关键词').fill('未保存草稿');
     await nav.getByRole('button', { name: '诊断与数据', exact: true }).click();
     assert.equal(await rules.isVisible(), false, 'inactive settings panels leave the page');
-    const diagnostics = page.locator('[data-settings-section="diagnostics"]');
+    const diagnostics = settingsPanel('diagnostics');
     assert.equal(await diagnostics.locator('.diagnostics-advanced').getAttribute('open'), null, 'technical details are collapsed by default');
     await diagnostics.locator('.diagnostics-advanced>summary').click();
     await diagnostics.getByText('服务端 SQLite 条件事务', { exact: true }).waitFor();
@@ -578,7 +600,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
 
   await t.test('recommendation preferences preview the real rules, preserve drafts and fit both themes on phones', async () => {
     await openSettings('推荐偏好');
-    const panel=page.locator('[data-settings-section="recommendation"]'), save=panel.getByRole('button',{name:'保存偏好',exact:true});
+    const panel=settingsPanel('recommendation'), save=panel.getByRole('button',{name:'保存偏好',exact:true});
     await panel.getByLabel('偏好关键词').waitFor();
     assert.equal(await panel.locator('.recommendation-advanced').getAttribute('open'),null);
     assert.equal(await panel.locator('.recommendation-compatibility').getAttribute('open'),null);
@@ -598,19 +620,28 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert.equal(await save.isEnabled(),true);
     const artifacts=join(root,'test-results/recommendation-preferences');mkdirSync(artifacts,{recursive:true});
     for(const theme of ['light','dark']) {
+      await setViewport({width:1440,height:1000});
+      await page.locator('.settings-view').waitFor();
       await page.locator('.settings-nav').getByRole('button',{name:'外观',exact:true}).click();
       await page.locator('.theme-mode-options').getByRole('button',{name:theme==='light'?'白天':'黑夜',exact:true}).click();
       await page.locator('.settings-nav').getByRole('button',{name:'推荐偏好',exact:true}).click();
       await page.waitForFunction(theme=>document.documentElement.dataset.theme===theme,theme);
       for(const width of [1440,1100,390,320]) {
-        await page.setViewportSize({width,height:width<760?900:1100});
+        await setViewport({width,height:width<760?900:1100});
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,theme+' '+width+' fits the viewport');
-        if(width<760) assert(await panel.locator('.recommendation-actions button').evaluateAll(elements=>elements.every(el=>el.getBoundingClientRect().height>=44)),'phone actions keep their touch targets');
+        if(width<760) {
+          await panel.getByRole('button',{name:'预览效果',exact:true}).waitFor();
+          assert(await panel.locator('.recommendation-actions button').evaluateAll(elements=>elements.every(el=>el.getBoundingClientRect().height>=44)),'phone actions keep their touch targets');
+        }
         await page.evaluate(()=>scrollTo(0,0));
         await page.screenshot({path:join(artifacts,theme+'-'+width+'.png'),fullPage:true});
       }
     }
-    await page.setViewportSize({width:1440,height:1000});
+    await setViewport({width:1440,height:1000});
+    await page.locator('.settings-nav').getByRole('button',{name:'推荐偏好',exact:true}).click();
+    // The two layouts mount separate forms; recreate the desktop draft before previewing it.
+    await panel.getByLabel('偏好关键词').fill('现场');
+    await panel.getByLabel('排除关键词').fill('伴奏');
     await panel.getByLabel('排除关键词').fill('伴奏\n其他');
     assert.equal(await save.isEnabled(),false,'a changed draft requires a new preview');
     await panel.getByRole('button',{name:'预览效果',exact:true}).click();
@@ -641,12 +672,13 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await panel.getByLabel('推荐栏目').selectOption('music-recommendation');
     await page.waitForFunction(()=>document.querySelector('[aria-label="偏好关键词"]')?.value==='现场');
     assert.equal(await panel.getByLabel('排除关键词').inputValue(),'伴奏\n其他','the previously saved column remains independent');
+    await setViewport({width:320,height:900});
+    await page.locator('.mobile-settings:not([hidden])').waitFor();
     await panel.locator('.recommendation-advanced>summary').click();
-    await page.setViewportSize({width:320,height:900});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'expanded advanced fields also fit 320px');
     await page.evaluate(()=>scrollTo(0,0));
     await page.screenshot({path:join(artifacts,'advanced-320.png'),fullPage:true});
-    await page.setViewportSize({width:1440,height:1000});
+    await setViewport({width:1440,height:1000});
     await closeSettings();await navigate(page,'发现');
   });
 
@@ -680,8 +712,10 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert((await recommended.locator('.catalog-meta [role="status"]').innerText()).includes('1 首新音乐'));
     await refresh.click();await recommended.getByText('B站本次返回相同的音乐',{exact:false}).waitFor();
     assert.equal(chartCalls.length,chartBefore);assert.equal(await page.locator('[data-shelf-id="hot-chart"],[data-shelf-id="new-music"]').count(),0);
-    await page.setViewportSize({width:320,height:740});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-    assert((await refresh.boundingBox()).height>=44);await page.setViewportSize({width:1440,height:1000});
+    await setViewport({width:320,height:740});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    const mobileRefresh=recommended.getByRole('button',{name:'换一批音乐',exact:true});
+    assert((await mobileRefresh.boundingBox()).height>=48);
+    await mobileRefresh.click();await setViewport({width:1440,height:1000});
     discoveryMode='same';await page.reload();await page.locator('.music-card').first().waitFor();
   });
 
@@ -693,20 +727,21 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await warning.waitFor();
     assert(await warning.isVisible());
     assert(await page.locator('.song-library-row .row-sub').isVisible());
-    await page.setViewportSize({ width: 390, height: 844 });
+    await setViewport({ width: 390, height: 844 });
     assert(await warning.isVisible());
     assert(await page.locator('.song-library-row .row-sub').isVisible());
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 1440, height: 1000 });
   });
 
   await t.test('acceptance helpers operate playlist menus, queue drawers and the independent player page', async () => {
     await page.locator('.song-library-row').filter({hasText:part.title}).first().getByRole('button',{name:'更多操作 '+part.title,exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 '+part.title,exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与版本'});
+    await menu.getByRole('tab', { name: '播放版本', exact: true }).waitFor();
     assert(await menu.getByRole('tab', { name: '播放版本', exact: true }).isVisible());
     await menu.getByRole('button', { name: '关闭', exact: true }).click();
     await createPlaylist(page, '新验收歌单');
     await selectPlaylist(page, '新验收歌单');
-    assert.equal(await page.locator('.playlist-copy h2').textContent(), '新验收歌单');
+    assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(), '新验收歌单');
     await page.getByRole('button', { name: '打开播放队列', exact: true }).click();
     const firstActions = await queueTrackMenu(page, part.title);
     await firstActions.getByRole('button', { name: '下移', exact: true }).click();
@@ -718,12 +753,14 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await page.getByRole('button', { name: '关闭播放队列', exact: true }).click();
     await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
     assert.equal(await page.locator('.playing-title h2').getAttribute('title'), part.title);
-    await page.setViewportSize({ width: 1024, height: 768 });
+    await setViewport({ width: 1024, height: 768 });
     await navigate(page, '歌单');
-    await page.setViewportSize({ width: 390, height: 844 });
+    await setViewport({ width: 390, height: 844 });
     await selectPlaylist(page, '失效歌曲歌单');
     await navigate(page, '发现');
-    await navigate(page, '队列');
+    await page.getByRole('button',{name:'打开正在播放',exact:true}).click();
+    const queueOpener=page.getByRole('button',{name:'播放队列',exact:true});
+    await queueOpener.click();
     assert(await page.locator('.queue-panel').isVisible());
     const drawer=page.getByRole('dialog',{name:'播放队列',exact:true});
     assert(await drawer.isVisible(),'a phone queue is a modal drawer');
@@ -733,11 +770,12 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert(await drawer.isVisible(),'dismissing the popover keeps the queue open');
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('.queue-panel').isVisible(), false);
-    assert.equal(await page.getByRole('button',{name:'队列',exact:true}).evaluate(el=>el===document.activeElement),true,'closing the modal restores focus to its opener');
+    assert.equal(await queueOpener.evaluate(el=>el===document.activeElement),true,'closing the modal restores focus to its opener');
+    await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();
   });
   await t.test('the player fits phones, tablets and desktops; queue dialogs trap focus and options stay reachable',async()=>{
     for(const width of [320,390,768,1024,1260,1440]){
-      await page.setViewportSize({width,height:844});
+      await setViewport({width,height:844});
       await page.getByRole('button',{name:'打开正在播放',exact:true}).click();
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'the listening page fits '+width+'px');
       if(width>1050){
@@ -745,7 +783,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
         assert.equal(await page.locator('.queue-content').evaluate(el=>el.scrollWidth>el.clientWidth),false,'long queue titles fit the desktop panel');
         await page.getByRole('button',{name:'关闭播放队列',exact:true}).click();
       }
-      assert(await page.locator('.stage-controls').evaluate(el=>[...el.children].every(child=>child.getBoundingClientRect().right<=el.getBoundingClientRect().right+1)),'auxiliary controls fit their group at '+width+'px');
+      assert(await page.locator(width>760?'.stage-controls':'.mobile-player-tools').evaluate(el=>[...el.children].every(child=>child.getBoundingClientRect().right<=el.getBoundingClientRect().right+1)),'auxiliary controls fit their group at '+width+'px');
       assert(await page.getByRole('button',{name:'下一首',exact:true}).isVisible());
       if(width<=760)assert(await page.locator('.listening-transport button').evaluateAll(els=>els.every(el=>el.getBoundingClientRect().width>=44&&el.getBoundingClientRect().height>=44)),'all main playback targets are at least 44px');
       if(width===768){
@@ -787,15 +825,17 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     for (const theme of ['dark', 'light']) {
       await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
       for (const width of [1440, 390, 320]) {
-        await page.setViewportSize({ width, height: 1000 });
+        await setViewport({ width, height: 1000 });
         await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
-        const stage = page.locator('.listening-stage');
+        const stage = page.locator(width>760?'.listening-stage':'.mobile-player');
+        await stage.waitFor();
         assert.equal(await stage.getByRole('button', { name: '播放模式', exact: true }).count(), 1);
-        await selectRate(stage, 1.25);
-        await page.waitForFunction(() => document.querySelector('.stage-controls .rate-value')?.textContent === '1.25×');
+        if(width<=760)await page.getByRole('button',{name:'更多播放选项',exact:true}).click();
+        await selectRate(page, 1.25);
+        await page.waitForFunction(() => document.querySelector('audio').playbackRate === 1.25);
         assert.equal(await page.locator('audio').evaluate(audio => audio.playbackRate), 1.25, 'speed changes apply before a song starts');
-        await stage.getByRole('button', { name: '播放速度', exact: true }).click();
-        const rateMenu = stage.getByRole('menu', { name: '播放速度', exact: true });
+        await page.getByRole('button', { name: '播放速度', exact: true }).click();
+        const rateMenu = page.getByRole('menu', { name: '播放速度', exact: true });
         await rateMenu.waitFor();
         assert(await rateMenu.evaluate(element => { const bounds = element.getBoundingClientRect(); return bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight; }), 'speed menu fits ' + width + 'px');
         assert.equal(await rateMenu.getByRole('menuitemradio', { name: '1.25×', exact: true }).getAttribute('aria-checked'), 'true');
@@ -806,6 +846,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
           await page.screenshot({ path: join(artifacts, `${theme}-speed-detail.png`), clip: { x, y, width: Math.max(menuBounds.x + menuBounds.width, triggerBounds.x + triggerBounds.width) - x + 8, height: Math.max(menuBounds.y + menuBounds.height, triggerBounds.y + triggerBounds.height) - y + 8 } });
         }
         await page.keyboard.press('Escape');
+        if(width<=760)await page.keyboard.press('Escape');
         await page.screenshot({ path: join(artifacts, `${theme}-${width}-player.png`), fullPage: true });
         await stage.getByRole('button', { name: '睡眠定时器', exact: true }).click();
         const sleep = page.getByRole('dialog', { name: '睡眠定时器', exact: true });
@@ -816,12 +857,14 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
         await page.screenshot({ path: join(artifacts, `${theme}-${width}-timer.png`) });
         await sleep.locator('[data-action="cancel-timer"]').click();
         await sleep.getByRole('button', { name: '关闭', exact: true }).click();
-        await selectRate(stage, 1);
+        if(width<=760)await page.getByRole('button',{name:'更多播放选项',exact:true}).click();
+        await selectRate(page, 1);
+        if(width<=760)await page.keyboard.press('Escape');
         await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
       }
     }
     await page.evaluate(() => document.documentElement.dataset.theme = 'dark');
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 1440, height: 1000 });
   });
   await t.test('speed menus support keyboard selection, light dismissal and focus return', async () => {
     // Finish the preceding phone-to-desktop resize; popovers deliberately dismiss on resize/scroll.
@@ -859,9 +902,9 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await selectRate(dock, 1);
   });
   await t.test('QR polling recovers from a transient error without generating a new challenge', async () => {
-    await page.setViewportSize({width:1440,height:1000});
+    await setViewport({width:1440,height:1000});
     await openSettings('B站账号');
-    const dialog=page.locator('[data-settings-section="account"]');
+    const dialog=settingsPanel('account');
     pollFailures.push('network');loginPhase='pending';
     const firstPoll=pollCalls.length;
     await dialog.getByRole('button',{name:'扫码登录 B站',exact:true}).click();
@@ -881,11 +924,11 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     loginPhase='pending';
   });
   await t.test('B站扫码登录: offline QR, scanned confirmation, personalized discovery, cancellation and disconnect', async () => {
-    await page.setViewportSize({width:1440,height:1000});
+    await setViewport({width:1440,height:1000});
     await openSettings('外观');
-    await page.locator('[data-settings-section="appearance"]').getByRole('button',{name:'白天',exact:true}).click();
+    await page.getByRole('group',{name:'明暗模式',exact:true}).getByRole('button',{name:'白天',exact:true}).click();
     await page.locator('.settings-nav').getByRole('button',{name:'B站账号',exact:true}).click();
-    const dialog=page.locator('[data-settings-section="account"]');
+    const dialog=settingsPanel('account');
     await dialog.getByRole('button',{name:'扫码登录 B站',exact:true}).click();
     const qr=dialog.getByRole('img',{name:'B站登录二维码'});
     await qr.waitFor();
@@ -898,7 +941,9 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await page.locator('.settings-nav').getByRole('button',{name:'B站账号',exact:true}).click();
     await qr.scrollIntoViewIfNeeded();
     await page.screenshot({path:join(artifacts,'desktop-dark-qr.png')});
-    await page.setViewportSize({width:320,height:740});
+    await setViewport({width:320,height:740});
+    await dialog.getByRole('button',{name:'扫码登录 B站',exact:true}).click();
+    await qr.waitFor();
     await qr.scrollIntoViewIfNeeded();
     assert.equal(await dialog.evaluate(el=>el.scrollWidth>el.clientWidth),false,'account controls fit a narrow phone');
     assert((await qr.boundingBox()).width<=240);
@@ -911,9 +956,11 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await dialog.getByText('已登录 · 音乐推荐、音轨与收藏夹',{exact:true}).waitFor();
     assert(!(await page.evaluate(()=>JSON.stringify({...localStorage}))).includes('SESSDATA'));
     await page.screenshot({path:join(artifacts,'phone-dark-authenticated.png')});
-    await page.locator('.settings-nav').getByRole('button',{name:'推荐偏好',exact:true}).click();
-    assert.equal(await page.getByLabel('推荐栏目').inputValue(),'account-recommendation','a logged-in account defaults to the recommendation column it actually uses');
+    await openSettings('推荐偏好');
+    assert.equal(await settingsPanel('recommendation').getByLabel('推荐栏目').inputValue(),'account-recommendation','a logged-in account defaults to the recommendation column it actually uses');
     await closeSettings();
+    await page.getByRole('heading',{name:'为你推荐',exact:true}).waitFor();
+    await setViewport({width:1440,height:1000});
     await page.getByRole('heading',{name:'为你推荐 · B站账号',exact:true}).waitFor();
     await openSettings('B站账号');
     loginPhase='pending';
@@ -941,7 +988,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
   });
   await t.test('YouTube music discovery: region persistence, stale requests, batch refresh, failure recovery and mobile layout',async()=>{
     youtubeAvailable=true;
-    await page.setViewportSize({width:1440,height:1000});
+    await setViewport({width:1440,height:1000});
     await page.reload();
     const youtube=page.locator('[data-shelf-id="youtube-music-selection"]');
     await youtube.getByText('HK精选 1',{exact:true}).waitFor();
@@ -983,19 +1030,26 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await page.waitForFunction(()=>!document.querySelector('[data-shelf-id="youtube-music-selection"] [role="alert"]'));
     assert.equal(youtubeCalls.at(-1).region,'JP','the shelf retry refetches the region chosen in the shelf');
     assert.equal(youtubeCalls.at(-1).refresh,'1');
-    await page.setViewportSize({width:320,height:740});
-    await youtube.getByLabel('YouTube 音乐区地区').scrollIntoViewIfNeeded();
+    await setViewport({width:320,height:740});
+    await youtube.getByRole('button',{name:'YouTube 音乐精选栏目操作',exact:true}).click();
+    const menu=page.getByRole('dialog',{name:'YouTube 音乐精选栏目操作',exact:true});
+    await menu.getByLabel('YouTube 音乐区地区').scrollIntoViewIfNeeded();
+    assert.equal(await menu.getByLabel('YouTube 音乐区地区').inputValue(),'JP','mobile column settings keep the chosen region');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     const artifacts=join(root,'test-results/youtube-discovery');mkdirSync(artifacts,{recursive:true});
     await page.screenshot({path:join(artifacts,'phone-320.png')});
-    assert.equal(await youtube.getByRole('button',{name:'YouTube 音乐精选换一批',exact:true}).getAttribute('title'),'换一批','the icon-only batch button shows its label on hover');
-    assert.equal(await youtube.getByRole('button',{name:'YouTube 音乐精选封面视图',exact:true}).getAttribute('title'),'封面');
-    assert(await youtube.locator('.catalog-view button,.catalog-actions button').evaluateAll(els=>els.every(el=>el.getBoundingClientRect().height>=44&&el.getBoundingClientRect().width>=44)),'icon-only shelf controls keep a 44px touch target');
+    for(const name of ['加入歌单','封面浏览','歌曲列表']){
+      const button=menu.getByRole('button',{name,exact:true});
+      assert(await button.isVisible(),'mobile column actions have visible labels');
+      const bounds=await button.boundingBox();assert(bounds.height>=48&&bounds.width>=48,'mobile column actions keep a 48px touch target');
+    }
+    await menu.getByRole('button',{name:'封面浏览',exact:true}).click();
+    await menu.waitFor({state:'detached'});
   });
   await t.test('saving the YouTube column from the settings page refetches its candidates without the discover shelf', async () => {
-    await page.setViewportSize({ width: 1440, height: 1000 });
+    await setViewport({ width: 1440, height: 1000 });
     await openSettings('推荐偏好');
-    const panel = page.locator('[data-settings-section="recommendation"]');
+    const panel = settingsPanel('recommendation');
     await panel.getByLabel('推荐栏目').selectOption('youtube-music-selection');
     await panel.getByRole('button', { name: '预览效果', exact: true }).click();
     await panel.locator('.recommendation-preview').waitFor();

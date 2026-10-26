@@ -12,6 +12,7 @@ import { PagedList } from './Pagination';
 const sources: Record<ChartSource,string> = {netease:'网易云',qq:'QQ',bilibili:'B站',apple:'Apple Music'};
 const sourceIcons = { netease: RecordIcon, qq: WaveformIcon, bilibili: TelevisionSimpleIcon, apple: MusicNoteIcon };
 const date = (value:number) => new Date(value).toLocaleString('zh-CN',{timeZone:'Asia/Hong_Kong',hour12:false});
+let lastChartView: {source:ChartSource;kind:string;period:string} = {source:'netease',kind:'hot',period:'latest'};
 function ChartCover({item}:{item:ChartItem}) {
   const url=artworkUrl(item.artwork),[failed,setFailed]=useState('');
   return url&&failed!==url?<img className="chart-cover" src={url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(url)}/>:<span className="chart-cover unknown-cover" aria-label="封面未知"><MusicNotesIcon size={22}/></span>;
@@ -23,8 +24,9 @@ function ChartFavoriteButton({context,state,onFavorite}:{context:ChartSongContex
 }
 export function ChartsPage({onSearch,onPlay,onPlayAll,onFavorite,favoriteState}:{onSearch:(item:ChartItem,context?:ChartSongContext)=>void;onPlay:(item:ChartItem,context?:ChartSongContext)=>void;onPlayAll:(items:ChartItem[],contexts?:ChartSongContext[])=>void;onFavorite?:(context:ChartSongContext)=>void;favoriteState?:ChartFavoriteState}) {
   const tabsId=useId();
-  const [source,setSource]=useState<ChartSource>('netease'),[kind,setKind]=useState('hot'),[period,setPeriod]=useState('latest');
-  const [data,setData]=useState<Record<string,MusicChart>>(():Record<string,MusicChart>=>{const saved=cachedChart('netease','hot');return saved?{'netease:hot':saved}:{};}),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [source,setSource]=useState<ChartSource>(lastChartView.source),[kind,setKind]=useState(lastChartView.kind),[period,setPeriod]=useState(lastChartView.period);
+  const [data,setData]=useState<Record<string,MusicChart>>(():Record<string,MusicChart>=>{const {source,kind,period}=lastChartView,chart=source==='netease'?kind as ChartKind:source==='apple'?'most-played':'hot',saved=cachedChart(source,chart,period);return saved?{[source+':'+chart]:saved}:{};}),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  useEffect(()=>{lastChartView={source,kind,period};},[source,kind,period]);
   const active=useRef<AbortController|null>(null);
   const chart:ChartKind=source==='netease'?kind as ChartKind:source==='apple'?'most-played':'hot', key=`${source}:${chart}`, current=data[key];
   const context=(item:ChartItem):ChartSongContext=>({source:current!.source,title:item.title,...(item.artists?{artists:item.artists}:{}),chart:current!.chart,...(current!.period?{periodId:current!.period.id}:{}),rank:item.rank,sourceUrl:current!.sourceUrl,...(item.artwork?{artwork:item.artwork}:{})});

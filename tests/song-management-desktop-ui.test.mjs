@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate, selectPlaylist } from '../scripts/browser-ui.mjs';
+import { navigate, selectPlaylist, libraryAction } from '../scripts/browser-ui.mjs';
 
 test('concurrent version edits survive review and save without overwriting untouched fields', { timeout: 30000 }, async t => {
   const fixture = await startSongManagementFixture(); t.after(fixture.close);
@@ -12,7 +12,7 @@ test('concurrent version edits survive review and save without overwriting untou
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } }); page.setDefaultTimeout(10000);
   await page.route('**/*', route => new URL(route.request().url()).origin === fixture.origin ? route.continue() : route.abort());
   await page.goto(fixture.origin); await navigate(page, '歌单');
-  await page.getByRole('button', { name: '歌曲管理', exact: true }).click();
+  await libraryAction(page, '歌曲管理');
   await page.getByRole('button', { name: '管理歌曲 晴天', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '歌曲与版本', exact: true });
   await editor.getByLabel('版本名称', { exact: true }).fill('旧版本草稿');
@@ -105,7 +105,7 @@ test('desktop song workspace stages edits, keeps exact members, returns from sea
   await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => document.body.style.overflow), '');
   await page.getByRole('button', { name: '打开播放队列', exact: true }).click(); await page.setViewportSize({ width: 1440, height: 900 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); await page.screenshot({ path: join(artifacts, '03-queue-layout.png') });
-  await page.getByRole('button', { name: '歌曲管理', exact: true }).click(); await manager.getByLabel('搜索已保存歌曲').fill('收藏的旋律');
+  await libraryAction(page, '歌曲管理'); await manager.getByLabel('搜索已保存歌曲').fill('收藏的旋律');
   await manager.getByRole('button', { name: '已保存歌曲下一页', exact: true }).click();
   await manager.getByRole('button', { name: '管理歌曲 收藏的旋律 31', exact: true }).click();
   await editor.getByRole('button', { name: '全部歌曲', exact: true }).click();
@@ -153,8 +153,8 @@ test('desktop song workspace stages edits, keeps exact members, returns from sea
   await editor.getByRole('button', { name: '预览影响', exact: true }).click(); await editor.getByRole('button', { name: '合并到《晴天 · 已整理》', exact: true }).click();
   await manager.waitFor(); assert(!snapshot().songs.some(s => s.id === 'duplicate')); await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '关闭播放队列', exact: true }).click();
-  await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('button', { name: '资料库维护', exact: true }).waitFor();
-  assert.equal(await page.getByRole('button', { name: '歌曲管理', exact: true }).count(), 0); await page.locator('.song-library-row').first().locator('summary').click();
+  await page.setViewportSize({ width: 390, height: 844 }); await libraryAction(page,'资料库维护');await page.getByRole('dialog',{name:'资料库维护',exact:true}).getByRole('button',{name:'返回上一级',exact:true}).click();
+  assert.equal(await page.getByRole('button', { name: '歌曲管理', exact: true }).count(), 0); await page.locator('.song-library-row').first().getByRole('button',{name:/^更多操作 /}).click();
   assert.equal(await page.getByRole('combobox', { name: '固定版本 晴天 · 已整理', exact: true }).count(), 1);
   for (const width of [390, 320]) { await page.setViewportSize({ width, height: 844 }); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); await page.screenshot({ path: join(artifacts, 'mobile-regression-' + width + '.png') }); }
   assert.deepEqual(errors, []);

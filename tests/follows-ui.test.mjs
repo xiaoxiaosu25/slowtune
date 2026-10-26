@@ -102,8 +102,8 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
     assert.equal(await page.locator('.follows-page .track-row').count(),2,'unfollow keeps the public author contents open');
     await nav('关注');await page.getByText('关注喜欢的 UP 和博主',{exact:true}).waitFor();
     await nav('发现');creatorFailure=true;await page.getByRole('button',{name:'查看 UP / 博主 · 合集里的音乐',exact:true}).click();await page.getByText(/网络或服务连接中断/).waitFor();assert.equal(state.creators.length,0);
-    creatorFailure=false;await page.getByRole('button',{name:'关闭提示',exact:true}).click();
-    creatorDelay=400;await page.getByRole('button',{name:'查看 UP / 博主 · 合集里的音乐',exact:true}).click();await nav('歌单');await new Promise(resolve=>setTimeout(resolve,450));assert.equal(await page.locator('h1').textContent(),'我的歌单');creatorDelay=0;
+    creatorFailure=false;await page.getByRole('button',{name:'关闭操作提示',exact:true}).click();
+    creatorDelay=400;await page.getByRole('button',{name:'查看 UP / 博主 · 合集里的音乐',exact:true}).click();await nav('歌单');await new Promise(resolve=>setTimeout(resolve,450));assert.equal(await page.locator('.playlist-copy h1').textContent(),'我的收藏');creatorDelay=0;
     await nav('发现');await page.getByRole('button',{name:'更多操作 合集里的音乐',exact:true}).first().click();
     creatorDelay=400;await page.getByRole('button',{name:'查看 UP / 博主',exact:true}).click();await page.getByRole('button',{name:'关闭',exact:true}).click();await new Promise(resolve=>setTimeout(resolve,450));assert.equal(await page.locator('h1').textContent(),'发现音乐');creatorDelay=0;
   });
@@ -186,16 +186,16 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
     await page.getByRole('button',{name:'打开合集 测试博主 的合集',exact:true}).click();await page.getByTitle('博主最新发布',{exact:true}).waitFor();
     await page.getByRole('button',{name:'返回作者合集',exact:true}).click();await page.getByRole('button',{name:'返回关注',exact:true}).click();
   });
-  await t.test('desktop and 320px mobile show both tabs and five navigation entries without overflow',async()=>{
+  await t.test('desktop and 320px mobile show author tabs and the mobile discovery navigation without overflow',async()=>{
     const directory=resolve('local/verification/follows/screenshots');mkdirSync(directory,{recursive:true});
     await page.screenshot({path:join(directory,'desktop-authors.png'),fullPage:true});
-    await page.setViewportSize({width:320,height:800});assert.equal(await page.locator('.mobile-nav button').count(),5);
-    assert(await page.locator('.mobile-nav').getByRole('button',{name:'关注',exact:true}).isVisible());
+    await page.setViewportSize({width:320,height:800});await page.locator('.app[data-layout="mobile"]').waitFor();assert.equal(await page.locator('.mobile-nav button').count(),3);
+    assert(await page.getByRole('navigation',{name:'发现栏目'}).getByRole('button',{name:'关注',exact:true}).isVisible());
     await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.getByTitle('博主最新发布',{exact:true}).waitFor();
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile content does not overflow horizontally');
     await page.screenshot({path:join(directory,'mobile-updates.png'),fullPage:true});
     await page.getByRole('button',{name:'查看 UP / 博主 · 博主最新发布',exact:true}).click();await page.getByRole('button',{name:'打开合集 测试博主 的合集',exact:true}).waitFor();assert.equal(state.creators.length,2);
-    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:join(directory,'mobile-author-preview.png'),fullPage:true});await nav('关注');
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.equal(await page.getByRole('navigation',{name:'发现栏目'}).count(),0,'author details use the dedicated mobile header');await page.screenshot({path:join(directory,'mobile-author-preview.png'),fullPage:true});await page.getByRole('button',{name:'返回关注',exact:true}).click();
     await page.getByRole('button',{name:'关注的 UP',exact:true}).click();await page.getByRole('button',{name:'取消关注 测试 UP',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.follow-creator-card').length===1);
     await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.follows-page .track-row').length===1);
     assert.equal(await page.locator('.follows-page .track-name').textContent(),'博主最新发布');assert.deepEqual(errors,[]);assert(avatarRequests.some(url=>url.includes('account-avatar')));assert(avatarRequests.some(url=>url.includes('up-avatar')));assert(avatarRequests.some(url=>url.includes('blogger-avatar')));

@@ -8,6 +8,7 @@ import { developmentPaths } from './workspace-paths.mjs';
 
 const executable = process.argv[2] && resolve(process.argv[2]);
 if (!executable || !existsSync(executable)) throw new Error('请提供要验证的 Windows 免安装包 SlowTune.exe 绝对路径。');
+const delivery = JSON.parse(readFileSync(join(dirname(executable), 'desktop-delivery.json'), 'utf8'));
 const output = join(developmentPaths().testRuntime, 'desktop-package-verification'); mkdirSync(output, { recursive: true });
 const portableData = process.argv.includes('--portable-data');
 const directory = mkdtempSync(join(output, 'run-')), data = portableData ? join(dirname(executable), 'data') : join(directory, 'profile');
@@ -104,6 +105,8 @@ try {
   config = JSON.parse(readFileSync(join(data, 'instance/config.local.json'), 'utf8'));
   state = JSON.parse(readFileSync(join(data, 'runtime/service.json'), 'utf8'));
   await page.getByRole('button', { name: '打开正在播放', exact: true }).waitFor({ timeout: 20000 });
+  assert.equal(await application.evaluate(({ app }) => app.getVersion()), delivery.version);
+  assert.equal(await page.evaluate(() => fetch('/api/status').then(response => response.json()).then(status => status.version)), delivery.version);
   assert.equal(await page.getByLabel('服务访问码', { exact: true }).count(), 0);
   assert.equal(application.windows().some(window => window.url().endsWith('/setup.html')), false);
   assert.equal((await fetch(page.url() + 'api/song-library')).status, 401, 'ordinary browser access still needs authentication');

@@ -22,10 +22,10 @@ export function LyricsSettings({ lyrics, desktopImmersive = false, nativeDesktop
     {error && <div className="lyrics-feedback feedback" data-tone="error" role="alert"><span>{error}</span>{stale ? <button className="btn btn-secondary" disabled={!!busy} onClick={() => void load(true)}>重读当前歌词</button> : <button className="btn btn-ghost" disabled={!!busy} onClick={() => void resolve()}>重试读取歌词</button>}</div>}
   </>;
   const displaySettings = <>
-    {!nativeDesktop && <label className="choice"><input type="checkbox" checked={lyrics.bottom} onChange={event => lyrics.updateDisplay({ bottom: event.target.checked })}/>显示底部歌词</label>}
+    {desktopImmersive && !nativeDesktop && <label className="choice"><input type="checkbox" checked={lyrics.bottom} onChange={event => lyrics.updateDisplay({ bottom: event.target.checked })}/>显示底部歌词</label>}
     <label className="choice"><input type="checkbox" checked={lyrics.translations} onChange={event => lyrics.updateDisplay({ translations: event.target.checked })}/>显示翻译</label>
     {desktopImmersive && <DesktopLyricFont/>}
-    <p className="muted lyrics-settings-help">{nativeDesktop ? '歌词显示在独立桌面窗口，可通过应用菜单或托盘调整；点击歌曲操作区的“词”打开沉浸歌词。此处的翻译开关用于沉浸歌词。' : desktopImmersive ? '底部歌词独立显示；点击歌曲操作区的“词”打开沉浸歌词。有真实逐字时间时逐字推进，普通 LRC 整句高亮。' : '底部歌词独立显示；左侧可像切换唱片、圆形一样切换为歌词。有逐字时间时准确变色，普通 LRC 按句时长平滑推进。'}</p>
+    <p className="muted lyrics-settings-help">{nativeDesktop ? '歌词显示在独立桌面窗口，可通过应用菜单或托盘调整；点击歌曲操作区的“词”打开沉浸歌词。此处的翻译开关用于沉浸歌词。' : desktopImmersive ? '底部歌词独立显示；点击歌曲操作区的“词”打开沉浸歌词。有真实逐字时间时逐字推进，普通 LRC 整句高亮。' : '在播放页点击“歌词”进入完整歌词，再点击“唱片”返回。有逐字时间时准确变色，普通 LRC 按句时长平滑推进。'}</p>
   </>;
   const content = <>
     {selector ? <>
@@ -43,7 +43,7 @@ export function LyricsSettings({ lyrics, desktopImmersive = false, nativeDesktop
         <div><strong>{candidate.title}</strong><p>{candidate.artists.join(' / ') || '歌手未知'}{candidate.album ? ' · ' + candidate.album : ''}</p><small>{labels[candidate.provider]} · {time(candidate.durationSeconds)}{candidate.durationSeconds && durationSeconds && Math.abs(candidate.durationSeconds - durationSeconds) > 5 ? ' · 时长有差异' : ''}{candidate.instrumental ? ' · 纯音乐' : candidate.synced === false ? ' · 纯文本' : ''}</small></div>
         <button className="btn btn-secondary" disabled={!!busy && !(desktopImmersive && busy === '搜索')} aria-label={'预览 ' + labels[candidate.provider] + ' ' + candidate.title + ' ' + candidate.id} aria-pressed={preview?.provider === candidate.provider && preview.id === candidate.id} onClick={() => void inspect(candidate)}>预览</button>
       </div>)}</div>}
-      {preview && <section className="lyrics-preview" aria-label="歌词预览"><h3>{preview.title} · {labels[preview.provider]}</h3><div tabIndex={0}>{preview.instrumental ? '纯音乐' : preview.lines.map((line, index) => <p key={index}>{line.text || '♪'}{line.translation && <small>{line.translation}</small>}</p>)}</div><button className="btn btn-primary" disabled={!!busy || stale} onClick={() => void accept(embedded)}>使用这份歌词</button></section>}
+      {preview && <section className="lyrics-preview" aria-label="歌词预览"><h3>{preview.title} · {labels[preview.provider]}</h3><div tabIndex={0}>{preview.instrumental ? '纯音乐' : preview.lines.map((line, index) => <p key={index}>{line.text || '♪'}{line.translation && <small>{line.translation}</small>}</p>)}</div><button className="btn btn-primary" disabled={!!busy || stale || !state} onClick={() => void accept(embedded)}>使用这份歌词</button></section>}
       <details className="lyrics-import"><summary>导入或粘贴歌词</summary>
         <label className="field"><span className="field-label">LRC 或 UTF-8 文本文件（最多 128 KiB）</span><input className="input" type="file" aria-label="导入歌词文件" accept=".lrc,.txt,text/plain" onChange={event => {
           const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;
@@ -60,7 +60,7 @@ export function LyricsSettings({ lyrics, desktopImmersive = false, nativeDesktop
       {!lyrics.track && <p className="muted">播放音乐后自动查找适合当前版本的歌词。</p>}
       {embedded && lyrics.track && !document && <p className="muted">当前版本尚未选择歌词，可以查找或导入。</p>}
       {feedback}
-      {document?.synced && <details className="lyrics-offset" open={embedded || undefined}><summary>调整歌词时间{offsetMs !== state?.offsetMs ? ' · 未保存' : state?.offsetMs ? ` · ${state.offsetMs / 1000} 秒` : ''}</summary>
+      {document?.synced && <details className="lyrics-offset" open={embedded || !desktopImmersive && window.matchMedia('(max-width:760px)').matches || undefined}><summary>调整歌词时间{offsetMs !== state?.offsetMs ? ' · 未保存' : state?.offsetMs ? ` · ${state.offsetMs / 1000} 秒` : ''}</summary>
         <p className="muted">让歌词与当前版本对齐，正数表示延后。</p>
         <div className="lyrics-offset-buttons"><button className="btn btn-secondary" onClick={() => setOffset(String(Math.max(-600, offsetMs / 1000 - .5)))}>提前 0.5 秒</button><button className="btn btn-secondary" onClick={() => setOffset(String(Math.min(600, offsetMs / 1000 + .5)))}>延后 0.5 秒</button></div>
         {embedded && <p className="lyrics-offset-preview" role="status">{offsetMs === 0 ? '使用原始时间' : `已${offsetMs > 0 ? '延后' : '提前'} ${Math.abs(offsetMs / 1000).toFixed(1)} 秒`}{offsetMs !== state?.offsetMs ? ' · 正在预览，尚未保存' : ' · 已保存'}<br/>歌词早了请延后，歌词晚了请提前。越播偏差越大时，请更换匹配的歌词。</p>}
@@ -71,5 +71,5 @@ export function LyricsSettings({ lyrics, desktopImmersive = false, nativeDesktop
       <div className="lyrics-settings-actions"><button className="btn btn-secondary" disabled={!state || !!busy} onClick={() => setSelector(true)}>更换或导入歌词</button><button className="btn btn-ghost" disabled={!lyrics.track || !!busy} onClick={() => void resolve()}><ArrowsClockwiseIcon size={16}/>{document ? '刷新当前歌词' : '重新匹配'}</button></div>
     </>}
   </>;
-  return embedded ? <section className="embedded-lyrics-settings" aria-label="当前版本歌词管理">{content}</section> : <Modal title={selector ? '选择歌词' : '歌词设置'} className={selector ? 'lyrics-dialog' : 'lyrics-settings-dialog'} onClose={lyrics.closeSettings}>{content}</Modal>;
+  return embedded ? <section className="embedded-lyrics-settings" aria-label="当前版本歌词管理">{content}</section> : <Modal mobilePage={!desktopImmersive} title={selector ? '选择歌词' : '歌词设置'} className={selector ? 'lyrics-dialog' : 'lyrics-settings-dialog'} onClose={lyrics.closeSettings}>{content}</Modal>;
 }

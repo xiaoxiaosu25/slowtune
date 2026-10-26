@@ -7,6 +7,7 @@ import { DesktopPersistenceNotice } from './DesktopPersistenceNotice';
 import './styles.css';
 import './lyrics.css';
 import './playback-management.css';
+import './mobile.css';
 void initializePreferenceStorage().then(() => {
   initializeTheme();
   initializeDesktopChrome();

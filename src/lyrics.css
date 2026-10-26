@@ -106,3 +106,16 @@
 }
 @keyframes lyric-line-enter { from { opacity:.5; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 @media(prefers-reduced-motion:reduce) { .bottom-lyrics-lines { animation:none; } .lyrics-scroll li { transition:none; } .lyric-text.is-current .lyric-ink { background:none; color:var(--accent-text); } }
+
+/* Browsing keeps one lyric line beside the player; the full listening view stays unchanged. */
+@media(min-width:761px) {
+  .app.has-bottom-lyrics:not(.immersive) { --lyrics-dock-height:36px; }
+  .app.has-bottom-lyrics:not(.immersive):has(>.desktop-lyrics-dock.is-expanded) { --lyrics-dock-height:68px; }
+  .bottom-lyrics.desktop-lyrics-dock { width:min(720px,calc(100% - 32px)); padding:0 44px; border-radius:12px 12px 0 0; background:var(--bg); backdrop-filter:none; }
+  .desktop-lyrics-dock .bottom-lyrics-lines { gap:2px; }
+  .bottom-lyrics.desktop-lyrics-dock .bottom-lyrics-current { display:block; font-size:14px; line-height:24px; letter-spacing:.02em; white-space:nowrap; text-overflow:ellipsis; }
+  .desktop-lyrics-dock .lyric-text { white-space:nowrap; }
+  .bottom-lyrics.desktop-lyrics-dock .bottom-lyrics-next { font-size:12px; line-height:20px; min-height:20px; }
+  .desktop-lyrics-dock .bottom-lyrics-status { min-height:36px; font-size:13px; }
+  .desktop-lyrics-dock .bottom-lyrics-expand { position:absolute; right:4px; top:0; width:36px; height:36px; color:var(--muted); }
+}

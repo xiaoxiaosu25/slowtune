@@ -6,6 +6,7 @@ import {resolve,join,extname} from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import {fromMusicRef} from './helpers/song-fixture.mjs';
 import {installSearchFixture} from './helpers/search-fixture.mjs';
+import {navigate} from '../scripts/browser-ui.mjs';
 
 test('music browsing: discovery, four chart tabs, search dialogs and the default favorites playlist',async t=>{
   const root=resolve(process.env.MUSIC_APP_TEST_BUILD??'.'),artifacts=resolve('local/verification/music-browse-2026-10-13');mkdirSync(artifacts,{recursive:true});
@@ -59,7 +60,7 @@ test('music browsing: discovery, four chart tabs, search dialogs and the default
   const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));});
   const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  const nav=async name=>{const search=page.getByRole('dialog',{name:'搜索音乐',exact:true});if(await search.count())await search.getByRole('button',{name:'关闭',exact:true}).click();await page.locator('nav:visible').getByRole('button',{name,exact:true}).click();};
+  const nav=name=>navigate(page,name);
   const dialog=page.getByRole('dialog',{name:'搜索音乐',exact:true});
   await page.goto('http://127.0.0.1:'+server.address().port);
 
@@ -136,19 +137,19 @@ test('music browsing: discovery, four chart tabs, search dialogs and the default
     searchDelay=350;await dialog.getByLabel('弹窗搜索关键词').fill('迟到搜索');await dialog.getByRole('button',{name:'搜索',exact:true}).click();await dialog.getByRole('button',{name:'关闭',exact:true}).click();await page.waitForTimeout(400);assert.equal(await dialog.count(),0);searchDelay=0;
   });
   await t.test('existing favorites become a protected playlist with ordering, filtering and removal',async()=>{
-    await nav('歌单');assert.equal(await page.locator('.playlist-copy h2').textContent(),'我的收藏');assert.equal(await page.getByRole('button',{name:'删除歌单',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'改名',exact:true}).count(),0);
+    await nav('歌单');assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(),'我的收藏');assert.equal(await page.getByRole('button',{name:'删除歌单',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'改名',exact:true}).count(),0);
     const rows=page.locator('.main-content .song-library-row');assert.equal(await rows.count(),libraryFixture.library.read().snapshot.favorites.length);assert((await rows.locator('.track-name').allTextContents()).includes('旧收藏甲'));
     await rows.first().getByRole('button',{name:'更多操作 旧收藏甲',exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'下移 旧收藏甲',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.song-library-row .track-name')?.textContent==='旧收藏乙');
     await page.getByLabel('搜索歌单内音乐').fill('旧收藏甲');assert.equal(await rows.count(),1);await rows.getByRole('button',{name:'取消收藏 旧收藏甲',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.main-content .song-library-row'));assert(!libraryFixture.library.read().snapshot.favorites.some(f=>f.songId==='song-0'));
-    await page.getByLabel('搜索歌单内音乐').fill('');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'自建歌单'}).first().click();await nav('关注');await nav('歌单');assert.equal(await page.locator('.playlist-copy h2').textContent(),'自建歌单');
+    await page.getByLabel('搜索歌单内音乐').fill('');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'自建歌单'}).first().click();await nav('关注');await nav('歌单');assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(),'自建歌单');
     await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'我的收藏'}).first().click();await page.screenshot({path:join(artifacts,'favorites-desktop.png'),fullPage:true});
   });
   await t.test('public playlists use the search dialog and mobile dialogs fit the viewport',async()=>{
     await page.getByRole('button',{name:'粘贴链接',exact:true}).click();await page.getByLabel('视频或歌单链接').fill('https://www.youtube.com/playlist?list=PLfixture');await page.getByRole('button',{name:'读取真实元信息',exact:true}).click();await dialog.getByTitle('旧收藏乙',{exact:true}).waitFor();await dialog.getByRole('button',{name:'关闭',exact:true}).click();
     for(const width of [390,320]){
-      await page.setViewportSize({width,height:740});await nav('音乐榜单');await page.locator('.chart-song-search').first().waitFor();await page.locator('.chart-song-search').first().click();await dialog.locator('.track-row').first().waitFor();
-      const bounds=await dialog.evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scroll:el.scrollWidth,width:el.clientWidth};});assert(bounds.left>=0&&bounds.right<=width&&bounds.top>=0&&bounds.bottom<=740);assert(bounds.scroll<=bounds.width);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-      assert.equal(await page.locator('.mobile-nav button').count(),5);await page.screenshot({path:join(artifacts,`search-${width}.png`)});await dialog.getByRole('button',{name:'关闭',exact:true}).click();await page.screenshot({path:join(artifacts,`charts-${width}.png`)});
+      await page.setViewportSize({width,height:740});await page.locator('.app[data-layout="mobile"]').waitFor();await nav('音乐榜单');await page.locator('.chart-song-search').first().waitFor();await page.locator('.chart-song-search').first().click();const mobileSearch=page.getByRole('main',{name:'搜索音乐',exact:true});await mobileSearch.locator('.track-row').first().waitFor();
+      const bounds=await mobileSearch.evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scroll:el.scrollWidth,width:el.clientWidth};});assert(bounds.left>=0&&bounds.right<=width&&bounds.top>=0&&bounds.bottom<=740);assert(bounds.scroll<=bounds.width);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      assert.equal(await page.locator('.mobile-nav button').count(),0);assert.equal(await page.locator('.mobile-mini-player').count(),1);await page.screenshot({path:join(artifacts,`search-${width}.png`)});await mobileSearch.getByRole('button',{name:'关闭搜索',exact:true}).click();await page.screenshot({path:join(artifacts,`charts-${width}.png`)});
     }
   });
   assert.deepEqual(errors,[]);writeFileSync(join(artifacts,'browser-report.json'),JSON.stringify({searches:searches.length,chartCalls,confirmations:confirmations.map(c=>({column:c.column,count:c.ids.length})),prepareCalls,errors},null,2));

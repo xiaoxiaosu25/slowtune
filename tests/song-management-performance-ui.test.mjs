@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate } from '../scripts/browser-ui.mjs';
+import { navigate, libraryAction } from '../scripts/browser-ui.mjs';
 
 // Timing assertions run alone through scripts/verify-song-management-performance.mjs.
 test('large desktop song management stays responsive during media clock updates', { timeout: 90000, skip: !process.env.MUSIC_APP_PERF_VERIFY && !process.env.MUSIC_APP_PERF_BASELINE }, async t => {
@@ -56,7 +56,7 @@ test('large desktop song management stays responsive during media clock updates'
   }
   await page.getByRole('button', { name: '播放 晴天', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .2);
-  await page.getByRole('button', { name: '歌曲管理', exact: true }).click(); await manager.waitFor();
+  await libraryAction(page, '歌曲管理'); await manager.waitFor();
   await page.waitForTimeout(300); await page.evaluate(() => { window.managementLongTasks = [];window.slowTuneRenderCounts={}; });
   await page.waitForTimeout(1800);
   const clockTasks = await page.evaluate(() => window.managementLongTasks);

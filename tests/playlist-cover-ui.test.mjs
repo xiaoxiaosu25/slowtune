@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate } from '../scripts/browser-ui.mjs';
+import { navigate, selectPlaylist } from '../scripts/browser-ui.mjs';
 
 test('desktop playlist covers upload, crop, select, persist, recover and leave mobile unchanged', { timeout: 120000 }, async t => {
   const fixture = await startSongManagementFixture(); t.after(fixture.close);
@@ -100,6 +100,7 @@ test('desktop playlist covers upload, crop, select, persist, recover and leave m
   await t.test('mobile retains its original artwork and exposes no new cover controls', async () => {
     const saved = fixture.library.read().snapshot.desktopFavoritesCover; assert(saved);
     await page.setViewportSize({ width: 390, height: 844 }); await page.reload(); await navigate(page, '歌单');
+    await selectPlaylist(page,'我的收藏');
     assert.equal(await trigger().count(), 0); assert.equal(await image(), 'https://p1.music.126.net/sun.jpg');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.setViewportSize({ width: 1440, height: 1000 });

@@ -4,7 +4,7 @@ import { DiscoveryShelf } from './DiscoveryShelf';
 import { request, cancelled, errorText, type FollowFeed, type FollowState, type Track } from './api';
 import { discoverySize } from './CatalogView';
 
-export function FollowUpdatesShelf({state,source,renderCovers,renderList,onPlayAll,onFollow,onImport,youtubeEnabled=true}:{state:FollowState|null;source:'all'|'bilibili'|'youtube';renderCovers:(items:Track[])=>ReactNode;renderList:(items:Track[])=>ReactNode;onPlayAll:(items:Track[])=>void;onFollow:()=>void;onImport?:(items:Track[],title?:string)=>void;youtubeEnabled?:boolean}) {
+export function FollowUpdatesShelf({state,source,renderCovers,renderList,onPlayAll,onFollow,onImport,youtubeEnabled=true,mobile=false}:{state:FollowState|null;source:'all'|'bilibili'|'youtube';renderCovers:(items:Track[])=>ReactNode;renderList:(items:Track[])=>ReactNode;onPlayAll:(items:Track[])=>void;onFollow:()=>void;onImport?:(items:Track[],title?:string)=>void;youtubeEnabled?:boolean;mobile?:boolean}) {
   const [data,setData]=useState<FollowFeed>(),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const active=useRef<AbortController|null>(null);
   const creators=state?.creators.filter(c=>(youtubeEnabled||c.provider!=='youtube')&&(source==='all'||c.provider===source))??[];
@@ -18,7 +18,7 @@ export function FollowUpdatesShelf({state,source,renderCovers,renderList,onPlayA
   }
   useEffect(()=>{void load();return()=>active.current?.abort();},[state?.revision,source,youtubeEnabled]);
   return <>
-    <DiscoveryShelf shelf={{id:'follow-updates',title:'关注的最近更新',kind:'new',page:{items}}} loading={busy} renderCovers={renderCovers} renderList={renderList} renderError={()=>null} onPlayAll={onPlayAll} onImport={onImport} onRefresh={creators.length?()=>void load(true):undefined} info={<p>已关注作者的最新投稿，按发布时间倒序。</p>} status={busy?'正在读取最近更新…':data?`获取于 ${new Date(data.fetchedAt).toLocaleTimeString('zh-CN')}`:undefined} empty={!state?<p className="muted">正在读取关注名单…</p>:!creators.length?<div className="empty"><h3>先关注喜欢的作者</h3><button className="btn btn-secondary" onClick={onFollow}>添加关注</button></div>:<p className="muted">暂时没有可展示的更新。</p>}/>
+    <DiscoveryShelf mobile={mobile} shelf={{id:'follow-updates',title:'关注的最近更新',kind:'new',page:{items}}} loading={busy} renderCovers={renderCovers} renderList={renderList} renderError={()=>null} onPlayAll={onPlayAll} onImport={onImport} onRefresh={creators.length?()=>void load(true):undefined} info={<p>已关注作者的最新投稿，按发布时间倒序。</p>} status={busy?'正在读取最近更新…':data?`获取于 ${new Date(data.fetchedAt).toLocaleTimeString('zh-CN')}`:undefined} empty={!state?<p className="muted">正在读取关注名单…</p>:!creators.length?<div className="empty"><h3>先关注喜欢的作者</h3><button className="btn btn-secondary" onClick={onFollow}>添加关注</button></div>:<p className="muted">暂时没有可展示的更新。</p>}/>
     {(error||!!data?.warnings.length)&&<div className="feedback" role="status"><p>{error||data?.warnings.map(w=>`${w.name}：${errorText({code:w.code})}`).join('；')} 已保留可用内容。</p><RefreshButton label="重试更新" busy={busy} onClick={()=>void load(true)}/></div>}
   </>;
 }

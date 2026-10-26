@@ -43,7 +43,7 @@ export function SongVersionDialog({ track, library, onChange, onClose, desktop =
     finally { if (work.current === controller) setBusy(false); }
   };
   const art = artworkUrl(track.artwork);
-  return <Modal title="归入歌曲" className="song-group-modal" onClose={onClose}>
+  return <Modal mobilePage title="归入歌曲" className="song-group-modal" onClose={onClose}>
     <div className="song-group-source">{art ? <img src={art} alt="" referrerPolicy="no-referrer"/> : <span className="unknown-cover"><MusicNotesIcon size={24}/></span>}<div><span className="eyebrow">当前版本</span><strong>{track.title}</strong><small>{track.ref.provider === 'bilibili' ? 'B站' : 'YouTube'}{track.uploader?.name ? ' · ' + track.uploader.name : ''}</small></div></div>
     <div className="segmented song-group-tabs"><button aria-pressed={!existing} className={!existing ? 'selected' : ''} disabled={busy} onClick={() => { setExisting(false); setPreview(undefined); }}>{owner ? '整理本首歌曲' : '新建歌曲'}</button><button aria-pressed={existing} className={existing ? 'selected' : ''} disabled={busy} onClick={() => { setExisting(true); setPreview(undefined); }}>加入已有歌曲</button></div>
     <form className="song-group-form" onSubmit={event => { event.preventDefault(); void save(); }}>

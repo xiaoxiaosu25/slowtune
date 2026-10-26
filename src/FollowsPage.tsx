@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { MusicClient } from '@studio/music-sources/client';
-import { ArrowLeftIcon, PlusIcon, UsersIcon, ListBulletsIcon, CheckIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, PlusIcon, UsersIcon, ListBulletsIcon, CheckIcon, LinkIcon, CaretRightIcon } from '@phosphor-icons/react';
 import { request, errorText, cancelled, type Track, type FollowState, type CreatorProfile, type CreatorRef, type CreatorCollection, type CreatorCollections, type CreatorVideos, type FollowFeed } from './api';
 import { artworkUrl } from '../server/artwork-url';
 import { Avatar } from './Avatar';
@@ -8,6 +8,7 @@ import { CatalogViewToggle, useCatalogView } from './CatalogView';
 import { PlayAllButton, RefreshButton, AddToPlaylistButton } from './ListActions';
 import type { ListImportRequest } from './SongListImportPanel';
 import { PagedList, Pagination, usePagination } from './Pagination';
+import { initialFollowView, type FollowView } from './mobile-follow';
 
 const identity=(creator:CreatorRef)=>`${creator.provider}:${creator.id}`;
 const sourceName=(provider:string)=>provider==='bilibili'?'B站':'YouTube';
@@ -35,7 +36,8 @@ export function FollowTrackButton({client,track,state,onChange,author,onResolved
 }
 const feedCache=new Map<string,FollowFeed>();
 const videoCache=new Map<string,CreatorVideos>();
-let lastFollowView:{tab:'creators'|'updates';selected?:CreatorProfile;collection?:CreatorCollection;view:'collections'|'videos'}={tab:'creators',view:'collections'};
+let lastFollowView:FollowView=initialFollowView;
+const collectionCache=new Map<string,CreatorCollections>();
 function FeedPages({revision,source,refresh,render,onData}:{revision:string;source:string;refresh:number;render:(items:Track[],offset:number)=>ReactNode;onData:(feed:FollowFeed)=>void}) {
   const id='follow-feed:'+source+':'+revision;
   const [feed,setFeed]=useState<FollowFeed|undefined>(()=>feedCache.get(id)),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -99,10 +101,17 @@ function CreatorVideoPages({creator,collection,refresh,render,onData}:{creator:C
   </div>;
 }
 interface Props { client:MusicClient;state:FollowState|null;onChange:(value:FollowState)=>void;source:'all'|'bilibili'|'youtube';renderList:(items:Track[],timestamps?:boolean,offset?:number,all?:Track[])=>ReactNode;renderCovers:(items:Track[],timestamps?:boolean,offset?:number,all?:Track[])=>ReactNode;onPlayAll:(items:Track[])=>void;onImport?:(items:Track[],title?:string)=>void;onImportSource?:(input:ListImportRequest)=>void;onSearch:()=>void;initialCreator?:CreatorProfile;onClearCreator:()=>void }
-export function FollowsPage({client,state,onChange,source,renderList,renderCovers,onPlayAll,onImport,onImportSource,onSearch,initialCreator,onClearCreator,youtubeEnabled=true}:Props&{youtubeEnabled?:boolean}) {
+export function FollowsPage({client,state,onChange,source,renderList,renderCovers,onPlayAll,onImport,onImportSource,onSearch,initialCreator,onClearCreator,youtubeEnabled=true,navigationView,onNavigationViewChange,onMobileBack,mobile=false}:Props&{youtubeEnabled?:boolean;navigationView?:FollowView;onNavigationViewChange?:(update:(old:FollowView)=>FollowView)=>void;onMobileBack?:(target:FollowView,fallback:()=>void)=>void;mobile?:boolean}) {
   const updatesView=useCatalogView('follow-updates','list');
-  const [tab,setTab]=useState<'creators'|'updates'>(lastFollowView.tab),[selected,setSelected]=useState<CreatorProfile|undefined>(initialCreator??lastFollowView.selected),[collection,setCollection]=useState<CreatorCollection|undefined>(initialCreator?undefined:lastFollowView.collection),[view,setView]=useState<'collections'|'videos'>(initialCreator?'collections':lastFollowView.view);
-  const [collections,setCollections]=useState<CreatorCollections>(),[videos,setVideos]=useState<CreatorVideos>(),[feed,setFeed]=useState<FollowFeed>(),[feedRefresh,setFeedRefresh]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[writing,setWriting]=useState(false),[addOpen,setAddOpen]=useState(false),[input,setInput]=useState(''),[writeError,setWriteError]=useState('');
+  const [localView,setLocalView]=useState<FollowView>(()=>initialCreator?{...lastFollowView,selected:initialCreator,collection:undefined,view:'collections'}:lastFollowView);
+  const {tab,selected,collection,view}=navigationView??localView;
+  useEffect(()=>{if(navigationView)setLocalView(navigationView);},[navigationView]);
+  const changeView=(update:(old:FollowView)=>FollowView)=>(onNavigationViewChange??setLocalView)(update);
+  const setTab=(tab:FollowView['tab'])=>changeView(old=>({...old,tab}));
+  const setSelected=(next:CreatorProfile|undefined|((old:CreatorProfile|undefined)=>CreatorProfile|undefined))=>changeView(old=>({...old,selected:typeof next==='function'?next(old.selected):next}));
+  const setCollection=(collection:CreatorCollection|undefined)=>changeView(old=>({...old,collection}));
+  const setView=(view:FollowView['view'])=>changeView(old=>({...old,view}));
+  const [collections,setCollections]=useState<CreatorCollections|undefined>(()=>selected?collectionCache.get(identity(selected)):undefined),[videos,setVideos]=useState<CreatorVideos>(),[feed,setFeed]=useState<FollowFeed>(),[feedRefresh,setFeedRefresh]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[writing,setWriting]=useState(false),[addOpen,setAddOpen]=useState(false),[input,setInput]=useState(''),[writeError,setWriteError]=useState('');
   const work=useRef<AbortController|null>(null),writeWork=useRef<AbortController|null>(null);
   const [videoRefresh,setVideoRefresh]=useState(0);
   const visibleCreators=state?.creators.filter(c=>(youtubeEnabled||c.provider!=='youtube')&&(source==='all'||c.provider===source)) ?? [];
@@ -120,12 +129,15 @@ export function FollowsPage({client,state,onChange,source,renderList,renderCover
           void request<CreatorProfile>('/api/creators/profile?'+query+(refresh?'&refresh=1':''),undefined,controller.signal).then(profile=>{if(!controller.signal.aborted)setSelected(previous=>previous&&identity(previous)===identity(profile)?{...previous,artwork:profile.artwork??previous.artwork}:previous);}).catch(()=>{});
         }
         if(view==='collections'&&!collection) {
+          const cached=collectionCache.get(selectedKey);if(!more&&!refresh&&cached){setCollections(cached);return;}
           if(more&&collections?.cursor)query.set('cursor',collections.cursor);
           const value=await request<CreatorCollections>('/api/follows/collections?'+query,undefined,controller.signal);
-          if(!controller.signal.aborted)setCollections(previous=>({...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(c=>[c.id,c])).values()]:value.items}));
+          if(!controller.signal.aborted)setCollections(previous=>{const next={...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(c=>[c.id,c])).values()]:value.items};if(collectionCache.size>=20&&!collectionCache.has(selectedKey))collectionCache.delete(collectionCache.keys().next().value!);collectionCache.set(selectedKey,next);return next;});
         } else if(selected.provider==='bilibili'){
           if(refresh)setVideoRefresh(value=>value+1);
         } else {
+          const cacheKey='author-videos:'+selectedKey+':'+(collection?.id??'uploads'),cached=videoCache.get(cacheKey);
+          if(!more&&!refresh&&cached){setVideos(cached);return;}
           if(more&&videos?.cursor)query.set('cursor',videos.cursor);
           let value:CreatorVideos;
           if(collection?.kind==='playlist'&&collection.ref) {
@@ -134,15 +146,15 @@ export function FollowsPage({client,state,onChange,source,renderList,renderCover
             if(collection)query.set('collection',collection.id);
             value=await request<CreatorVideos>((collection?'/api/follows/collection?':'/api/follows/videos?')+query,undefined,controller.signal);
           }
-          if(!controller.signal.aborted)setVideos(previous=>({...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(t=>[t.resourceId,t])).values()]:value.items}));
+          if(!controller.signal.aborted)setVideos(previous=>{const next={...value,items:more?[...new Map([...(previous?.items??[]),...value.items].map(t=>[t.resourceId,t])).values()]:value.items};if(videoCache.size>=20&&!videoCache.has(cacheKey))videoCache.delete(videoCache.keys().next().value!);videoCache.set(cacheKey,next);return next;});
         }
       } else if(tab==='updates'&&refresh)setFeedRefresh(value=>value+1);
     } catch(e){if(!cancelled(e)&&!controller.signal.aborted)setError(errorText(e));}
     finally{if(work.current===controller)setBusy(false);}
   };
-  useEffect(()=>{setSelected(initialCreator);setCollection(undefined);setView('collections');},[initialCreator]);
+  useEffect(()=>{if(!navigationView)changeView(old=>({...old,selected:initialCreator,collection:undefined,view:'collections'}));},[initialCreator]);
   useEffect(()=>{lastFollowView={tab,selected,collection,view};},[tab,selected,collection,view]);
-  useEffect(()=>{if(selected&&(!youtubeEnabled&&selected.provider==='youtube'||source!=='all'&&source!==selected.provider)){setSelected(undefined);setCollection(undefined);onClearCreator();return;}setError('');setCollections(undefined);setVideos(undefined);setFeed(undefined);void load();return()=>work.current?.abort();},[selectedKey,collectionId,view,tab,source,updatesRevision,youtubeEnabled]);
+  useEffect(()=>{if(selected&&(!youtubeEnabled&&selected.provider==='youtube'||source!=='all'&&source!==selected.provider)){setSelected(undefined);setCollection(undefined);onClearCreator();return;}setError('');setCollections(selected?collectionCache.get(selectedKey):undefined);setVideos(undefined);setFeed(undefined);void load();return()=>work.current?.abort();},[selectedKey,collectionId,view,tab,source,updatesRevision,youtubeEnabled]);
   useEffect(()=>()=>{writeWork.current?.abort();},[]);
   const change=async(creator?:CreatorProfile)=>{
     if(writing)return;const controller=new AbortController();writeWork.current=controller;setWriting(true);setWriteError('');
@@ -160,23 +172,25 @@ export function FollowsPage({client,state,onChange,source,renderList,renderCover
   const filteredVideos=(videos?.items ?? []).filter(t=>source==='all'||t.ref.provider===source);
   const filteredFeed=(feed?.items ?? []).filter(t=>(youtubeEnabled||t.ref.provider!=='youtube')&&(source==='all'||t.ref.provider===source)&&state?.creators.some(c=>c.provider===t.ref.provider&&c.id===t.uploader?.id));
   const retry=()=>void load(false,tab==='updates');
+  const returnToParent=()=>{const fallback=()=>{if(collection){setCollection(undefined);setView('collections');}else {setSelected(undefined);onClearCreator();}};if(onMobileBack)onMobileBack({tab,selected:collection?selected:undefined,view:'collections'},fallback);else fallback();};
+  const followButton=selected&&<button className="btn btn-secondary" aria-pressed={!!selectedFollowed} disabled={writing} onClick={()=>void change(selected)}>{selectedFollowed?<CheckIcon size={18}/>:<PlusIcon size={18}/>}<span>{writing?'保存中…':selectedFollowed?'取消关注':'关注作者'}</span></button>;
   return <section className="follows-page">
-    <div className="toolbar follow-toolbar">
-      {selected?<button className="btn btn-ghost" onClick={()=>{if(collection){setCollection(undefined);setView('collections');}else {setSelected(undefined);onClearCreator();}}}><ArrowLeftIcon size={18}/>{collection?'返回作者合集':'返回关注'}</button>:<div className="segmented" aria-label="关注视图"><button className={tab==='creators'?'selected':''} aria-pressed={tab==='creators'} onClick={()=>setTab('creators')}>关注的 UP</button><button className={tab==='updates'?'selected':''} aria-pressed={tab==='updates'} onClick={()=>setTab('updates')}>最近更新</button></div>}
+    {(!mobile||!selected)&&<div className="toolbar follow-toolbar">
+      {selected?<button className="btn btn-ghost" onClick={returnToParent}><ArrowLeftIcon size={18}/>{collection?'返回作者合集':'返回关注'}</button>:<div className="segmented" aria-label="关注视图"><button className={tab==='creators'?'selected':''} aria-pressed={tab==='creators'} onClick={()=>setTab('creators')}>关注的 UP</button><button className={tab==='updates'?'selected':''} aria-pressed={tab==='updates'} onClick={()=>setTab('updates')}>最近更新</button></div>}
       {!selected&&tab==='updates'&&<CatalogViewToggle title="关注的最近更新" view={updatesView.view} onChange={updatesView.setView}/>}
       {!selected&&tab==='updates'&&<><PlayAllButton label="播放本页" count={filteredFeed.length} onClick={()=>onPlayAll(filteredFeed)}/>{onImport&&<AddToPlaylistButton count={filteredFeed.length} title="加入本页更新到歌单" onClick={()=>onImport(filteredFeed,'关注的最近更新 · 本页')}/>}</>}
       <RefreshButton busy={busy} onClick={()=>void load(false,true)}/>
       {!selected&&<button className="btn btn-secondary follow-add-button" aria-label="添加关注" title="添加关注" aria-expanded={addOpen} onClick={()=>{setAddOpen(value=>!value);setWriteError('');}}><PlusIcon size={18}/>添加关注</button>}
-    </div>
+    </div>}
     {addOpen&&!selected&&<form className="panel follow-add" onSubmit={e=>{e.preventDefault();void change();}}><label className="field"><span className="field-label">作者主页链接 / B站 UID</span><input className="input" value={input} onChange={e=>setInput(e.target.value)} placeholder="B站空间、YouTube @主页或频道链接" maxLength={500} required/></label><p className="muted">也可以在歌曲的更多操作中关注作者。关注名单在慢听中保存，{window.slowTuneDesktop?'与服务版各自保存。':'电脑和手机共用。'}</p><div className="toolbar"><button className="btn btn-primary" disabled={writing||!input.trim()}>{writing?'正在添加…':'关注作者'}</button><button type="button" className="btn btn-ghost" disabled={writing} onClick={()=>setAddOpen(false)}>取消</button></div></form>}
     {writeError&&<p className="feedback error-text" role="alert">{writeError}</p>}
     {!selected&&tab==='updates'&&updatesView.saveFailed&&<p className="muted" role="status">当前浏览器无法保存显示设置。</p>}
     {error&&<div className="feedback" data-tone="error" role="alert"><p>{error}</p><RefreshButton label="重新读取" busy={busy} onClick={retry}/></div>}
     {busy&&<div className="loading" role="status">正在读取{selected?collection?'合集内容':'作者内容':tab==='updates'?'关注作者的最新投稿':'关注名单'}… <button className="btn btn-ghost" onClick={()=>{work.current?.abort();void request('/api/follows/cancel',{}).catch(()=>{});setBusy(false);}}>取消</button></div>}
     {!selected&&tab==='creators'&&<><p className="muted follow-status">{visibleCreators.length} 位已关注作者 · 点击作者查看合集</p>{visibleCreators.length?<PagedList id={'follow-creators:'+source} group="follow-creators" label="关注作者" items={visibleCreators}>{items=><div className="follow-creator-grid">{items.map(creator=><article className="panel follow-creator-card" key={identity(creator)}><button className="follow-creator-open" onClick={()=>choose(creator)} aria-label={'查看 '+creator.name+' 的合集'}><CreatorArt url={creator.artwork} name={creator.name}/><span><strong>{creator.name}</strong><small>{sourceName(creator.provider)} · 查看合集</small></span></button><button className="btn btn-secondary btn-sm" aria-pressed="true" disabled={writing} onClick={()=>void change(creator)} aria-label={'取消关注 '+creator.name}><CheckIcon size={16}/>已关注</button></article>)}</div>}</PagedList>:state&&!busy&&!error&&<div className="empty"><UsersIcon size={40}/><h3>{state.creators.length?'这个来源还没有关注':'关注喜欢的 UP 和博主'}</h3><p>在歌曲菜单关注作者，或粘贴作者主页链接。</p><button className="btn btn-secondary" onClick={onSearch}>去搜索</button></div>}</>}
-    {selected&&<><div className="follow-author-heading"><CreatorArt url={selected.artwork} name={selected.name}/><div><h2>{selected.name}</h2><p className="muted">{sourceName(selected.provider)} · <a href={selected.url} target="_blank" rel="noreferrer">查看作者主页</a></p></div><button className="btn btn-secondary" aria-pressed={!!selectedFollowed} disabled={writing} onClick={()=>void change(selected)}>{selectedFollowed?<CheckIcon size={18}/>:<PlusIcon size={18}/>}<span>{writing?'保存中…':selectedFollowed?'取消关注':'关注作者'}</span></button></div>
+    {selected&&<>{mobile&&collection?<div className="mobile-collection-author"><button onClick={returnToParent} aria-label={'查看作者 '+selected.name}><CreatorArt url={selected.artwork} name={selected.name}/><span>{selected.name}</span><CaretRightIcon size={18}/></button><RefreshButton busy={busy} onClick={()=>void load(false,true)}/></div>:<div className="follow-author-heading"><CreatorArt url={selected.artwork} name={selected.name}/><div><h2>{selected.name}</h2><p className="muted">{sourceName(selected.provider)} · <a href={selected.url} target="_blank" rel="noreferrer">查看作者主页</a></p></div>{mobile?<div className="follow-author-actions">{followButton}<RefreshButton busy={busy} onClick={()=>void load(false,true)}/></div>:followButton}</div>}
       {!collection&&<div className="segmented follow-author-tabs" aria-label="作者内容"><button className={view==='collections'?'selected':''} aria-pressed={view==='collections'} onClick={()=>setView('collections')}>合集</button><button className={view==='videos'?'selected':''} aria-pressed={view==='videos'} onClick={()=>setView('videos')}>{selected.provider==='youtube'?'最近投稿':'全部投稿'}</button></div>}
-      {(collection||view==='videos')&&<div className="section-heading"><h3>{collection?.title??(selected.provider==='youtube'?'最近投稿':'全部投稿')}</h3><div className="toolbar"><span className="catalog-count">{filteredVideos.length} 首</span><PlayAllButton compact label={selected.provider==='bilibili'?'播放本页':'播放已读'} count={filteredVideos.length} onClick={()=>onPlayAll(filteredVideos)}/><AddToPlaylistButton compact count={collection?1:filteredVideos.length} onClick={()=>{if(collection&&onImportSource)onImportSource({title:collection.title,source:collection.kind==='playlist'&&collection.ref?{kind:'playlist',ref:collection.ref}:{kind:'creator-collection',creator:{provider:selected.provider,id:selected.id},collectionId:collection.id}});else onImport?.(filteredVideos,selected.name+'的投稿');}}/>{collection&&<a className="btn btn-ghost btn-sm" href={collection.url} target="_blank" rel="noreferrer">查看原合集</a>}</div></div>}
+      {(collection||view==='videos')&&<div className="section-heading follow-content-heading"><h3 title={collection?.title}>{collection?.title??(selected.provider==='youtube'?'最近投稿':'全部投稿')}</h3><div className="toolbar"><span className="catalog-count">{filteredVideos.length} 首</span><PlayAllButton compact label={selected.provider==='bilibili'?'播放本页':'播放已读'} count={filteredVideos.length} onClick={()=>onPlayAll(filteredVideos)}/><AddToPlaylistButton compact count={collection?1:filteredVideos.length} onClick={()=>{if(collection&&onImportSource)onImportSource({title:collection.title,source:collection.kind==='playlist'&&collection.ref?{kind:'playlist',ref:collection.ref}:{kind:'creator-collection',creator:{provider:selected.provider,id:selected.id},collectionId:collection.id}});else onImport?.(filteredVideos,selected.name+'的投稿');}}/>{collection&&<a className={'btn btn-ghost btn-sm'+(mobile?' mobile-collection-source':'')} aria-label="查看原合集" href={collection.url} target="_blank" rel="noreferrer">{mobile?<LinkIcon size={21}/>: '查看原合集'}</a>}</div></div>}
       {view==='collections'&&!collection?<>{collections&&<PagedList id={'collections:'+selectedKey} group="collections" label="作者合集" items={collections.items} cursor={collections.cursor} busy={busy} error={!!error} onLoadMore={()=>load(true)}>{items=>items.length?<div className="follow-collection-grid">{items.map(item=><button className="panel follow-collection-card" key={item.id} onClick={()=>setCollection(item)} aria-label={'打开合集 '+item.title}><CreatorArt url={item.artwork} name={item.title} collection/><strong>{item.title}</strong><small>{item.count===undefined?'公开合集':`${item.count} 个视频`}</small></button>)}</div>:!busy&&!error&&<div className="empty"><ListBulletsIcon size={36}/><h3>作者还没有公开合集</h3><p>可以切换到投稿查看内容。</p></div>}</PagedList>}</>:<>{selected.provider==='youtube'&&!collection&&<p className="muted follow-status">YouTube 公开更新提供最近 15 条投稿。</p>}{selected.provider==='bilibili'?<CreatorVideoPages key={selectedKey+':'+collectionId} creator={selected} collection={collection} refresh={videoRefresh} onData={setVideos} render={(items,offset)=>renderList(items,!collection,offset,items)}/>:videos&&<PagedList id={'creator-videos:'+selectedKey+':'+collectionId} group="creator-videos" label="作者内容" items={filteredVideos} cursor={videos.cursor} busy={busy} error={!!error} onLoadMore={()=>load(true)}>{(items,offset)=>renderList(items,!collection,offset,filteredVideos)}</PagedList>}</>}
     </>}
     {!selected&&tab==='updates'&&state&&<FeedPages key={(youtubeEnabled?source:'bilibili')+':'+state.revision} revision={state.revision} source={youtubeEnabled?source:'bilibili'} refresh={feedRefresh} onData={setFeed} render={(items,offset)=>{const visible=items.filter(t=>(youtubeEnabled||t.ref.provider!=='youtube')&&state.creators.some(c=>c.provider===t.ref.provider&&c.id===t.uploader?.id));return updatesView.view==='covers'?renderCovers(visible,true,offset,visible):renderList(visible,true,offset,visible);}}/>}

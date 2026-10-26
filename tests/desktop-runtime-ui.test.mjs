@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate } from '../scripts/browser-ui.mjs';
+import { navigate, libraryAction } from '../scripts/browser-ui.mjs';
 
 async function setup(t) {
   const fixture = await startSongManagementFixture();
@@ -29,7 +29,7 @@ test('desktop feature load failure retries with a fresh URL while the same audio
   });
   await play(page, fixture.origin);
   assert.equal(requests.length, 0, 'desktop manager is not fetched at startup or while browsing the library');
-  await page.getByRole('button', { name: '歌曲管理', exact: true }).click();
+  await libraryAction(page, '歌曲管理');
   await page.getByRole('dialog', { name: '歌曲管理暂不可用', exact: true }).waitFor();
   const before = await page.evaluate(() => window.testAudio.currentTime);
   fail = false;
@@ -52,7 +52,7 @@ test('desktop managers share one retryable module without unloaded static depend
     requests.push(route.request().url());
     return fail ? route.fulfill({ status: 503, contentType: 'text/javascript', body: '' }) : route.continue();
   });
-  await page.getByRole('button', { name: '歌曲管理', exact: true }).click();
+  await libraryAction(page, '歌曲管理');
   await page.getByRole('dialog', { name: '歌曲管理暂不可用', exact: true }).waitFor();
   fail = false;
   await page.getByRole('button', { name: '重试显示', exact: true }).click();

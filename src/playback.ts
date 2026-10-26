@@ -458,6 +458,10 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
   const readPosition=useCallback(()=>engine.current?.player.currentTime??0,[]);
   return {snapshot,clock,readPosition,sleep,sleepTimer,audioAnalysis,error,preparing,chartFailures,chartSearchTitle,chartSearchSong,diagnostics:playbackDiagnostics,
     playSelection,
+    enqueueSelection:(selection:SongPlaybackSelection,song:Pick<Song,'title'|'artists'|'artwork'>)=>run((e,signal)=>{
+      if(e.queue.snapshot.items.length>=500)throw {code:'queue-limit'};
+      const track=selectionTrack(selection,song);signal.throwIfAborted();e.queue.add([songQueueItem(e,track,selection)]);
+    }),
     playSelections:(items:{selection:SongPlaybackSelection;song:Pick<Song,'title'|'artists'|'artwork'>}[])=>run(async(e,signal)=>{
       if(!items.length||items.length>500)throw {code:'queue-limit'};
       const tracks=items.map(item=>selectionTrack(item.selection,item.song)),first=tracks.findIndex(track=>!blocked(track));

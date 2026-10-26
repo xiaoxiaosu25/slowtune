@@ -8,6 +8,7 @@ import {fromMusicRef} from './helpers/song-fixture.mjs';
 import {DEFAULT_CONFIG} from '@studio/recommendation';
 import {resourceId} from '@studio/music-sources';
 import {installSearchFixture} from './helpers/search-fixture.mjs';
+import {navigate,selectPlaylist} from '../scripts/browser-ui.mjs';
 
 test('list actions: loaded and filtered playback, search drafts, queue identity and responsive buttons',async t=>{
   const build=resolve(process.env.MUSIC_APP_TEST_BUILD??'.'),artifacts=resolve(process.env.MUSIC_APP_TEST_ARTIFACTS??'local/verification/list-actions-2026-10-13');mkdirSync(artifacts,{recursive:true});
@@ -73,7 +74,7 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
   const browser=await chromium.launch({headless:true});
   t.after(async()=>{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));});
   const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
-  const dialog=page.getByRole('dialog',{name:'搜索音乐',exact:true}),nav=async name=>{if(await dialog.count())await dialog.getByRole('button',{name:'关闭',exact:true}).click();await page.locator('nav:visible').getByRole('button',{name,exact:true}).click();};
+  const dialog=page.getByRole('dialog',{name:'搜索音乐',exact:true}),nav=name=>navigate(page,name);
   const storage=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
   const playAndCheck=async(button,titles)=>{
     await page.evaluate(()=>{const audio=document.querySelector('audio');if(audio?.duration)audio.currentTime=5;});
@@ -109,9 +110,9 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
     await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'重复条目歌单'}).first().click();await page.getByLabel('搜索歌单内音乐').fill('匹配');await playAndCheck(all,[a.title,a.title]);const queue=await storage();assert.equal(new Set(queue.items.map(x=>x.instanceId)).size,2);assert.equal(queue.items[0].selection.songId,queue.items[1].selection.songId);
     await page.getByLabel('搜索歌单内音乐').fill('');await playAndCheck(all,[a.title,a.title,c.title]);
   });
-  await t.test('shortcut search leaves both inputs empty; source switches, retries and pagination use the submitted term',async()=>{
+  await t.test('shortcut search fills both editable inputs; source switches, retries and pagination use the submitted term',async()=>{
     await nav('音乐榜单');await page.getByLabel('搜索歌曲或视频').fill('旧输入');await page.getByRole('button',{name:'搜索 快捷歌名',exact:true}).click();await dialog.locator('.track-row').nth(3).waitFor();
-    assert.equal(await page.getByLabel('搜索歌曲或视频').inputValue(),'');assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'');assert(searches.slice(-2).every(x=>x.query==='快捷歌名'));assert.match(await dialog.locator('.search-description').textContent(),/快捷歌名/);
+    assert.equal(await page.getByLabel('搜索歌曲或视频').inputValue(),'快捷歌名');assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'快捷歌名');assert(searches.slice(-2).every(x=>x.query==='快捷歌名'));assert.match(await dialog.locator('.search-description').textContent(),/快捷歌名/);
     const bili=dialog.locator('.catalog').filter({has:page.getByRole('heading',{name:'B站',exact:true})});await playAndCheck(bili.locator('.play-all'),['快捷歌名 · bilibili 600','快捷歌名 · bilibili 601','快捷歌名 · bilibili 602','快捷歌名 · bilibili 603']);
     await dialog.getByLabel('弹窗搜索关键词').fill('未提交草稿');await dialog.getByRole('button',{name:'YouTube 视频',exact:true}).click();await dialog.locator('.track-row').nth(1).waitFor();assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'未提交草稿');assert.equal(searches.at(-1).query,'快捷歌名');
     await page.waitForFunction(()=>document.querySelectorAll('.search-modal .track-row').length===4);assert.equal(searches.at(-1).query,'快捷歌名');assert.equal(await dialog.getByLabel('弹窗搜索关键词').inputValue(),'未提交草稿');
@@ -126,7 +127,7 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
   });
   await t.test('oversized lists show an actionable limit and preserve the existing queue',async()=>{
     const entries=playlist.entries;playlist.entries=Array.from({length:501},(_,i)=>({...saved(a),id:'large-'+i}));
-    libraryFixture.reset(library.snapshot);try{await page.reload();await nav('歌单');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'重复条目歌单'}).first().click();const before=await storage();await page.locator('.playlist-intro .play-all').click();await page.getByText('当前列表超过 500 首，播放队列最多支持 500 首，请筛选后再播放。',{exact:true}).waitFor();assert.deepEqual((await storage()).items,before.items);}finally{playlist.entries=entries;libraryFixture.reset(library.snapshot);}
+    libraryFixture.reset(library.snapshot);try{await page.reload();await nav('歌单');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'重复条目歌单'}).first().click();const before=await storage();await page.locator('.playlist-intro .play-all').click();await page.getByRole('button',{name:'播放失败，查看详情',exact:true}).click();await page.getByText('当前列表超过 500 首，播放队列最多支持 500 首，请筛选后再播放。',{exact:true}).waitFor();assert.deepEqual((await storage()).items,before.items);await page.keyboard.press('Escape');}finally{playlist.entries=entries;libraryFixture.reset(library.snapshot);}
   });
   await t.test('list panels, numbering and column headings stay aligned across pages, breakpoints and queue states',async()=>{
     await page.setViewportSize({width:1440,height:1000});await page.reload();
@@ -145,26 +146,25 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
           number:number.textContent,font:getComputedStyle(number).fontSize,panelRadius:getComputedStyle(panel).borderRadius};
       });
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-      assert.equal(value.overflow,false,JSON.stringify({width,...value}));assert.equal(value.number,'01');assert.equal(value.font,'12px');assert.equal(value.panelRadius,'18px');
+      assert.equal(value.overflow,false,JSON.stringify({width,...value}));assert.equal(value.number,'01');assert.equal(value.font,'12px');assert.equal(value.panelRadius,'0px','list content keeps the current flat page surface');
       if(width>760){assert(value.headingVisible);assert.equal(value.grid,value.headingGrid);assert(Math.abs(value.titleDelta)<1);assert(Math.abs(value.durationDelta)<1);}
       else assert.equal(value.headingVisible,false);
       measurements.push({width,...value});
     };
     const scenarios=[
-      ['discovery',async()=>{await nav('发现');await page.getByRole('button',{name:'音乐推荐列表视图',exact:true}).click();return page.locator('[data-shelf-id="music-recommendation"] .track-list');}],
-      ['favorites',async()=>{await nav('歌单');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'我的收藏'}).first().click();return page.locator('.list-view .track-list');}],
-      ['playlist',async()=>{await nav('歌单');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'重复条目歌单'}).first().click();return page.locator('.list-view .track-list');}],
+      ['discovery',async()=>{await nav('发现');if(await page.locator('.app').getAttribute('data-layout')==='mobile'){await page.getByRole('button',{name:'音乐推荐栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'音乐推荐栏目操作',exact:true}).getByRole('button',{name:'歌曲列表',exact:true}).click();}else await page.getByRole('button',{name:'音乐推荐列表视图',exact:true}).click();return page.locator('[data-shelf-id="music-recommendation"] .track-list');}],
+      ['favorites',async()=>{await nav('歌单');await selectPlaylist(page,'我的收藏');return page.locator('.list-view .track-list');}],
+      ['playlist',async()=>{await nav('歌单');await selectPlaylist(page,'重复条目歌单');return page.locator('.list-view .track-list');}],
       ['follows',async()=>{await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.getByRole('button',{name:'关注的最近更新列表视图',exact:true}).click();return page.locator('.follows-page .track-list');}],
-      ['search',async()=>{await page.getByLabel('搜索歌曲或视频').fill('超长歌曲标题与现场演出完整版，用于验证搜索列表中的列对齐');await page.getByRole('button',{name:'开始搜索',exact:true}).click();return dialog.locator('.track-list').first();}],
+      ['search',async()=>{await nav('发现');const mobile=await page.locator('.app').getAttribute('data-layout')==='mobile';if(mobile){await nav('搜索');await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('超长歌曲标题与现场演出完整版，用于验证搜索列表中的列对齐');await page.getByRole('main',{name:'搜索音乐',exact:true}).getByRole('button',{name:'搜索',exact:true}).click();}else {await page.getByLabel('搜索歌曲或视频').fill('超长歌曲标题与现场演出完整版，用于验证搜索列表中的列对齐');await page.getByRole('button',{name:'开始搜索',exact:true}).click();}return page.getByRole(mobile?'main':'dialog',{name:'搜索音乐',exact:true}).locator('.track-list').first();}],
     ];
     for(const [name,open] of scenarios){
-      await page.setViewportSize({width:1440,height:1000});const list=await open();await list.locator('.track-row,.song-library-row').first().waitFor();
       for(const width of [1440,1251,1249,1051,1024,390,320]){
-        await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);await checkList(list,width);
+        await page.setViewportSize({width,height:1000});await page.waitForFunction(()=>document.querySelector('.app')?.dataset.layout===(innerWidth>760?'desktop':'mobile'));const list=await open();await list.locator('.track-row,.song-library-row').first().waitFor();await page.evaluate(()=>document.fonts.ready);await checkList(list,width);
         if(width===1440||width===320)await page.screenshot({path:join(artifacts,`list-${name}-${width}.png`)});
       }
     }
-    await dialog.getByRole('button',{name:'关闭',exact:true}).click();await page.setViewportSize({width:1440,height:1000});await nav('发现');
+    await page.setViewportSize({width:1440,height:1000});await dialog.getByRole('button',{name:'关闭',exact:true}).click();await nav('发现');
     const list=page.locator('[data-shelf-id="music-recommendation"] .track-list');
     await page.getByRole('button',{name:'打开播放队列',exact:true}).click();
     for(const width of [1440,1251,1249,1051]){await page.setViewportSize({width,height:1000});await checkList(list,width);}
@@ -180,13 +180,13 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
     await page.evaluate(()=>{localStorage.removeItem('slow-listening:palette:v1');window.dispatchEvent(new StorageEvent('storage',{key:'slow-listening:palette:v1',newValue:null,storageArea:localStorage}));});
     writeFileSync(join(artifacts,'list-layout-report.json'),JSON.stringify(measurements,null,2));
   });
-  await t.test('light and dark layouts align toolbar controls, fit all target widths and keep touch buttons at least 44px',async()=>{
+  await t.test('light and dark layouts align toolbar controls, fit all target widths and keep mobile touch buttons at least 48px',async()=>{
     await page.reload();await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.getByRole('button',{name:'关注的最近更新封面视图',exact:true}).click();await page.locator('.follows-page .music-card').nth(1).waitFor();
     const measurements=[];
     for(const theme of ['light','dark'])for(const width of [1440,1024,390,320]){
-      await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);
+      await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width,height:1000});await page.waitForFunction(()=>document.querySelector('.app')?.dataset.layout===(innerWidth>760?'desktop':'mobile'));await page.evaluate(()=>document.fonts.ready);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-      const buttons=await page.locator('.follow-toolbar>.btn').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {label:el.textContent,top:r.top,height:r.height,radius:s.borderRadius,background:s.backgroundColor};}));assert(buttons.every(x=>x.height===(width<=760?44:40)&&x.radius==='12px'));if(width>760)assert(buttons.every(x=>x.top===buttons[0].top),'desktop actions align');measurements.push({theme,width,buttons});
+      const buttons=await page.locator('.follow-toolbar>.btn').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {label:el.textContent,top:r.top,height:r.height,radius:s.borderRadius,background:s.backgroundColor};}));assert(buttons.every(x=>x.height===(width<=760?48:40)&&x.radius==='12px'),JSON.stringify({theme,width,buttons}));if(width>760)assert(buttons.every(x=>x.top===buttons[0].top),'desktop actions align');measurements.push({theme,width,buttons});
       await page.screenshot({path:join(artifacts,`updates-${theme}-${width}.png`)});
       if(width===1440){await page.getByRole('button',{name:'查看 UP / 博主 · '+a.title,exact:true}).first().click();await page.getByRole('button',{name:'打开合集 测试合集',exact:true}).click();await page.locator('.follows-page .track-row').nth(1).waitFor();await page.screenshot({path:join(artifacts,`collection-${theme}.png`)});await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.locator('.follows-page .music-card').nth(1).waitFor();}
     }

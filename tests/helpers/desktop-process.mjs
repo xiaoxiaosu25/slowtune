@@ -1,9 +1,9 @@
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 export const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
-export async function closeDesktop(application, { mainWindow = false } = {}) {
+export async function closeDesktop(application, { mainWindow = false, pid: knownPid } = {}) {
   const wrapper = application.process();
-  const pid = await application.evaluate(() => process.pid);
+  const pid = knownPid ?? await application.evaluate(() => process.pid);
   const closing = mainWindow
     ? application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(window => window.webContents.getURL().startsWith('http:')).close()).catch(() => {})
     : application.close().catch(() => {});

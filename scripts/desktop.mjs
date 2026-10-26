@@ -122,7 +122,8 @@ foreach($target in $targets) {
   }
 }`;
   const result = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
-    env: { ...environment, SLOWTUNE_RESTART_APP: join(root, 'desktop'), SLOWTUNE_RESTART_ELECTRON: electron, SLOWTUNE_RESTART_CUSTOM_DATA: environment.MUSIC_APP_DESKTOP_DATA ? resolve(data) : '' }, windowsHide: true, timeout: 15000, maxBuffer: 65536,
+    // Cold Windows hosts can spend more than 15 seconds initializing CIM and Add-Type.
+    env: { ...environment, SLOWTUNE_RESTART_APP: join(root, 'desktop'), SLOWTUNE_RESTART_ELECTRON: electron, SLOWTUNE_RESTART_CUSTOM_DATA: environment.MUSIC_APP_DESKTOP_DATA ? resolve(data) : '' }, windowsHide: true, timeout: 45000, maxBuffer: 65536,
   });
   for (const line of result.stdout.trim().split(/\s+/).filter(Boolean)) { const pid = Number(line); if (Number.isInteger(pid) && pid > 0) await waitForExit(pid); }
 }

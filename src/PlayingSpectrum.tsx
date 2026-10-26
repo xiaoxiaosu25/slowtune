@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react';
 import type { PlaybackAudioAnalysis } from './audio-analysis';
 
 /** The original centred bars and a separate circular halo share the same real frequency analysis. */
-export function PlayingSpectrum({ variant = 'bars', active, playing, muted, reduced, analysis, state }: {
+export function PlayingSpectrum({ variant = 'bars', active, playing, muted, analysis, state }: {
   variant?: 'bars' | 'halo';
-  active: boolean; playing: boolean; muted: boolean; reduced: boolean;
+  active: boolean; playing: boolean; muted: boolean;
   analysis: PlaybackAudioAnalysis | null; state: string;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -18,9 +18,8 @@ export function PlayingSpectrum({ variant = 'bars', active, playing, muted, redu
     const analyser = analysis?.analyser;
     const samples = new Uint8Array(analyser?.frequencyBinCount ?? 0);
     let width = 0, height = 0, color = '', count = levels.current.length, bands = levels.current;
-    if (reduced) bands.fill(0);
     let frame = 0, lastPaint = 0;
-    const live = playing && !muted && !reduced && state === 'ready' && !!analyser;
+    const live = playing && !muted && state === 'ready' && !!analyser;
     let lastMotion = 0;
     const paint = (now = performance.now()) => {
       if (live) analyser.getByteFrequencyData(samples);
@@ -91,7 +90,7 @@ export function PlayingSpectrum({ variant = 'bars', active, playing, muted, redu
       if (document.hidden) return;
       if (now - lastPaint < 1000 / 30) { frame = requestAnimationFrame(tick); return; }
       lastPaint = now;
-      if (paint(now) && !reduced) frame = requestAnimationFrame(tick);
+      if (paint(now)) frame = requestAnimationFrame(tick);
     };
     const redraw = () => {
       cancelAnimationFrame(frame); frame = 0;
@@ -104,13 +103,13 @@ export function PlayingSpectrum({ variant = 'bars', active, playing, muted, redu
       const nextCount = width < 340 ? 32 : 48;
       if (nextCount !== count) { count = nextCount; bands = new Float32Array(count); levels.current = bands; }
       lastPaint = 0; lastMotion = 0;
-      if (paint() && !reduced) frame = requestAnimationFrame(tick);
+      if (paint()) frame = requestAnimationFrame(tick);
     };
     const resize = new ResizeObserver(redraw); resize.observe(canvas);
     const theme = new MutationObserver(redraw); theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-palette', 'style', 'class'] });
     document.addEventListener('visibilitychange', redraw);
     redraw();
     return () => { cancelAnimationFrame(frame); resize.disconnect(); theme.disconnect(); document.removeEventListener('visibilitychange', redraw); };
-  }, [variant, active, playing, muted, reduced, analysis, state]);
+  }, [variant, active, playing, muted, analysis, state]);
   return <canvas ref={ref} className="playing-spectrum" aria-hidden="true"/>;
 }

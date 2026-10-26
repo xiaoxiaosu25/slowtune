@@ -51,6 +51,7 @@ import { DesktopPlayback, desktopAudioCapability, desktopSourcePath } from './de
 import { validateAudioSupport } from './search-settings.js';
 
 const config = readConfig();
+const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 const build = captureBuild(root);
 if (Number(process.versions.node.split('.')[0]) < 24) throw new Error('请使用 Node 24.15 或更新的兼容版本。');
 accessSync(join(root, 'dist/client/index.html'), constants.R_OK);
@@ -283,7 +284,7 @@ app.route('/api/song-library',createSongLibraryRouter(songLibrary,c=>getCookie(c
 app.route('/api/lyrics',createLyricsRouter(lyricsStore,lyricProviders,c=>getCookie(c,'music_session')??''));
 app.post('/api/logout', async c=>{await expireSession(getCookie(c,'music_session')??'');deleteCookie(c,'music_session',{path:'/'});return c.json({ok:true});});
 // Logout should expire only this browser's identity; shared deliveries are released by its player.
-app.get('/api/status', c=>c.json({version:'0.1.30',brand,authenticationRequired:startupSettings.access().authenticationRequired,node:process.version,providers:{bilibili:{available:true},youtube:youtube.status()},sourceSettings:sourceState(),library:'sqlite',...diagnostics()}));
+app.get('/api/status', c=>c.json({version,brand,authenticationRequired:startupSettings.access().authenticationRequired,node:process.version,providers:{bilibili:{available:true},youtube:youtube.status()},sourceSettings:sourceState(),library:'sqlite',...diagnostics()}));
 app.get('/api/settings/access',c=>c.json(startupSettings.access()));
 app.post('/api/settings/access',async c=>{
   const input=await json(c.req.raw,4096);c.req.raw.signal.throwIfAborted();const failure=checkAccessAttempt(c,input?.currentAccessKey);

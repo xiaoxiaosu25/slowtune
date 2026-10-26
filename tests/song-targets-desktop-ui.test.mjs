@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { startSongManagementFixture } from './helpers/song-management-fixture.mjs';
-import { navigate } from '../scripts/browser-ui.mjs';
+import { navigate, libraryAction } from '../scripts/browser-ui.mjs';
 
 async function setup(t, width = 1280) {
   const fixture = await startSongManagementFixture(); t.after(fixture.close);
@@ -17,7 +17,7 @@ async function setup(t, width = 1280) {
   const snapshot = () => fixture.library.read().snapshot;
   const edit = commands => fixture.library.execute(fixture.library.read().revision, commands);
   edit([{ type: 'remove-favorite', favoriteId: snapshot().favorites.find(f => f.songId === 'duplicate').favoriteId }]);
-  await page.goto(fixture.origin); await navigate(page, '歌单');
+  await page.goto(fixture.origin); await navigate(page, '收藏');
   const refresh = () => Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/api/song-library'),
     page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))),
@@ -80,7 +80,7 @@ test('desktop merge and move selectors exclude historical targets and invalidate
   const { page, snapshot, edit, refresh } = await setup(t);
   const manager = page.getByRole('dialog', { name: '歌曲管理', exact: true });
   const editor = page.getByRole('dialog', { name: '歌曲与版本', exact: true });
-  await page.getByRole('button', { name: '歌曲管理', exact: true }).click();
+  await libraryAction(page, '歌曲管理');
   await manager.getByRole('button', { name: '管理歌曲 晴天', exact: true }).click();
   for (const task of ['移到其他歌曲', '合并到另一首歌曲']) {
     if (task === '合并到另一首歌曲') await editor.getByRole('tab', { name: '歌曲资料', exact: true }).click();

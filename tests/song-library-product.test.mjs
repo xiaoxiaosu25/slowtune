@@ -9,6 +9,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
 import { chromium } from './helpers/browser.mjs';
 import { startupFixture } from './helpers/startup-fixture.mjs';
+import { libraryAction, navigate } from '../scripts/browser-ui.mjs';
 const root = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
 const load = name => import(pathToFileURL(join(root, 'dist/server', name + '.js')));
 const { SongLibraryStore } = await load('song-library-store'), { SongLibraryService } = await load('song-library-service'), { SongLibrarySources } = await load('song-library-sources'), { createSongLibraryRouter } = await load('song-library-http');
@@ -54,14 +55,16 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   t.after(async () => { release?.(); await browser.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); store.close(); });
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } }), errors = [], external = []; page.setDefaultTimeout(10000);
   const editSong=async title=>{
+    const search=page.getByRole('main',{name:'搜索音乐',exact:true});
+    if(await search.isVisible())await search.getByRole('button',{name:'关闭搜索',exact:true}).click();
+    if(await page.getByRole('dialog',{name:'歌曲与版本',exact:true}).isVisible())return;
     const row=page.locator('.song-library-row').filter({has:page.getByRole('button',{name:title,exact:true})}).first();
     if(await row.locator('.song-row-menu').count()){
       await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
       await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();return;
     }
-    const options=row.locator('.song-row-options');
-    if(!await options.evaluate(element=>element.open))await options.locator('summary').click();
-    await row.getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();
+    await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
+    await page.getByRole('dialog',{name:'歌曲操作',exact:true}).getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();
   };
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => { if (new URL(route.request().url()).origin !== origin) { external.push(route.request().url()); return route.abort(); } return route.continue(); });
@@ -124,14 +127,14 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   assert.equal(await page.getByRole('combobox', { name: '本条歌单记录播放版本',exact:true }).inputValue(), versionId);
   await page.keyboard.press('Escape');
   const snapshot = service.read().snapshot;
-  await page.getByRole('button', { name: '导入 / 导出', exact: true }).click();
+  await libraryAction(page, '导入 / 导出');
   await page.getByLabel('新资料库快照内容').fill(JSON.stringify(snapshot)); await page.getByRole('combobox', { name: '导入方式' }).selectOption('replace');
   await page.getByRole('button', { name: '校验并预览影响', exact: true }).click(); await page.getByRole('checkbox', { name: /我已导出/ }).check(); await page.getByRole('button', { name: '确认导入', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('textarea[aria-label="新资料库快照内容"]').value === ''); assert.deepEqual(service.read().snapshot, snapshot);
   await page.keyboard.press('Escape'); await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: join(directory, 'song-library-mobile.png'), fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await page.getByLabel('搜索歌曲或视频',{exact:true}).fill('七里香');await page.getByRole('button',{name:'开始搜索',exact:true}).click();
+  await navigate(page,'搜索');await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('七里香');await page.getByRole('button',{name:'搜索',exact:true}).click();
   await page.getByRole('button',{name:'播放 来源原标题 902',exact:true}).click();
   await page.waitForFunction(()=>/part=902/.test(document.querySelector('audio').currentSrc)&&!document.querySelector('audio').paused);
   await page.getByRole('button',{name:'保持本 P',exact:true}).click();
@@ -142,7 +145,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   await group.getByRole('button',{name:'保存歌曲与版本',exact:true}).click();await group.waitFor({state:'detached'});
   const grouped=service.read().snapshot.songs.find(song=>song.title==='七里香');assert(grouped);assert.deepEqual(grouped.artists,['周杰伦']);const first=grouped.defaultVersionId;assert(first);assert.equal(service.read().snapshot.versions.find(v=>v.id===first).label,'无损版');
   assert.equal(await page.evaluate(()=>document.querySelector('audio').paused),false);assert.match(await page.evaluate(()=>document.querySelector('audio').currentSrc),/part=902/);
-  await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'我的收藏'}).first().click();await editSong('七里香');
+  await navigate(page,'收藏');await editSong('七里香');
   const singleRow=page.locator('.song-library-row').filter({hasText:'七里香'});
   assert.equal(await singleRow.locator('.song-version-link').count(),0,'one version needs no version-management badge');
   assert.equal(await singleRow.locator('.row-status').count(),0,'one default version needs no repeated source title');
@@ -165,7 +168,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
     await page.locator('.playlist-intro').getByRole('button',{name:'播放全部',exact:true}).click();
     await page.waitForFunction(()=>/part=901/.test(document.querySelector('audio').currentSrc)&&!document.querySelector('audio').paused);
     const queued=await page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')));assert.equal(queued.items.length,3);
-    await page.getByRole('button',{name:'歌曲管理',exact:true}).click();await page.getByRole('button',{name:'管理歌曲 七里香',exact:true}).click();
+    await libraryAction(page, '歌曲管理');await page.getByRole('button',{name:'管理歌曲 七里香',exact:true}).click();
     const maintenance=page.getByRole('dialog',{name:'歌曲与版本',exact:true});
     await maintenance.getByRole('tab',{name:'歌曲资料',exact:true}).click();await maintenance.getByRole('button',{name:'合并到另一首歌曲',exact:true}).click();
     await maintenance.getByRole('radiogroup',{name:'目标歌曲'}).getByRole('radio').nth(0).check();
@@ -226,8 +229,8 @@ test('product uses one new library for songs, repeated playlist members, edits, 
         await listening.locator('.song-library-row').first().evaluate(element=>element.scrollIntoView({block:'center',behavior:'instant'}));
         await listening.screenshot({path:join(directory,'library-'+width+'.png')});
       }
-      const more=listening.locator('.song-library-row').first().locator('.song-row-options');
-      await more.locator('summary').click();
+      await listening.locator('.song-library-row').first().getByRole('button',{name:'更多操作 其他页面的新歌名',exact:true}).click();
+      const more=listening.getByRole('dialog',{name:'歌曲操作',exact:true});
       assert.equal(await more.getByRole('button',{name:'编辑歌曲 其他页面的新歌名',exact:true}).isVisible(),true);
       assert.equal(await listening.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
       await more.evaluate(element=>element.scrollIntoView({block:'center',behavior:'instant'}));

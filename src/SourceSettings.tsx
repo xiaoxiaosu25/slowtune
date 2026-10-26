@@ -1,17 +1,41 @@
 import { useState } from 'react';
+import { CaretDownIcon } from '@phosphor-icons/react';
 import { request, errorText } from './api';
 import type { SourceSettingsState, DisabledDisplay } from './source-settings';
+import { MobileChoiceSheet, MobileSettingRow } from './MobileSettingsControls';
 
-export function SourceSettings({state,onChanged,onOpenAbout}:{state?:SourceSettingsState;onChanged:(value:SourceSettingsState)=>void;onOpenAbout?:()=>void}){
+const displayChoices = [{value:'show',label:'正常显示'},{value:'dim',label:'变灰'},{value:'hide',label:'隐藏'}] as const;
+
+export function SourceSettings({state,onChanged,onOpenAbout,mobile=false}:{state?:SourceSettingsState;onChanged:(value:SourceSettingsState)=>void;onOpenAbout?:()=>void;mobile?:boolean}){
   const desktop=!!window.slowTuneDesktop;
   const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const [draft,setDraft]=useState<{enabled?:boolean;disabledDisplay?:DisabledDisplay}>();
+  const [choosing,setChoosing]=useState(false);
   async function save(patch:{enabled?:boolean;disabledDisplay?:DisabledDisplay}){
     if(!state)return;setDraft(patch);setBusy(true);setMessage('');
     try{const value=await request<SourceSettingsState>('/api/settings/sources',{revision:state.revision,youtube:{enabled:state.youtube.enabled,disabledDisplay:state.youtube.disabledDisplay,...patch}});onChanged(value);setMessage('已保存，立即生效。');}
     catch(error){setMessage((error as {code?:string}).code==='conflict'?'其他页面已修改音乐来源，请重新读取后再设置。':errorText(error));}
     finally{setDraft(undefined);setBusy(false);}
   }
+  const feedback=message&&<p className="feedback" role="status">{message}{message.includes('其他页面')&&<button className="btn btn-ghost" onClick={async()=>{try{onChanged(await request<SourceSettingsState>('/api/settings/sources'));setMessage('已读取最新设置。');}catch(error){setMessage(errorText(error));}}}>重新读取设置</button>}</p>;
+  if(mobile)return <div className="source-settings mobile-source-settings" aria-busy={busy}>
+    <div className="mobile-setting-group">
+      <div className="mobile-setting-static"><span className="mobile-setting-copy"><strong>B站</strong><small>默认音乐来源</small></span><span className="mobile-setting-value">已开启</span></div>
+      {!state?<p role="status">正在读取音乐来源设置…</p>:<>
+        <label className="source-setting-toggle"><span><strong>YouTube</strong><small>发现、搜索与播放</small></span><input type="checkbox" role="switch" aria-label="启用 YouTube" checked={draft?.enabled??state.youtube.enabled} disabled={busy} onChange={event=>void save({enabled:event.target.checked})}/></label>
+      </>}
+    </div>
+    <p className="mobile-setting-note">YouTube 需要能够访问其服务的网络环境。电脑和手机共用来源设置。</p>
+    {state&&<>
+      <div className="mobile-setting-group" inert={busy}><MobileSettingRow label="关闭后的歌曲" value={displayChoices.find(choice=>choice.value===(draft?.disabledDisplay??state.youtube.disabledDisplay))?.label} onClick={()=>setChoosing(true)}/></div>
+      <p className="mobile-setting-note">来源关闭后无法播放，混合队列会自动跳过。收藏、歌单和歌曲资料仍然保留。</p>
+      <p className="mobile-source-status" role="status">{!state.youtube.enabled?'YouTube 已关闭':state.youtube.checking?'正在检查 YouTube 取源工具…':state.youtube.available?'YouTube 可以使用':`YouTube 暂不可用：${state.youtube.issue??'请检查取源工具'}`}</p>
+      {state.youtube.enabled&&!state.youtube.checking&&!state.youtube.available&&<button className="btn btn-secondary" disabled={busy} onClick={async()=>{setBusy(true);try{onChanged(await request<SourceSettingsState>('/api/settings/sources/youtube/check',{}));}catch(error){setMessage(errorText(error));}finally{setBusy(false);}}}>重新检查 YouTube</button>}
+      {choosing&&<MobileChoiceSheet title="关闭后的歌曲" value={state.youtube.disabledDisplay} choices={displayChoices} onClose={()=>setChoosing(false)} onChoose={value=>{setChoosing(false);void save({disabledDisplay:value});}}/>}
+    </>}
+    <details className="mobile-setting-details"><summary>来源与使用说明<CaretDownIcon size={18}/></summary><p className="mobile-setting-note">YouTube 目录由 YouTube.js 接入，播放资源由服务电脑上的 yt-dlp 解析。访问受平台条款、内容权限与网络条件限制。</p>{onOpenAbout&&<button className="settings-text-link" onClick={onOpenAbout}>查看来源与许可说明</button>}</details>
+    {feedback}
+  </div>;
   return <div className="source-settings" aria-busy={busy}>
     <h3>音乐来源</h3><p className="muted">YouTube 需要能够访问其服务的网络环境，按需开启。{desktop?'此设置保存在本桌面应用的 data 中，与服务版各自保存。':'电脑和手机共用此设置。'}</p>
     <p className="source-access-notice muted">YouTube 目录由 YouTube.js 接入，播放资源由{desktop?'本机配置的':'服务电脑上的'} yt-dlp 解析，均为第三方工具。访问受平台条款、内容权限及网络条件限制。{onOpenAbout&&<button className="settings-text-link" onClick={onOpenAbout}>查看来源与许可说明</button>}</p>
@@ -22,6 +46,6 @@ export function SourceSettings({state,onChanged,onOpenAbout}:{state?:SourceSetti
       <p role="status">{!state.youtube.enabled?'YouTube 已关闭':state.youtube.checking?'正在检查 YouTube 取源工具…':state.youtube.available?`YouTube 已开启 · yt-dlp ${state.youtube.toolVersion??''}`:`YouTube 已开启，但当前不可用：${state.youtube.issue??'请检查取源工具'}`}</p>
       {state.youtube.enabled&&!state.youtube.checking&&!state.youtube.available&&<button className="btn btn-secondary" disabled={busy} onClick={async()=>{setBusy(true);try{onChanged(await request<SourceSettingsState>('/api/settings/sources/youtube/check',{}));}catch(error){setMessage(errorText(error));}finally{setBusy(false);}}}>重新检查 YouTube</button>}
     </>}
-    {message&&<p className="feedback" role="status">{message}{message.includes('其他页面')&&<button className="btn btn-ghost" onClick={async()=>{try{onChanged(await request<SourceSettingsState>('/api/settings/sources'));setMessage('已读取最新设置。');}catch(error){setMessage(errorText(error));}}}>重新读取设置</button>}</p>}
+    {feedback}
   </div>;
 }

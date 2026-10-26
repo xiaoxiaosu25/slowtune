@@ -45,7 +45,9 @@ test('pagination: thousands of rows, first/last, jumps, sizes, filters, stable r
   await page.getByRole('textbox',{name:'搜索歌单内音乐',exact:true}).fill('分页歌曲 2300');
   assert.equal(await libraryRows.count(),1);assert.equal(await libraryRows.locator('.track-name').textContent(),'分页歌曲 2300');
   await page.getByRole('textbox',{name:'搜索歌单内音乐',exact:true}).fill('');
-  await library.getByRole('button',{name:'播放全部',exact:true}).click();await page.getByText(/播放队列最多支持 500 首/).waitFor();
+  await library.getByRole('button',{name:'播放全部',exact:true}).click();
+  await page.getByRole('button',{name:'播放失败，查看详情',exact:true}).click();
+  await page.getByText(/播放队列最多支持 500 首/).waitFor();await page.keyboard.press('Escape');
   await navigate(page,'关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();
   const feed=page.locator('.follow-feed-pages'),input=page.getByRole('textbox',{name:'最近更新页码',exact:true});
   await input.waitFor();await page.waitForFunction(()=>!document.querySelector('.follow-feed-pages [aria-busy="true"]'));
@@ -116,14 +118,21 @@ test('pagination: returning to a cursor list beyond the bounded refill keeps loa
   const before=reads.length;
   await page.getByRole('button',{name:'合集',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.follows-page .pagination')?.getAttribute('aria-label')==='作者合集分页'&&document.querySelector('.follows-page .pagination')?.getAttribute('aria-busy')==='false');
-  assert.deepEqual(reads.slice(before),[1,2,3,4],'restoration keeps the source read budget bounded');
-  assert.equal(await input.inputValue(),'2','a remembered page beyond loaded content falls back to a complete available page');
+  assert.deepEqual(reads.slice(before),[],'switching views reuses loaded cursor pages');
+  assert.equal(await input.inputValue(),'6');
+  assert.match(await page.locator('.follow-collection-card').first().innerText(),/分页合集 151/);
+  const refreshReads=reads.length;await page.locator('.follow-toolbar').getByRole('button',{name:'刷新',exact:true}).click();
+  await page.waitForFunction(()=>Number(document.querySelector('input[aria-label="作者合集页码"]')?.value)<=2&&document.querySelector('.follows-page .pagination')?.getAttribute('aria-busy')==='false'&&document.querySelectorAll('.follow-collection-card').length===30);
+  const refill=reads.slice(refreshReads);assert(refill.length>=2&&refill.length<=4,'refresh keeps source reads bounded');
+  assert.deepEqual(refill,Array.from({length:refill.length},(_,index)=>index+1));
+  const availablePage=Math.floor(refill.length*20/30);
+  assert.equal(await input.inputValue(),String(availablePage),'a remembered page beyond refreshed content falls back to a complete available page');
   assert.equal(await page.locator('.follow-collection-card').count(),30);
   assert.equal(await page.getByText('作者还没有公开合集',{exact:true}).count(),0);
-  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(3);
-  assert.match(await page.locator('.follow-collection-card').first().innerText(),/分页合集 61/);
-  assert.match(await page.locator('.follow-collection-card').last().innerText(),/分页合集 90/,'the next read fills the unfinished page without skipping later arrivals');
-  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(4);
+  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(availablePage+1);
+  await page.locator('.follow-collection-card').first().getByText('分页合集 '+(availablePage*30+1),{exact:true}).waitFor();
+  await page.locator('.follow-collection-card').last().getByText('分页合集 '+((availablePage+1)*30),{exact:true}).waitFor();
+  await page.getByRole('button',{name:'作者合集下一页',exact:true}).click();await settled(availablePage+2);
   assert.equal(await page.locator('.follow-collection-card').count(),30,'reading can continue after the bounded fallback');
 });
 
@@ -143,8 +152,10 @@ test('pagination: page changes keep the first row clear of desktop and mobile he
     assert(bounds.row>=bounds.header,`first chart row clears the fixed header at ${width}px: ${JSON.stringify(bounds)}`);
   }
   fixture.state.searchItems=Array.from({length:60},(_,index)=>({ref:{provider:'bilibili',kind:'video',id:'BV'+String(index+1).padStart(10,'0')},resourceId:'modal-'+index,title:'翻页歌曲 '+(index+1),url:'https://www.bilibili.com/video/BV'+String(index+1).padStart(10,'0')}));
-  await page.getByRole('textbox',{name:'搜索歌曲或视频',exact:true}).fill('翻页歌曲');await page.getByRole('button',{name:'开始搜索',exact:true}).click();
-  const search=page.getByRole('dialog',{name:'搜索音乐',exact:true});await search.locator('.track-row').first().waitFor();
+  await navigate(page,'搜索');
+  const search=page.getByRole('main',{name:'搜索音乐',exact:true});
+  await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('翻页歌曲');await search.getByRole('button',{name:'搜索',exact:true}).click();
+  await search.locator('.track-row').first().waitFor();
   await search.getByRole('button',{name:'B站搜索结果下一页',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('input[aria-label="B站搜索结果页码"]')?.value==='2');
   const bounds=await search.locator('.track-row').first().evaluate(element=>new Promise(resolve=>requestAnimationFrame(()=>resolve({row:element.getBoundingClientRect().top,container:document.querySelector('.search-results').getBoundingClientRect().top}))));
