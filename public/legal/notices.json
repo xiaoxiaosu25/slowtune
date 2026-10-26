@@ -1289,10 +1289,10 @@
     },
     {
       "name": "react",
-      "version": "19.2.0",
+      "version": "19.3.1",
       "license": "MIT",
       "purpose": "界面组件",
-      "source": "https://github.com/facebook/react",
+      "source": "https://github.com/react/react",
       "texts": [
         {
           "name": "LICENSE",
@@ -1302,10 +1302,10 @@
     },
     {
       "name": "react-dom",
-      "version": "19.2.0",
+      "version": "19.3.1",
       "license": "MIT",
       "purpose": "浏览器界面渲染",
-      "source": "https://github.com/facebook/react",
+      "source": "https://github.com/react/react",
       "texts": [
         {
           "name": "LICENSE",
@@ -1352,10 +1352,10 @@
     },
     {
       "name": "scheduler",
-      "version": "0.27.0",
+      "version": "0.28.0",
       "license": "MIT",
       "purpose": "运行依赖",
-      "source": "https://github.com/facebook/react",
+      "source": "https://github.com/react/react",
       "texts": [
         {
           "name": "LICENSE",
