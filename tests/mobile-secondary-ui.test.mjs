@@ -81,7 +81,9 @@ test('mobile secondary navigation retains chart choice, author depth, pagination
   await page.route('**/api/follows',async route=>{await delayedRead;await route.continue();});
   await page.getByRole('button',{name:'打开正在播放',exact:true}).click();await page.locator('.mobile-player').waitFor();
   await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();
-  await page.locator('.follows-page>.loading').waitFor();finishRead();
+  await page.locator('.follows-page>.loading').waitFor();
+  await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+  finishRead();
   await page.locator('.follows-page .track-row').first().waitFor();
   assert.equal(await page.getByRole('textbox',{name:'作者内容页码',exact:true}).inputValue(),'2');await assertPosition(page,uploadsScroll);
   await page.setViewportSize({width:1280,height:800});await page.getByRole('heading',{name:'散步的音乐人 35',exact:true}).waitFor();
