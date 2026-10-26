@@ -15,7 +15,7 @@ export const publicDocuments = [
 
 // Keep the README's curated product screenshots in source exports as well.
 export const publicDocumentAssets = [
-  'docs/images/player.png', 'docs/images/lyrics.png', 'docs/images/library.png',
+  'docs/images/player.jpg', 'docs/images/charts.jpg',
 ];
 
 export function publicSourceFiles(root) {
