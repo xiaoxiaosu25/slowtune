@@ -1,6 +1,6 @@
 {
   "name": "slowtune-desktop",
-  "version": "0.1.30",
+  "version": "0.1.32",
   "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
