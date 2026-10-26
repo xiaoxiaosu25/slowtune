@@ -47,17 +47,13 @@ test('desktop player and read-only comments: sort, pagination, replies, failures
   const measurements = [];
   for (const [width, height] of [[1920,880],[1440,900],[1100,768],[1024,600],[800,600]]) {
     await page.setViewportSize({ width, height });
-    await page.locator('.desktop-tools').waitFor();
+    await page.locator('.listening-stage').waitFor();
     const bounds = await page.evaluate(() => {
       const rect = element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height }; };
-      return { width: innerWidth, height: innerHeight, docHeight: document.documentElement.scrollHeight, docWidth: document.documentElement.scrollWidth, stage: rect(document.querySelector('.listening-stage')), controls: rect(document.querySelector('.stage-controls')), title: rect(document.querySelector('.playing-title')), transport: rect(document.querySelector('.listening-transport')), art: rect(document.querySelector('.playing-art-frame')), header: rect(document.querySelector('.listening-header')), tools: [...document.querySelectorAll('.topbar-actions button,.desktop-tools button')].map(rect), headerTitle: rect(document.querySelector('.listening-header-title')) };
+      return { width: innerWidth, height: innerHeight, docHeight: document.documentElement.scrollHeight, docWidth: document.documentElement.scrollWidth, stage: rect(document.querySelector('.listening-stage')), controls: rect(document.querySelector('.stage-controls')), title: rect(document.querySelector('.playing-title')), transport: rect(document.querySelector('.listening-transport')), art: rect(document.querySelector('.playing-art-frame')), header: rect(document.querySelector('.listening-header')) };
     });
     assert(bounds.docHeight <= height + 1 && bounds.docWidth <= width + 1, JSON.stringify(bounds));
     for (const name of ['controls','title','transport','art']) assert(bounds[name].top >= bounds.stage.top && bounds[name].bottom <= bounds.stage.bottom + 1 && bounds[name].left >= 0 && bounds[name].right <= width, name + ': ' + JSON.stringify(bounds));
-    for (const tool of bounds.tools) {
-      assert(tool.left >= 20 && tool.right <= 180 && tool.top >= height - 70 && tool.bottom <= height, 'desktop tools stay at the bottom left: ' + JSON.stringify(bounds));
-      assert(tool.right - tool.left >= 40 && tool.height >= 40);
-    }
     await page.screenshot({ path: join(artifacts, `player-${width}x${height}.png`) });
     const options = page.locator('.listening-stage .player-options');
     await options.getByRole('button', { name: '更多播放选项', exact: true }).click();
@@ -80,9 +76,12 @@ test('desktop player and read-only comments: sort, pagination, replies, failures
     await page.keyboard.press('Escape'); await menu.waitFor({ state: 'hidden' });
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('.desktop-tools').waitFor();
+  await page.locator('.listening-header').waitFor();
   assert.equal(await page.locator('.listening-header button').count(), 1, 'the desktop header keeps the back button');
-  assert.equal(await page.locator('.desktop-tools button').count(), 3, 'global tools remain reachable at the bottom left');
+  await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
+  await page.locator('.desktop-tools').waitFor();
+  assert.equal(await page.locator('.desktop-tools button').count(), 3, 'returning to browsing exposes the global tools');
+  await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await page.getByRole('button', { name: '播放队列', exact: true }).click();
   await page.locator('.listening-panel-tabs').getByRole('button', { name: '评论', exact: true }).click();
   const panel = page.getByRole('complementary', { name: '视频评论', exact: true }); await panel.locator('.comment-thread').first().waitFor();
