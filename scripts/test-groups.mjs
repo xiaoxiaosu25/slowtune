@@ -14,7 +14,7 @@ export const testGroups = {
   browser: [
     'song-targets-desktop-ui', 'desktop-runtime-ui', 'playback-performance-ui',
     'playback', 'sleep-timer-ui', 'playback-retry', 'song-version-switch', 'playback-management-ui',
-    'desktop-lyrics-ui', 'desktop-lyrics-progress-ui', 'lyrics-ui', 'mobile-layout-ui', 'mobile-lyrics-recovery-ui', 'mobile-settings-ui', 'mobile-browse-ui',
+    'desktop-lyrics-ui', 'desktop-lyrics-progress-ui', 'lyrics-ui', 'comments-ui', 'mobile-layout-ui', 'mobile-lyrics-recovery-ui', 'mobile-settings-ui', 'mobile-browse-ui',
     'playlist-cover-ui', 'song-management-desktop-ui', 'desktop-library-layout-ui', 'mobile-secondary-ui', 'mobile-design-ui',
   ],
   desktop: ['desktop-host', 'desktop-lifecycle', 'desktop-state-recovery', 'desktop-restart'],
