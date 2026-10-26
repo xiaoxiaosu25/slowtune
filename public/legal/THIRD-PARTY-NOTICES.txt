@@ -5753,13 +5753,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ========================================================================
 
-react — 19.2.0
+react — 19.3.1
 
 用途：界面组件
 
 许可证：MIT
 
-https://github.com/facebook/react
+https://github.com/react/react
 
 LICENSE
 
@@ -5788,13 +5788,13 @@ SOFTWARE.
 
 ========================================================================
 
-react-dom — 19.2.0
+react-dom — 19.3.1
 
 用途：浏览器界面渲染
 
 许可证：MIT
 
-https://github.com/facebook/react
+https://github.com/react/react
 
 LICENSE
 
@@ -6576,13 +6576,13 @@ Repository: https://github.com/yargs/yargs-parser.git
 
 ========================================================================
 
-scheduler — 0.27.0
+scheduler — 0.28.0
 
 用途：运行依赖
 
 许可证：MIT
 
-https://github.com/facebook/react
+https://github.com/react/react
 
 LICENSE
 
