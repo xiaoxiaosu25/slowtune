@@ -29,7 +29,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
     root.style.overflowAnchor = 'none';
     const session = 'mobile-' + Date.now() + '-' + Math.random();
     const tokens = new WeakMap<Element, number>(); let token = 0, serial = 0, restoring = false, disposed = false;
-    let pendingClose: string | undefined, frame = 0;
+    let pendingClose: string | undefined, pendingNavigationKey: string | undefined, frame = 0;
     let stopRestoring = () => {};
     const entries: Entry[] = []; let index = 0;
     const layers = () => Array.from(document.querySelectorAll<HTMLElement>('dialog[open],[popover]:popover-open'));
@@ -80,10 +80,11 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
         target = { session, id: ++serial, page: target.page, layers: [], key: JSON.stringify([target.page, [], []]), scroll: Number.isFinite(target.scroll) ? target.scroll : 0 };
         entries.splice(0, entries.length, target); at = 0;
       }
-      stopRestoring(); index = at;
+      stopRestoring(); restoring = false; index = at;
       const actual = snapshot();
+      const navigationOrigin = pendingNavigationKey; pendingNavigationKey = undefined;
       // A rapid close-and-open must not let the queued Back dismiss the new UI.
-      if (pendingClose && actual.key !== pendingClose) {
+      if (pendingClose && actual.key !== pendingClose && actual.key !== navigationOrigin) {
         pendingClose = undefined; write({ ...target, id: ++serial }, true); commit(); return;
       }
       pendingClose = undefined; restoring = true;
@@ -132,13 +133,20 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
       const state = history.state && typeof history.state === 'object' ? history.state : {};
       history.replaceState({ ...state, [stateKey]: next }, '');
     };
-    write(snapshot(), true); refresh.current = commit;
+    write(snapshot(), true);
+    refresh.current = () => {
+      // New navigation must commit before paint even while a restored list is
+      // waiting for layout. Reload must never reopen the page we just left.
+      if (restoring && latest.current.page !== entries[index]?.page) { stopRestoring(); restoring = false; }
+      commit();
+    };
     back.current = (targetPage, fallback) => {
+      if (restoring) { stopRestoring(); restoring = false; }
       let previousIndex=index-1;
       while(previousIndex>=0){const candidate=entries[previousIndex];if(!candidate.layers.length&&(typeof targetPage==='string'?candidate.page===targetPage:targetPage(candidate.page)))break;previousIndex--;}
       const previous=entries[previousIndex],matches=!!previous;
-      if (!pendingClose && !restoring && matches) {
-        pendingClose = previous.key; latest.current.onRestore(previous.page); history.go(previousIndex-index);
+      if (!pendingClose && matches) {
+        pendingClose = previous.key; pendingNavigationKey = snapshot().key; history.go(previousIndex-index);
       } else fallback();
     };
     const observer = new MutationObserver(commit);

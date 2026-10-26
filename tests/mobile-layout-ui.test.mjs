@@ -85,6 +85,7 @@ test('mobile navigation, player and direct lyrics keep one audio session and fit
   await page.getByRole('button',{name:'返回音乐库',exact:true}).click();
   await primary.getByRole('button',{name:'我的',exact:true}).click();
   await page.getByRole('region',{name:'我的',exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>history.state?.slowTuneMobileNavigation?.page),'profile','the visible page is already committed before reload');
   await page.reload();await primary.waitFor();await page.goBack();
   await page.locator('.mobile-library').waitFor();
   assert.equal(await page.locator('audio').evaluate(audio=>audio.paused),true,'reload restores the queue without autoplay');
