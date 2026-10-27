@@ -1,7 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { SongLibraryError, type SongLibraryErrorCode } from './song-library-errors.js';
 
-export type DesktopLibraryOperation = { type: 'read' } | { type: 'edit'; revision: string | null; edits: unknown };
+export type DesktopLibraryOperation = { type: 'read' } | { type: 'export' } | { type: 'edit'; revision: string | null; edits: unknown };
 type Reply = { id: number; bytes?: ArrayBuffer; error?: { code: SongLibraryErrorCode; currentRevision?: string | null } };
 type Pending = { cancel: Int32Array; resolve: (bytes: Uint8Array) => void; reject: (error: unknown) => void; detach: () => void };
 

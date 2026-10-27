@@ -20,10 +20,11 @@ test('product manual recovery uses the failed source, position and newest transp
   const ref = part => ({ provider: 'bilibili', kind: 'video', id: 'BV1tX4y1W7Xm', part });
   const entry = r => ({ ref: r, resourceId: 'source-' + r.part, title: '来源 ' + r.part, url: 'https://www.bilibili.com/video/' + r.id, durationSeconds: 180 });
   const leases = [], released = new Set(), streams = new Set(), records = [], errors = [], external = [], requests = [];
-  let fault, failPrepare = false, gate, serial = 0;
+  let fault, failPrepare = false, gate, serial = 0,requestSerial=0;
   const json = (res, value, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)); };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
+    if(url.pathname.startsWith('/v1/call/'))res.setHeader('X-SlowTune-Operation','desktop-'+ ++requestSerial);
     requests.push({ path: url.pathname, method: req.method, injected: url.pathname === '/audio.wav' && fault === url.searchParams.get('lease') || url.pathname === '/v1/call/prepare' && failPrepare });
     if (url.pathname === '/probe.js') { res.setHeader('Content-Type', 'text/javascript'); return res.end(bundle); }
     if (url.pathname === '/v1/handshake') return json(res, { protocol: 2, capabilities: [{ provider: 'bilibili', operations: ['metadata', 'prepare'], anonymous: true, limitations: [] }] });
@@ -72,6 +73,33 @@ test('product manual recovery uses the failed source, position and newest transp
   const until = async (condition, message) => { for (let i = 0; i < 300 && !condition(); i++) await new Promise(r => setTimeout(r, 10)); assert(condition(), message); };
   const beginRetry = () => page.evaluate(() => { window.retryTask = window.playbackProbe.retry(); });
   const recovered = paused => page.waitForFunction(paused => { const a = document.querySelector('audio'); return a.currentTime >= 120 && a.currentTime < 125 && a.readyState >= 2 && a.paused === paused; }, paused);
+  await t.test('direct playback, song preflight and version switching retain one selection diagnostic ID', async () => {
+    await invoke('updateSongs', [{ id: 'song', title: '歌曲', defaultVersionId: 'v900' }], ['900', '901'].map(part => ({ id: 'v' + part, songId: 'song', ref: ref(part), facts: { title: '来源 ' + part, artists: [] } })));
+    for (const action of [
+      () => invoke('play', entry(ref('900'))),
+      () => invoke('playSelection', { kind: 'song', songId: 'song' }, { title: '歌曲' }),
+      () => invoke('playSelection', { kind: 'song', songId: 'song', explicitVersionId: 'v901' }, { title: '歌曲' }),
+    ]) {
+      assert.equal(await action(), true); await playing();
+      const events = await invoke('diagnostics'), active = events.findLast(event => event.operation === 'player' && event.code === 'playback-started').operationId;
+      for (const [operation, code] of [['recovery', 'selection'], ['source-prepare', 'complete'], ['/v1/call/prepare', 'complete']]) {
+        assert.equal(events.findLast(event => event.operation === operation && event.code === code)?.operationId, active, operation + ' belongs to the committed selection');
+      }
+    }
+    const delayed = delayPrepare();
+    await page.evaluate(() => { window.selectionTask = window.playbackProbe.playSelection({ kind: 'song', songId: 'song', explicitVersionId: 'v900' }, { title: '歌曲' }); });
+    await until(() => delayed.started, 'version preflight did not start');
+    const events = await invoke('diagnostics'), pending = events.findLast(event => event.operation === 'source-prepare' && event.code === 'start').operationId;
+    const active = events.findLast(event => event.operation === 'player' && event.code === 'playback-started').operationId;
+    assert.notEqual(pending, active, 'preflight has its own ID while the old selection remains active');
+    const abandoned = leases.at(-1).leaseId;
+    await invoke('cancelPending'); delayed.release();
+    await page.evaluate(() => window.selectionTask); await until(() => released.has(abandoned), 'cancelled preflight lease was not released');
+    const after = await invoke('diagnostics');
+    assert(after.some(event => event.operation === 'source-release' && event.code === 'complete' && event.operationId === pending));
+    assert.equal(after.findLast(event => event.operation === 'player' && event.code === 'playback-started').operationId, active);
+    records.push({ name: 'selection-diagnostic-ownership', events: after });
+  });
   await t.test('native media read failure plus recovery prepare 503 then manual retry preserves 120 seconds', async () => {
     await start(); const before = await snap(); await terminal(false); const failed = await snap();
     await page.getByRole('button', { name: '重试播放' }).click(); await playing();
@@ -79,6 +107,13 @@ test('product manual recovery uses the failed source, position and newest transp
     await page.waitForFunction(() => document.querySelector('audio').currentTime >= 120, undefined, { timeout: 4000 });
     const after = await snap(); assert.equal(after.current, before.current); assert.deepEqual(after.items, before.items); assert.equal(leases.at(-1).ref.part, '900'); assert(after.time < 125);
     records.push({ name: 'manual-retry', before, failed, after });
+    const events=await invoke('diagnostics'),failure=events.findLast(event=>event.code==='media-failure');assert(failure);
+    const related=events.filter(event=>event.operationId===failure.operationId);
+    assert(related.some(event=>event.code==='restore-start'&&event.positionSeconds>=120));
+    await page.waitForFunction(id=>window.playbackProbe.diagnostics().some(event=>event.operationId===id&&event.code==='position-restored'),failure.operationId);
+    assert(related.some(event=>event.operation==='/v1/call/prepare'&&event.serverOperation));
+    assert(related.some(event=>event.code==='source-applied'));
+    records.push({name:'correlated-recovery',events:await invoke('diagnostics')});
   });
   await t.test('paused failure and a new pause during delayed retry stay paused at the checkpoint', async () => {
     for (const pausedFirst of [true, false]) {
@@ -100,6 +135,7 @@ test('product manual recovery uses the failed source, position and newest transp
       else { assert.equal(after.paused, false); assert(!released.has(active), 'late cleanup released the active lease'); }
       if (action === 'next') { assert.notEqual(after.current, before.current); assert(after.time < 3); assert.equal(leases.find(l => l.leaseId === active).ref.part, '901'); }
       records.push({ name: 'late-' + action, before, after, abandonedReleased: released.has(abandoned), activeRetained: !released.has(active) });
+      const events=await invoke('diagnostics');assert(events.some(event=>event.operation==='source-release'&&event.code==='complete'&&event.operationId));
     }
   });
   await t.test('another failed manual preparation retains the checkpoint for a later retry', async () => {

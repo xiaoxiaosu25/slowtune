@@ -2,34 +2,33 @@
   "format": 2,
   "entries": [
     {
-      "file": "studio-player-0.12.5.tgz",
+      "file": "studio-player-0.12.10.tgz",
       "name": "@studio/player",
-      "version": "0.12.5",
+      "version": "0.12.10",
       "license": "AGPL-3.0-only",
-      "sha256": "43eb128902f489d4e426e11e7d75ddd7c5d048813e9413622f05b0a765bb9228",
-      "origin": "Studio platform: packages/audio-video/player; fixed 0.12.5 artifact",
-      "source": "sources/studio-player-0.12.5.tar.gz",
-      "sourceBasis": "Original src from this fixed artifact; standalone build configuration and dependency lock supplied with this source distribution",
+      "origin": "Studio platform: packages/audio-video/player; 2026-10-26 maintenance delivery",
+      "source": "sources/studio-player-0.12.10.tar.gz",
+      "sourceBasis": "Current platform src and tests; standalone package build inputs and existing AGPL license material supplied with this distribution",
       "documentation": "README.md"
     },
     {
-      "file": "studio-music-sources-0.2.8.tgz",
+      "file": "studio-music-sources-0.2.9.tgz",
       "name": "@studio/music-sources",
-      "version": "0.2.8",
+      "version": "0.2.9",
       "license": "AGPL-3.0-only",
-      "origin": "Studio platform: packages/audio-video/music-sources; desktop read/reuse 0.2.8 delivery",
-      "source": "sources/studio-music-sources-0.2.8.tar.gz",
-      "sourceBasis": "Platform 0.2.8 source with the recorded desktop read policy and tool reuse changes",
+      "origin": "Studio platform: packages/audio-video/music-sources; 2026-10-26 maintenance delivery",
+      "source": "sources/studio-music-sources-0.2.9.tar.gz",
+      "sourceBasis": "Current platform src and tests; standalone package build inputs and existing AGPL license material supplied with this distribution",
       "documentation": "README.md"
     },
     {
-      "file": "studio-recommendation-0.3.3.tgz",
+      "file": "studio-recommendation-0.3.4.tgz",
       "name": "@studio/recommendation",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "license": "AGPL-3.0-only",
-      "origin": "Studio platform: packages/audio-video/recommendation; review fixes 0.3.3 delivery",
-      "source": "sources/studio-recommendation-0.3.3.tar.gz",
-      "sourceBasis": "Source snapshot retained with the fixed 0.3.3 delivery",
+      "origin": "Studio platform: packages/audio-video/recommendation; 2026-10-26 maintenance delivery",
+      "source": "sources/studio-recommendation-0.3.4.tar.gz",
+      "sourceBasis": "Current platform src and tests; standalone package build inputs and existing AGPL license material supplied with this distribution",
       "documentation": "README.md"
     }
   ]

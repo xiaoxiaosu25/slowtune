@@ -4,6 +4,7 @@ import type { PlaybackPlan } from '@studio/player';
 import { audioMime, prepareBestAudio, supportedAudioTypes, desktopAudioCapability, type DesktopAudioApi, type VerifiedAudio, type VerifiedMusicEntry } from '../server/audio-quality';
 import { sameVideoPart } from '../server/search-policy';
 import { desktopSurface } from './song-search';
+import { tracePlaybackApi, invokingPlaybackOperation, withPlaybackDiagnostic } from './playback-diagnostics';
 export { audioQualityLabel } from '../server/audio-quality';
 
 export function retainVerifiedAudio(previous: Pick<PlaybackPlan,'metadata'>, next: PlaybackPlan): PlaybackPlan {
@@ -20,7 +21,8 @@ export class BestAudioBridge extends MusicPlayerBridge {
   private verifiedAudio: WeakMap<EntryRef, VerifiedAudio>;
   private sourceApi: MusicApi;
   readonly audioSupport: string[];
-  constructor(api: MusicApi, audio: Pick<HTMLAudioElement, 'canPlayType'>) {
+  constructor(api: MusicApi, audio: Pick<HTMLAudioElement, 'canPlayType'>, private readonly diagnosticContext?:()=>string|undefined) {
+    if(diagnosticContext)api=tracePlaybackApi(api,diagnosticContext);
     const preparedEntries = new Map<string, MusicEntry>();
     const verifiedAudio = new WeakMap<EntryRef, VerifiedAudio>();
     const playable = (format: Parameters<typeof audioMime>[0]) => !!audio.canPlayType(audioMime(format));
@@ -76,7 +78,8 @@ export class BestAudioBridge extends MusicPlayerBridge {
     return this.sourceFrom({...entry,verifiedAudio:checked},options);
   }
   override async source(...args: Parameters<MusicPlayerBridge['source']>) {
+    const operationId=invokingPlaybackOperation()??this.diagnosticContext?.();
     const source=await super.source(...args);
-    return { ...source, resolveTimeoutSeconds: 60,prepare:async(context:Parameters<typeof source.prepare>[0])=>desktopPlaybackPlan(await source.prepare(context)) };
+    return { ...source, resolveTimeoutSeconds: 60,prepare:async(context:Parameters<typeof source.prepare>[0])=>desktopPlaybackPlan(await withPlaybackDiagnostic(operationId,()=>source.prepare(context))) };
   }
 }

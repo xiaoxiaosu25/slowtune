@@ -1,18 +1,24 @@
 import type { EntryRef, Account, Shelf } from '@studio/music-sources';
 import type { VerifiedMusicEntry } from '../server/audio-quality';
 import { desktopSurface } from './song-search';
-import { observeSourceRequest } from './playback-diagnostics';
+import { observeSourceRequest, invokingPlaybackOperation, nextSourceRequest, recordPlaybackDiagnostic, playbackFailureCode } from './playback-diagnostics';
 export type { CreatorRef, CreatorProfile, FollowedCreator, FollowState, CreatorCollection, CreatorCollections, CreatorVideos, FollowFeed } from '../server/follow-types';
 export class ApiError extends Error { constructor(public code:string, public currentRevision?:string|null, public provider?:string,public upstreamCode?:string){super(code);} }
 export async function request<T>(path:string, body?:unknown, signal?:AbortSignal):Promise<T> {
+  const start=performance.now(),operationId=invokingPlaybackOperation(),context=operationId?{operationId,requestId:nextSourceRequest()}:{},operation=path.split('?')[0];
+  let received=false;
+  if(operationId)recordPlaybackDiagnostic({operation,code:'start',at:Date.now(),...context});
   try {
-    const start=performance.now(),r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Music-App':'1',...(desktopSurface()?{'X-SlowTune-Surface':'desktop'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{}),signal});
-    observeSourceRequest(path,r,start);
+    const r=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json','X-Music-App':'1',...(desktopSurface()?{'X-SlowTune-Surface':'desktop'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{}),signal});
+    received=true;observeSourceRequest(path,r,start,context);
     // A missing route falls through to the static page on an older running service: report that
     // instead of parsing the document as this endpoint's JSON.
     if(!(r.headers.get('Content-Type')??'').includes('json'))throw new ApiError('version-mismatch');
     const data=await r.json(); if(!r.ok){if(r.status===401&&data.error?.code==='authentication'&&!data.error?.provider&&!['/api/login','/api/session','/api/bootstrap'].includes(path))window.dispatchEvent(new Event('slowtune:session-expired'));throw new ApiError(data.error?.code??'network',data.error?.currentRevision,data.error?.provider,data.error?.upstreamCode);} return data;
-  } catch(e) {if(desktopSurface()&&(e as Error).name==='TimeoutError')throw new ApiError('timeout');if(e instanceof ApiError || (e as Error).name==='AbortError')throw e;throw new ApiError('network');}
+  } catch(e) {
+    if(operationId&&!received){const errorCode=signal?.aborted?playbackFailureCode(e,signal):'network';recordPlaybackDiagnostic({operation,code:errorCode==='cancelled'?'cancelled':'failure',at:Date.now(),...context,errorCode,elapsedMs:performance.now()-start});}
+    if(desktopSurface()&&(e as Error).name==='TimeoutError')throw new ApiError('timeout');if(e instanceof ApiError || (e as Error).name==='AbortError')throw e;throw new ApiError('network');
+  }
 }
 export const messages:Record<string,string>={'no-results':'本次没有取得符合当前规则的歌曲。',authentication:'访问会话已失效，请重新输入服务访问码。',restricted:'来源限制了此请求（地区或平台风控）。可以稍后重试或选择另一来源。','rate-limited':'来源请求过于频繁，请稍后重试。',network:'网络或服务连接中断，请检查服务后重试。','version-mismatch':'服务端与当前页面不是同一次构建：运行中的服务仍是旧版本。请运行 stop.cmd 后重新启动慢听，再刷新页面。',upstream:'来源暂时无法返回有效内容，请重试。','not-found':'来源内容不存在或无法访问。',unsupported:'此来源或功能当前不可用，请查看服务状态。','stale-cursor':'分页已失效，请重新搜索。',expired:'媒体地址已失效，请重试以重新取源。',timeout:'来源响应超时，可以取消或重试。',busy:'来源正在处理其他请求，请稍后重试。',conflict:'资料已被另一页面修改。当前编辑已保留，请重读后检查并重新提交。',storage:'资料保存失败，原资料保留。请检查存储和服务状态。','invalid-input':'输入格式不正确，请检查内容。','unknown-version':'无法导入这个版本的快照，原资料保留。',duplicate:'导入的标识与现有资料冲突，原资料保留。','queue-limit':'当前列表超过 500 首，播放队列最多支持 500 首，请筛选后再播放。','incomplete-queue':'歌单中有歌曲暂不可用。资料和当前队列保留，请检查条目后重试。'};
 export function errorText(e:unknown) {const code=(e as {code?:string})?.code;if(code==='cancelled')return '操作已取消，原资料保留。可以重新发起操作。';if(code==='bilibili-authentication'||code==='authentication'&&(e as {provider?:string}).provider==='bilibili')return 'B站登录已失效，请在设置中重新扫码登录，或重试使用匿名音轨。';return messages[code??'']??'操作失败，请重试。';}

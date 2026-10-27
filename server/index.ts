@@ -269,8 +269,9 @@ const protectSession:MiddlewareHandler=async(c,next)=>{
   const proceed=async(signal:AbortSignal)=>{
     const body=raw.body?.pipeThrough(new TransformStream(),{signal});
     c.req.raw=new Request(raw,{signal,...(body?{body}:{})});
-    if(desktopPlayback.current)c.header('X-SlowTune-Operation',desktopPlayback.current.id);
+    const operationId=desktopPlayback.current?.id;
     await next();
+    if(operationId)c.header('X-SlowTune-Operation',operationId);
     desktopPlayback.response(c.res.status);
   };
   if(c.req.header('X-SlowTune-Surface')==='desktop'&&desktopSourcePath(c.req.path)){

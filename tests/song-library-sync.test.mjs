@@ -26,6 +26,18 @@ test('remote deletion detaches contributions, retains local members and never re
   f.edit([{ type: 'set-default', songId: song.id, versionId: f.library.read().snapshot.versions[1].id }]); await f.sync.run(); assert.equal(f.state.changes.length, 1);
 });
 
+test('explicit assignment indexes preserve selected parts, omitted members and invalid mapping rejection',async t=>{
+  const f=songServices(t);await f.save({refs:[ref(1),ref(2)],target:'favorite'});
+  const state=f.library.read(),first=state.snapshot.favorites[0];await f.save({refs:[ref(1,'20')],target:'version',songId:first.songId});
+  const current=f.library.read(),version=current.snapshot.versions.find(version=>version.songId===first.songId&&version.ref.part==='20');
+  const assignment={member:{kind:'favorite',favoriteId:first.favoriteId},versionId:version.id};
+  const preview=assignments=>f.sync.preview('browser',current.revision,{folderId:'10',targetId:'system:favorites',assignments},f.signal);
+  await assert.rejects(preview([assignment,assignment]),{code:'invalid-input'});
+  await assert.rejects(preview([{...assignment,versionId:current.snapshot.versions.find(version=>version.songId!==first.songId).id}]),{code:'invalid-input'});
+  const selected=await preview([assignment]);assert.equal(selected.assignments.length,1);assert.equal(selected.assignments[0].versionId,version.id);assert.equal(selected.unmapped,1);
+  await f.sync.commit('browser',selected.token,selected.revision,f.signal);assert.equal(f.store.read().document.syncMappings[0].versionId,version.id);assert.deepEqual(f.state.changes.map(change=>change.id),[bv(1)]);
+});
+
 test('remote-only members disappear only without local or other-account contributions; songs and versions survive', async t => {
   const f = songServices(t); f.state.videos.set('10', [bv(1), bv(2)]); await f.link();
   assert.equal(f.library.read().snapshot.favorites.length, 2); assert(f.store.read().document.origins.every(o => o.local === 'absent'));

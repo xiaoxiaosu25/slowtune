@@ -55,7 +55,10 @@ export function createSongLibraryRouter(service: SongLibraryService, identity: (
     const response = service.store.desktopResponse({ type: 'read' }, c.req.raw.signal);
     return response ? c.body(await response, 200, { 'Content-Type': 'application/json; charset=UTF-8' }) : c.json(service.read());
   });
-  app.get('/export', c => c.body(service.export(), 200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="slowtune-library.json"' }));
+  app.get('/export', async c => {
+    const response=service.store.desktopResponse({type:'export'},c.req.raw.signal);
+    return c.body(response?await response:service.export(),200,{'Content-Type':'application/json','Content-Disposition':'attachment; filename="slowtune-library.json"'});
+  });
   app.get('/events', c => c.json({ revision: service.revision() }));
   app.post('/covers/source', async c => {
     if (c.req.header('X-SlowTune-Surface') !== 'desktop') throw new SongLibraryError('unsupported');

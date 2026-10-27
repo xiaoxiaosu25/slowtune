@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 // Browser/native tests run serially so timing and window focus do not compete.
 export const testGroups = {
   core: [
-    'documentation', 'desktop-lyric-source', 'browser-config', 'workspace-paths',
+    'documentation', 'desktop-lyric-source', 'browser-config', 'workspace-paths', 'vendor',
     'lyric-timing', 'audio-quality', 'song-library', 'song-library-sync', 'recommendation',
-    'desktop-continuity', 'desktop-playback-performance', 'desktop-library-copy',
+    'desktop-continuity', 'desktop-playback-performance', 'playback-diagnostics', 'desktop-library-copy',
     'song-library-worker', 'desktop-storage', 'desktop-state', 'desktop-profile',
     'search-playback', 'desktop-lyric-match', 'desktop-media-policy', 'desktop-youtube-reuse',
     'lyrics', 'desktop-lyrics-progress', 'playlist-cover',

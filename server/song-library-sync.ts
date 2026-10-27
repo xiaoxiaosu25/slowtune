@@ -15,9 +15,10 @@ type Remote = Pick<BilibiliFavorites, 'context' | 'check' | 'folders' | 'videos'
 const fail = (code: 'invalid-input' | 'not-found' | 'duplicate' | 'cancelled' | 'busy' = 'invalid-input'): never => { throw new SongLibraryError(code); };
 function targetMembers(document: SongLibraryDocument, target: string) {
   const s = document.snapshot;
-  if (target === 'system:favorites') return s.favorites.map(f => ({ member: { kind: 'favorite', favoriteId: f.favoriteId } as SongMember, songId: f.songId, versionId: s.songs.find(song => song.id === f.songId)?.defaultVersionId }));
+  const defaults = new Map(s.songs.map(song => [song.id, song.defaultVersionId]));
+  if (target === 'system:favorites') return s.favorites.map(f => ({ member: { kind: 'favorite', favoriteId: f.favoriteId } as SongMember, songId: f.songId, versionId: defaults.get(f.songId) }));
   const playlist = s.playlists.find(p => p.id === target) ?? fail('not-found');
-  return playlist.entries.map(entry => ({ member: { kind: 'playlist-entry', playlistId: target, entryId: entry.entryId } as SongMember, songId: entry.songId, versionId: entry.pinnedVersionId ?? s.songs.find(song => song.id === entry.songId)?.defaultVersionId }));
+  return playlist.entries.map(entry => ({ member: { kind: 'playlist-entry', playlistId: target, entryId: entry.entryId } as SongMember, songId: entry.songId, versionId: entry.pinnedVersionId ?? defaults.get(entry.songId) }));
 }
 /** All authority and pending work live with songs in the same SQLite aggregate. No sidecar or old model. */
 export class SongLibrarySync {
@@ -33,7 +34,8 @@ export class SongLibrarySync {
     const stored = this.library.store.read();
     const result: SongSyncState = { accountId: c.accountId, revision: stored.revision, busy: !!this.work, links: stored.document.syncLinks.filter(link => link.accountId === c.accountId).map(link => {
       const mappings = stored.document.syncMappings.filter(mapping => mapping.linkId === link.id);
-      let unmapped = 0; try { unmapped = targetMembers(stored.document, link.targetId).filter(entry => !mappings.some(mapping => memberKey(mapping.member) === memberKey(entry.member))).length; } catch {}
+      const mappedMembers = new Set(mappings.map(mapping => memberKey(mapping.member)));
+      let unmapped = 0; try { unmapped = targetMembers(stored.document, link.targetId).filter(entry => !mappedMembers.has(memberKey(entry.member))).length; } catch {}
       return { ...link, mappings, unmapped };
     }) };
     if (folders) result.folders = await this.remote.folders(c);
@@ -57,25 +59,33 @@ export class SongLibrarySync {
     const remote = input.create ? [] : await this.remote.videos(folder.id, c); this.remote.check(c);
     const newPlaylist = input.targetId === 'new', targetId = newPlaylist ? randomUUID() : input.targetId;
     const members = newPlaylist ? [] : targetMembers(stored.document, targetId);
+    const versions = new Map(stored.document.snapshot.versions.map(version => [version.id, version]));
     if (input.assignments !== undefined) {
       list(input.assignments, 10000); const keys = new Set<string>();
+      const memberIndex = new Map(members.map(member => [memberKey(member.member), member]));
       for (const assignment of input.assignments) {
         object(assignment, ['member', 'versionId']); text(assignment.versionId, 200); validateMember(assignment.member);
-        const member = members.find(item => memberKey(item.member) === memberKey(assignment.member)) ?? fail();
-        if (!stored.document.snapshot.versions.some(version => version.id === assignment.versionId && version.songId === member.songId && version.ref.provider === 'bilibili')) fail();
+        const member = memberIndex.get(memberKey(assignment.member)) ?? fail();
+        const version = versions.get(assignment.versionId);
+        if (!version || version.songId !== member.songId || version.ref.provider !== 'bilibili') fail();
         if (keys.has(memberKey(member.member))) fail(); keys.add(memberKey(member.member)); member.versionId = assignment.versionId;
       }
       // Explicit selection can narrow membership; omitted entries have no remote mapping.
       for (const member of members) if (!keys.has(memberKey(member.member))) member.versionId = null;
-    } else if (existing) for (const member of members) {
-      // An established mapping survives default changes. Only unmapped members get a proposal.
-      const mapping = stored.document.syncMappings.find(m => m.linkId === existing.id && memberKey(m.member) === memberKey(member.member));
-      if (mapping) member.versionId = mapping.versionId;
+    } else if (existing) {
+      const previous = new Map<string, SongSyncMapping>();
+      for (const mapping of stored.document.syncMappings) if (mapping.linkId === existing.id && !previous.has(memberKey(mapping.member))) previous.set(memberKey(mapping.member), mapping);
+      for (const member of members) {
+        // An established mapping survives default changes. Only unmapped members get a proposal.
+        const mapping = previous.get(memberKey(member.member));
+        if (mapping) member.versionId = mapping.versionId;
+      }
     }
+    const songs = new Map(stored.document.snapshot.songs.map(song => [song.id, song]));
     const assignments = members.flatMap(member => {
-      const version = stored.document.snapshot.versions.find(version => version.id === member.versionId && version.songId === member.songId && version.ref.provider === 'bilibili');
-      if (!version) return [];
-      return [{ member: member.member, versionId: version.id, title: stored.document.snapshot.songs.find(song => song.id === member.songId)!.title, version: version.label || version.facts.title, bvid: version.ref.id }];
+      const version = member.versionId ? versions.get(member.versionId) : undefined;
+      if (!version || version.songId !== member.songId || version.ref.provider !== 'bilibili') return [];
+      return [{ member: member.member, versionId: version.id, title: songs.get(member.songId)!.title, version: version.label || version.facts.title, bvid: version.ref.id }];
     });
     const wanted = new Set(assignments.map(a => a.bvid)), previous = existing ? syncProjection(stored.document, existing.id) : new Set<string>(), actual = new Set(remote.map(v => v.bvid));
     if (assignments.length > 10000 || new Set([...wanted, ...actual]).size > 10000) fail();

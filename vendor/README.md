@@ -8,9 +8,9 @@
 
 | 包 | 安装制品 | 对应源码 |
 | --- | --- | --- |
-| `@studio/player@0.12.5` | [studio-player-0.12.5.tgz](studio-player-0.12.5.tgz) | [studio-player-0.12.5.tar.gz](sources/studio-player-0.12.5.tar.gz) |
-| `@studio/music-sources@0.2.8` | [studio-music-sources-0.2.8.tgz](studio-music-sources-0.2.8.tgz) | [studio-music-sources-0.2.8.tar.gz](sources/studio-music-sources-0.2.8.tar.gz) |
-| `@studio/recommendation@0.3.3` | [studio-recommendation-0.3.3.tgz](studio-recommendation-0.3.3.tgz) | [studio-recommendation-0.3.3.tar.gz](sources/studio-recommendation-0.3.3.tar.gz) |
+| `@studio/player@0.12.10` | [studio-player-0.12.10.tgz](studio-player-0.12.10.tgz) | [studio-player-0.12.10.tar.gz](sources/studio-player-0.12.10.tar.gz) |
+| `@studio/music-sources@0.2.9` | [studio-music-sources-0.2.9.tgz](studio-music-sources-0.2.9.tgz) | [studio-music-sources-0.2.9.tar.gz](sources/studio-music-sources-0.2.9.tar.gz) |
+| `@studio/recommendation@0.3.4` | [studio-recommendation-0.3.4.tgz](studio-recommendation-0.3.4.tgz) | [studio-recommendation-0.3.4.tar.gz](sources/studio-recommendation-0.3.4.tar.gz) |
 
 上述包的原创代码采用 [AGPL-3.0-only](../LICENSE)。第三方许可见归档内的 `THIRD-PARTY.md`（如有）及项目的[第三方声明](../第三方声明.md)。版本和源码来源记录在 [provenance.json](provenance.json)。
 

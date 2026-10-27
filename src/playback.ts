@@ -3,8 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StudioPlayer } from '@studio/player/core';
 import { QueueController, type QueueItem } from '@studio/player/queue';
 import { MediaSessionController } from '@studio/player/media-session';
-import type { SleepTimerController, SleepTimerRule, SleepTimerSnapshot } from '@studio/player/sleep-timer';
-import { createSleepTimer } from './desktop-sleep-timer';
+import { SleepTimerController, type SleepTimerRule, type SleepTimerSnapshot } from '@studio/player/sleep-timer';
 import { BestAudioBridge, retainVerifiedAudio } from './audio-quality';
 import type { AudioFormat, EntryRef } from '@studio/music-sources';
 import type { MusicClient } from '@studio/music-sources/client';
@@ -21,15 +20,15 @@ import { PlaybackAudioAnalysis } from './audio-analysis';
 import { PlaybackRecovery } from './playback-recovery';
 import { desktopSongSearchOptions } from './song-search';
 import { desktopSurface } from './song-search';
-import { recordPlaybackDiagnostic, playbackDiagnostics } from './playback-diagnostics';
+import { recordPlaybackDiagnostic, playbackDiagnostics, nextPlaybackOperation, withPlaybackDiagnostic } from './playback-diagnostics';
 import { prunePlaybackRecords, DesktopNextPrefetch } from './desktop-continuity';
 import { PlaybackClock } from './playback-clock';
 
 // Queue instance IDs must also work on the personal service's LAN HTTP origin.
 const queueId=()=> 'queue-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
 const prefetchedRef=(requested:EntryRef,actual:EntryRef)=>requested.provider===actual.provider&&requested.kind===actual.kind&&requested.id===actual.id&&(!requested.part||requested.part===actual.part);
-async function resolveChartResult(song:Pick<ChartItem,'title'|'artists'>,signal:AbortSignal,audioSupport:string[]):Promise<Track>{
-  const result=await request<{entry:Track}>('/api/search/resolve',{title:song.title,...(song.artists?.length?{artists:song.artists}:{}),...desktopSongSearchOptions(audioSupport)},signal);
+async function resolveChartResult(song:Pick<ChartItem,'title'|'artists'>,signal:AbortSignal,audioSupport:string[],operationId?:string):Promise<Track>{
+  const result=await withPlaybackDiagnostic(operationId,()=>request<{entry:Track}>('/api/search/resolve',{title:song.title,...(song.artists?.length?{artists:song.artists}:{}),...desktopSongSearchOptions(audioSupport)},signal));
   signal.throwIfAborted();return result.entry;
 }
 interface ChartSession {failed:Set<string>;handled:Set<unknown>;allowed:boolean}
@@ -47,10 +46,10 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     const versionId=selection.explicitVersionId??selection.pinnedVersionId??song?.defaultVersionId;
     return libraryChoices.current.versions.some(v=>v.id===versionId&&v.songId===selection.songId&&v.ref.provider==='youtube');
   };
-  const readMetadata=async(ref:EntryRef,options:{signal?:AbortSignal}={})=>{
+  const readMetadata=async(ref:EntryRef,options:{signal?:AbortSignal}={},operationId=engine.current?.recovery.diagnosticId)=>{
     if(!enabled.current&&ref.provider==='youtube')throw {code:'source-disabled'};
     // Playback checks availability afresh; only catalogue UI reads use the short cache.
-    const entry=await client.metadata(ref,options);if(!options.signal?.aborted)partsStore?.seed(entry);return entry;
+    const entry=await withPlaybackDiagnostic(operationId,()=>client.metadata(ref,options));if(!options.signal?.aborted)partsStore?.seed(entry);return entry;
   };
   const engine=useRef<PlaybackEngine|null>(null);
   const [snapshot,setSnapshot]=useState({current:null as Track|null,currentId:undefined as string|undefined,format:undefined as AudioFormat|undefined,position:0,duration:undefined as number|undefined,playing:false,loading:false,volume:.5,rate:1,muted:false,buffered:[] as {start:number;end:number}[],items:[] as QueueTrack[],order:'sequential',repeat:'off',state:'idle',canPrevious:false,canNext:false});
@@ -64,7 +63,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
   useEffect(()=>{
     const initial=readSavedPlayback(preferenceStorage()),tracks=new Map(initial.tracks.map(t=>[t.resourceId,t]));
     const audio=document.createElement('audio');
-    const bridge=new BestAudioBridge(client,audio),aliases=new Map<string,string>(),committed=new Map<string,EntryRef>();
+    const bridge=new BestAudioBridge(client,audio,()=>recovery?.diagnosticId),aliases=new Map<string,string>(),committed=new Map<string,EntryRef>();
     // Songs start fresh when selected; pause/resume and source recovery retain the live position.
     let recovery:PlaybackRecovery;
     const sourceForPlan=(ref:EntryRef,plan:PlaybackPlan,options:{signal?:AbortSignal})=>plan.metadata?.verifiedAudio?bridge.sourceForPlan(ref,plan,options):bridge.source(ref,options);
@@ -72,10 +71,10 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     const refresh=(id:string,plan:PlaybackPlan,signal:AbortSignal)=>recovery.trackSource(async()=>{const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal}):undefined;const refreshed=await bridge.resolver.resolveUrl!(source?.resourceId??aliases.get(id)??id,plan,'retry',{signal});return typeof refreshed==='string'?{...plan,playUrl:refreshed,resourceId:id}:{...retainSelection(plan,refreshed),resourceId:id};});
     const player=new StudioPlayer({nativeElementTag:'audio',sourceResolver:{...bridge.resolver,
       prepareSource:(id,plan,context)=>refresh(id,plan,context.signal),
-      resolveUrl:(id,plan,reason,context)=>recovery.trackSource(async()=>{const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context?.signal}):undefined;const refreshed=await bridge.resolver.resolveUrl!(source?.resourceId??aliases.get(id)??id,plan,reason,context);return typeof refreshed==='string'?refreshed:{...retainSelection(plan,refreshed),resourceId:id};}),
-      recoverSource:(id,plan,context)=>recovery.trackSource(async()=>{recovery.capture(context.positionSeconds,context.paused);const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context.signal}):undefined;const recovered=await bridge.resolver.recoverSource?.(source?.resourceId??aliases.get(id)??id,plan,context);return recovered?{...retainSelection(plan,recovered),resourceId:id}:null;})
+      resolveUrl:(id,plan,reason,context)=>recovery.trackSource(async()=>{const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context?.signal}):undefined;const refreshed=await bridge.resolver.resolveUrl!(source?.resourceId??aliases.get(id)??id,plan,reason,context);return typeof refreshed==='string'?refreshed:{...retainSelection(plan,refreshed),resourceId:id};},reason),
+      recoverSource:(id,plan,context)=>recovery.trackSource(async()=>{recovery.capture(context.positionSeconds,context.paused);const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context.signal}):undefined;const recovered=await bridge.resolver.recoverSource?.(source?.resourceId??aliases.get(id)??id,plan,context);return recovered?{...retainSelection(plan,recovered),resourceId:id}:null;},'fallback')
     },autoResume:false});
-    recovery=new PlaybackRecovery(player,audio,desktopSurface()?desktopSurface:false);
+    recovery=new PlaybackRecovery(player,audio,desktopSurface()?desktopSurface:false,recordPlaybackDiagnostic);
     audio.dataset.productMedia='true';audio.preload='none';audio.hidden=true;document.body.append(audio);player.attach(audio);player.setVolume(initial.volume);
     const analysis=new PlaybackAudioAnalysis(audio);analysisRef.current=analysis;setAudioAnalysis(analysis);
     // Rate and mute are user preferences: they survive reloads and later source switches.
@@ -83,7 +82,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     if(initial.muted)player.setMuted(true);
     const queue=new QueueController(player,{order:initial.order,repeat:initial.repeat,autoAdvance:true});
     const system=new MediaSessionController(player,{queue,getMetadata:()=>{const track=tracks.get(queue.snapshot.current?.id??'');return track?{title:track.title,artist:track.artists?.join(' / ')??track.uploader?.name,artwork:track.artwork?[{src:track.artwork}]:[]}:null;}});
-    const sleep=createSleepTimer(player,audio);
+    const sleep=new SleepTimerController(player);
     engine.current={player,queue,bridge,recovery,system,sleep,tracks,aliases,committed,restored:initial.current,intent:0,pendingRecords:new Map(),created:new Map(),prune:()=>{},...(initial.tracks.some(t=>t.chartItem)?{chartSession:{failed:new Set<string>(),handled:new Set<unknown>(),allowed:false}}:{})};
     const owned=engine.current;
     owned.prune=()=>{
@@ -157,7 +156,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     };
     const unsubs=[()=>recovery.dispose(),player.on('timeupdate',progress),...['durationchange','pause','statechange','volumechange','ratechange','stop'].map(event=>player.on(event as 'timeupdate',update))];
     const suspend=window.slowTuneDesktop?.onCommand(command=>{if(command==='suspend')owned.prefetch?.cancel();});if(suspend)unsubs.push(suspend);
-    unsubs.push(player.on('diagnostic',event=>recordPlaybackDiagnostic({operation:'player',code:event.code,at:event.timestamp,...(event.elapsedMs!==undefined?{elapsedMs:event.elapsedMs}:{})})));
+    unsubs.push(player.on('diagnostic',event=>recordPlaybackDiagnostic({operation:'player',operationId:recovery.diagnosticId,code:event.code,at:event.timestamp,elapsedMs:event.elapsedMs,reason:event.reason,recovery:event.recovery,timeoutSeconds:event.timeoutSeconds})));
     unsubs.push(player.on('playing',()=>{if(desktopSurface()&&recovery.preparing)setError('');system.activate();update();}),player.on('pauseintent',()=>{owned.prefetch?.cancel();const e=engine.current;if(e&&!e.sourceStopping){e.intent++;if(e.chartSession)e.chartSession.allowed=false;if(e.batchSession)e.batchSession.allowed=false;}}));
     unsubs.push(player.on('loadstart',()=>{owned.prefetch?.retain([queue.snapshot.current?.id??'']);const e=engine.current;if(e&&!e.ownCommit)e.intent++;}),player.on('stop',()=>{owned.prefetch?.cancel();const e=engine.current;if(e&&!e.sourceStopping)e.intent++;}));
     const queueError=(event:Event)=>{
@@ -283,7 +282,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       const songSelection=e.staged?.id===id?e.staged.track.selection:existing.selection;
       if(e.staged?.id===id||songSelection?.kind==='song'||desktopSurface()&&songSelection?.kind==='source')return prepareSongQueueSource(e,existing,songSelection!,resourceId,ctx.signal);
       const selection=e.chartSelection;
-      const result=selection?.id===id&&!selection.signal.aborted?selection.track:await resolveChartResult(existing.chartItem!,ctx.signal,e.bridge.audioSupport);
+      const result=selection?.id===id&&!selection.signal.aborted?selection.track:await resolveChartResult(existing.chartItem!,ctx.signal,e.bridge.audioSupport,e.recovery.diagnosticId);
       const metadata=await readMetadata(result.ref,{signal:ctx.signal});ctx.signal.throwIfAborted();
       const resolvedEntry=metadata.ref.part?metadata:metadata.parts?.[0]??metadata;
       const entry={...resolvedEntry,...(result.verifiedAudio&&key(result.verifiedAudio.ref)===key(resolvedEntry.ref)?{verifiedAudio:result.verifiedAudio}:{})};
@@ -293,7 +292,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       e.aliases.set(resourceId,source.resourceId);if(desktopSurface())e.committed.set(resourceId,entry.ref);return {...plan,resourceId};
     })}};
   };
-  const prepareSelection=async(e:PlaybackEngine,t:QueueTrack,selection:SongPlaybackSelection,signal:AbortSignal)=>{
+  const prepareSelection=async(e:PlaybackEngine,t:QueueTrack,selection:SongPlaybackSelection,signal:AbortSignal,operationId=e.recovery.diagnosticId)=>{
     const library=libraryChoices.current,chosen=selection.kind==='song'&&!library.songs.some(song=>song.id===selection.songId)?undefined:chooseSongVersion(selection,library.songs,library.versions,library.catalogLinks);
     // A saved song is a local source index. Only unresolved titles need server-side search.
     const known=chosen?.kind==='source'?library.versions.find(version=>version.id===chosen.versionId&&key(version.ref)===key(chosen.ref)):undefined;
@@ -302,10 +301,10 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     // before them adds latency without making the eventual media URL fresher.
     const entry:Track|undefined=known?.facts?{ref:known.ref,resourceId:key(known.ref),title:known.facts.title,artists:known.facts.artists,artwork:known.facts.artwork,durationSeconds:known.facts.durationSeconds,url:known.facts.url??(known.ref.provider==='bilibili'?`https://www.bilibili.com/video/${known.ref.id}`:`https://www.youtube.com/watch?v=${known.ref.id}`),...(known.facts.uploader?{uploader:{name:known.facts.uploader,...(known.facts.uploaderId?{id:known.facts.uploaderId}:{})}}:{})}:undefined;
     const warm=desktopSurface()?e.prefetch?.take(t.resourceId,entry=>chosen?.kind==='source'&&prefetchedRef(chosen.ref,entry.ref)):undefined;
-    const result=chosen?.kind==='source'?{entry:warm??entry??await readMetadata(chosen.ref,{signal}),song:library.songs.find(song=>song.id===chosen.songId),versionId:chosen.versionId}:await request<{entry:Track;song?:Song;versionId?:string}>('/api/song-library/playback',{selection,...desktopSongSearchOptions(e.bridge.audioSupport)},signal);
+    const result=chosen?.kind==='source'?{entry:warm??entry??await readMetadata(chosen.ref,{signal},operationId),song:library.songs.find(song=>song.id===chosen.songId),versionId:chosen.versionId}:await withPlaybackDiagnostic(operationId,()=>request<{entry:Track;song?:Song;versionId?:string}>('/api/song-library/playback',{selection,...desktopSongSearchOptions(e.bridge.audioSupport)},signal));
     if(result.song&&desktopSongSearchOptions().searchMode)result.song=desktopCatalogSong(result.song,library);
     signal.throwIfAborted();if(!enabled.current&&result.entry.ref.provider==='youtube')throw {code:'source-disabled'};
-    const source=await e.bridge.sourceFrom(result.entry,{signal}),original=await source.prepare({signal,restart:true});
+    const source=await withPlaybackDiagnostic(operationId,()=>e.bridge.sourceFrom(result.entry,{signal})),original=await source.prepare({signal,restart:true});
     if(signal.aborted){e.player.sourceController.releaseUnusedPlan(original);signal.throwIfAborted();}
     const track:Track={...result.entry,...(original.durationSeconds!==undefined?{durationSeconds:original.durationSeconds}:{}),resourceId:t.resourceId,selection,...(t.partsGroupId?{partsGroupId:t.partsGroupId}:{}),...(t.chartItem?{chartItem:t.chartItem}:{}),...((selection.kind==='source'||selection.kind==='chart')&&selection.context?{chartContext:selection.context}:{}),...(result.song?{songId:result.song.id,title:result.song.title,artists:result.song.artists,artwork:result.song.artwork??result.entry.artwork,...(desktopSongSearchOptions().searchMode?{sourceArtwork:result.entry.artwork??null,sourceTitle:result.entry.title}:{})}:{}),...(result.versionId?{versionId:result.versionId}:{})};
     if(desktopSurface())track.sourceTitle=result.entry.title;
@@ -332,15 +331,16 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
   };
   const selectionTrack=(selection:SongPlaybackSelection,song:Pick<Song,'title'|'artists'|'artwork'>):QueueTrack=>selection.kind==='chart'?{...pendingChartTrack({rank:selection.context.rank??1,title:song.title,artists:song.artists,artwork:song.artwork},queueId()),selection}:{kind:'song',selection,resourceId:queueId(),title:song.title,artists:song.artists,artwork:song.artwork};
   const playSelection=(selection:SongPlaybackSelection,song:Pick<Song,'title'|'artists'|'artwork'>,replaceCurrent=false)=>run(async(e,signal)=>{
+    const operationId=nextPlaybackOperation();
     const current=e.queue.snapshot.current,id=current?.id??(desktopSurface()&&replaceCurrent?e.restored:undefined),active=id?e.tracks.get(id):undefined;
     if(id&&active&&(desktopSurface()&&replaceCurrent||isTrack(active)&&selection.kind==='song'&&active.songId===selection.songId&&selection.explicitVersionId)){
       const intent=e.intent,wasStopped=desktopSurface()&&replaceCurrent&&e.player.state==='stopped';let prepared:Awaited<ReturnType<typeof prepareSelection>>|undefined,staged:PlaybackEngine['staged'];versionPreparing.current=signal;
       try{
-        prepared=await prepareSelection(e,active,selection,signal);
+        prepared=await prepareSelection(e,active,selection,signal,operationId);
         signal.throwIfAborted();if(e.intent!==intent||(e.queue.snapshot.current?.id??e.restored)!==id||e.sleep.snapshot.status==='expired'||!wasStopped&&e.player.state==='stopped'||!enabled.current&&prepared.track.ref.provider==='youtube')return false;
         staged={id,track:prepared.track,plan:prepared.plan,used:false};e.staged=staged;resumeBatchItem(e,id);e.ownCommit=true;
         const controls={rate:e.player.playbackRate,volume:e.player.volume,muted:e.player.muted},epoch=controlsEpoch.current;
-        let task;try{task=e.queue.selectId(id,{restart:true,autoplay:!current||!e.player.paused&&e.player.playbackRequested});}finally{e.ownCommit=false;}
+        let task;try{task=withPlaybackDiagnostic(operationId,()=>e.queue.selectId(id,{restart:true,autoplay:!current||!e.player.paused&&e.player.playbackRequested}));}finally{e.ownCommit=false;}
         const result=await task;
         // The browser can reset native rate while replacing the media URL. Restore
         // the latest committed controls unless a newer user control superseded them.
@@ -351,7 +351,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     const track=selectionTrack(selection,song),intent=e.intent,previousId=e.queue.snapshot.current?.id;
     let prepared:Awaited<ReturnType<typeof prepareSelection>>|undefined,staged:PlaybackEngine['staged'];versionPreparing.current=signal;
     try{
-      prepared=await prepareSelection(e,track,selection,signal);signal.throwIfAborted();
+      prepared=await prepareSelection(e,track,selection,signal,operationId);signal.throwIfAborted();
       if(e.intent!==intent||e.queue.snapshot.current?.id!==previousId||blocked(prepared.track))return false;
       const q=e.queue.snapshot,resolved=prepared.track;
       const matches=q.items.filter(item=>{
@@ -374,7 +374,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       resumeBatchItem(e,item.id);
       e.ownCommit=true;
       const controls={rate:e.player.playbackRate,volume:e.player.volume,muted:e.player.muted},epoch=controlsEpoch.current;
-      let task;try{task=e.queue.selectId(item.id,{restart:true});}finally{e.ownCommit=false;}
+      let task;try{task=withPlaybackDiagnostic(operationId,()=>e.queue.selectId(item.id,{restart:true}));}finally{e.ownCommit=false;}
       const result=await task;
       if(staged.used&&controlsEpoch.current===epoch){e.player.setPlaybackRate(controls.rate);e.player.setVolume(controls.volume);e.player.setMuted(controls.muted);}
       return result;
@@ -412,8 +412,8 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       e.tracks.set(id,{...t,...entry,resourceId:id});e.aliases.set(resourceId,source.resourceId);e.committed.set(resourceId,entry.ref);return {...plan,resourceId};
     })}};
   };
-  const item=async(e:NonNullable<typeof engine.current>,t:Track,signal:AbortSignal,id=queueId(),ready=false):Promise<QueueItem>=>{
-    const metadata=ready?t:await readMetadata(t.ref,{signal});signal.throwIfAborted();
+  const item=async(e:NonNullable<typeof engine.current>,t:Track,signal:AbortSignal,id=queueId(),ready=false,operationId=e.recovery.diagnosticId):Promise<QueueItem>=>{
+    const metadata=ready?t:await readMetadata(t.ref,{signal},operationId);signal.throwIfAborted();
     const entry=metadata.ref.provider==='bilibili'&&!metadata.ref.part?metadata.parts?.[0]??metadata:metadata;
     const track={...t,...entry,ref:entry.ref};
     return deferredItem(e,track,id,true);
@@ -433,9 +433,9 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       return deferredItem(e,track,id);
     });
   };
-  const playSingle=async(e:PlaybackEngine,t:Track,s:AbortSignal,ready=false)=>{
+  const playSingle=async(e:PlaybackEngine,t:Track,s:AbortSignal,ready=false,operationId=nextPlaybackOperation())=>{
     await cancelLoading(e,s);
-    const selected=await item(e,t,s,queueId(),ready);s.throwIfAborted();
+    const selected=await item(e,t,s,queueId(),ready,operationId);s.throwIfAborted();
     const resolved=e.tracks.get(selected.id)! as Track,q=e.queue.snapshot;
     const matches=q.items.filter(candidate=>{const track=e.tracks.get(candidate.id);return track&&isTrack(track)&&key(track.ref)===key(resolved.ref);});
     const existing=matches.find(candidate=>candidate.id===(q.current?.id??e.restored))??matches[0];
@@ -452,7 +452,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     // Explicit playback uses the chosen reference for this selection only.
     // Later chart selections still resolve against the latest preferences.
     if(selection)e.chartSelection=selection;
-    try{s.throwIfAborted();return await e.queue.selectId(existing?.id??selected.id,{restart:true});}
+    try{s.throwIfAborted();return await withPlaybackDiagnostic(operationId,()=>e.queue.selectId(existing?.id??selected.id,{restart:true}));}
     finally{if(e.chartSelection===selection)e.chartSelection=undefined;}
   };
   const readPosition=useCallback(()=>engine.current?.player.currentTime??0,[]);
@@ -506,9 +506,10 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       }catch(issue){if(!cancelled(issue))setError(errorText(issue));return false;}
     },
     playChartItem:(chartItem:ChartItem)=>run(async(e,s)=>{
+      const operationId=nextPlaybackOperation();
       try {
         await cancelLoading(e,s);
-        const track=await resolveChartResult(chartItem,s,e.bridge.audioSupport);s.throwIfAborted();return await playSingle(e,track,s);
+        const track=await resolveChartResult(chartItem,s,e.bridge.audioSupport,operationId);s.throwIfAborted();return await playSingle(e,track,s,false,operationId);
       } catch(issue) {if(!s.aborted&&!cancelled(issue)){setChartSearchTitle(chartItem.title);setChartSearchSong(chartItem);setError(errorText(issue));}throw issue;}
     }),
     playChart:(list:ChartItem[])=>run(async(e,s)=>{

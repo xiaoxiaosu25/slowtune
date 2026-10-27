@@ -51,6 +51,9 @@ test('desktop HTTP uses the worker without changing response, origin, revision o
   const stale = await post(state.revision, [{ type: 'edit-song', songId: 's', title: 'Stale' }]);
   assert.equal(stale.status, 409);
   assert.equal((await stale.json()).error.currentRevision, store.revision());
+  const exported=await router.request('/export',{headers:{'X-SlowTune-Surface':'desktop'}});
+  assert.equal(exported.status,200);assert.match(exported.headers.get('Content-Disposition'),/slowtune-library.json/);
+  assert.deepEqual(await exported.json(),JSON.parse(service.export()));
   assert.equal((await router.request('/', { headers: { Origin: 'https://foreign.invalid', 'X-SlowTune-Surface': 'desktop' } })).status, 403);
 });
 
@@ -72,6 +75,10 @@ test('large desktop edits leave the host responsive; cancellation drains without
     await request({ type: 'edit', revision, edits: [{ type: 'edit-song', songId: 's-0', title: 'Saved' }] });
   } finally { clearInterval(timer); }
   assert(ticks > 2, 'host timers advance during the full validated write');
+  let exportTicks=0;const exporting=setInterval(()=>exportTicks++,1);
+  try{assert.deepEqual(decode(await request({type:'export'})),JSON.parse(service.export()));}finally{clearInterval(exporting);}
+  assert(exportTicks>2,'backup export leaves host timers responsive');
+  const cancelledExport=new AbortController();cancelledExport.abort();await assert.rejects(request({type:'export'},cancelledExport.signal),{code:'cancelled'});
   const queued = Array.from({ length: 17 }, () => request({ type: 'read' }));
   const results = await Promise.allSettled(queued);
   assert.equal(results[16].status, 'rejected');

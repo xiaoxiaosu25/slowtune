@@ -23,7 +23,7 @@ interface Work {
 }
 interface Pending {provider:ProviderId;priority:Priority;signal:AbortSignal;start:()=>void;reject:(error:unknown)=>void;detach:()=>void}
 interface Ticket {owner:string;generation:string;until:number;playback:PreparedPlayback}
-type Event = {id:string;operation:string;code:string;at:number;elapsedMs?:number;provider?:ProviderId;status?:number;errorCode?:string};
+type Event = {id:string;operation:string;code:string;at:number;elapsedMs?:number;provider?:ProviderId;status?:number;errorCode?:string;sourceRequest?:string;attempt?:number};
 const cancelled = (signal:AbortSignal) => new MusicSourceError({code:signal.reason?.name==='TimeoutError'?'timeout':'cancelled',retryable:signal.reason?.name==='TimeoutError'});
 
 /** Product-owned desktop work only. Normal browser/mobile source calls bypass it. */
@@ -147,7 +147,7 @@ export class DesktopPlayback {
     }
     return this.share(['best-audio',request,support,{...options,signal:undefined}],options.signal??work.signal,signal=>prepareBestAudio(api,request,{...options,signal},format=>supportsAudioType(support,format)));
   }
-  observe(event:SourceDiagnostic){const work=this.current;if(work||event.operation==='media')this.record({id:work?.id??event.requestId,operation:event.operation,code:event.code,at:event.timestamp,...(event.elapsedMs!==undefined?{elapsedMs:event.elapsedMs}:{}),...(event.provider?{provider:event.provider}:{}),...(event.status?{status:event.status}:{}),...(event.errorCode?{errorCode:event.errorCode}:{})});}
+  observe(event:SourceDiagnostic){const work=this.current;if(work||event.operation==='media')this.record({id:work?.id??event.requestId,sourceRequest:event.requestId,operation:event.operation,code:event.code,at:event.timestamp,...(event.attempt!==undefined?{attempt:event.attempt}:{}),...(event.elapsedMs!==undefined?{elapsedMs:event.elapsedMs}:{}),...(event.provider?{provider:event.provider}:{}),...(event.status?{status:event.status}:{}),...(event.errorCode?{errorCode:event.errorCode}:{})});}
   private prune(){for(const [token,ticket]of this.tickets)if(ticket.until<=this.now()||ticket.generation!==this.generation())this.tickets.delete(token);}
   cancelOwner(owner:string){this.inflight.cancelOwner(owner);for(const [token,ticket]of this.tickets)if(ticket.owner===owner)this.tickets.delete(token);}
   diagnostics(){

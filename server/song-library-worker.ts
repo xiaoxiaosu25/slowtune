@@ -13,6 +13,11 @@ parentPort!.on('message', ({ id, operation, cancel }: { id: number; operation: D
   const signal = { get aborted() { return Atomics.load(flag, 0) !== 0; } } as AbortSignal;
   try {
     if (signal.aborted) throw new SongLibraryError('cancelled');
+    if(operation.type==='export'){
+      const bytes=new TextEncoder().encode(store.onSurface(true,()=>service.export()));
+      if(signal.aborted)throw new SongLibraryError('cancelled');
+      parentPort!.postMessage({id,bytes:bytes.buffer},[bytes.buffer]);return;
+    }
     const revision = store.revision();
     if (operation.type !== 'read' || cached?.revision !== revision) {
       const value = store.onSurface(true, () => operation.type === 'read' ? service.read() : service.execute(operation.revision, operation.edits, signal));
