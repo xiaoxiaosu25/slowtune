@@ -436,11 +436,11 @@ const chartInputs=[{source:'netease',chart:'hot'},{source:'netease',chart:'new'}
 batches.start([()=>batches.warm('bilibili'),...chartInputs.map(input=>()=>charts.read(input,AbortSignal.any([batches.signal,AbortSignal.timeout(20000)])))]);
 let warmedYoutube=false;
 sourceListeners.add(()=>{if(!youtube.status().available){warmedYoutube=false;return;}if(warmedYoutube)return;warmedYoutube=true;for(const region of warmRegions)void batches.warm('youtube:'+region).catch(()=>{});});
-server.on('error',async e=>{console.error('服务监听失败', (e as NodeJS.ErrnoException).code);await expireSessions();await songSync.dispose();lyricProviders.dispose();songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();await batches.dispose();await charts.dispose();await comments.dispose();await follows.dispose();await youtubeCandidates.dispose();await youtubeDiscovery.dispose();await delivery.dispose();await api.dispose();browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();await songLibraryStore.close();process.exitCode=1;});
+server.on('error',async e=>{console.error('服务监听失败', (e as NodeJS.ErrnoException).code);await expireSessions();await songSync.dispose();await lyricProviders.dispose();await songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();await batches.dispose();await charts.dispose();await comments.dispose();await follows.dispose();await youtubeCandidates.dispose();await youtubeDiscovery.dispose();await delivery.dispose();await api.dispose();browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();await songLibraryStore.close();process.exitCode=1;});
 async function shutdown(reason = 'control') {
   if(stopping)return;stopping=true;
   if(desktopOwned)console.log(`${new Date().toISOString()} 正在停止桌面服务：${reason}`);
-  await expireSessions();await songSync.dispose();lyricProviders.dispose();songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();
+  await expireSessions();await songSync.dispose();await lyricProviders.dispose();await songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();
   closeSourceStreams();await youtube.dispose();
   const closing=new Promise<void>(resolve=>server.close(()=>resolve()));
   (server as import('node:http').Server).closeIdleConnections();

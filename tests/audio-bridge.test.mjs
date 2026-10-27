@@ -13,6 +13,9 @@ const imports={
   '../server/search-policy':pathToFileURL(resolve(built,'search-policy.js')).href,
   './song-search':'data:text/javascript,'+encodeURIComponent('export const desktopSurface=()=>false;'),
 };
+const diagnostics=ts.transpileModule(readFileSync(new URL('../src/playback-diagnostics.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText
+  .replace(/from\s+(['"])([^'"]+)\1/g,(_match,_quote,name)=>{assert(imports[name],'unmapped diagnostic import: '+name);return 'from '+JSON.stringify(imports[name]);});
+imports['./playback-diagnostics']='data:text/javascript;base64,'+Buffer.from(diagnostics).toString('base64');
 const source=ts.transpileModule(readFileSync(new URL('../src/audio-quality.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const module=source.replace(/from\s+(['"])([^'"]+)\1/g,(_match,_quote,name)=>'from '+JSON.stringify(imports[name]??name));
 const {BestAudioBridge,retainVerifiedAudio}=await import('data:text/javascript;base64,'+Buffer.from(module).toString('base64'));

@@ -146,11 +146,15 @@ export function createSongLibraryRouter(service: SongLibraryService, identity: (
   app.post('/imports/preview', async c => {
     const mode = c.req.query('mode'); if (!['append', 'replace'].includes(mode ?? '')) throw new SongLibraryError('invalid-input');
     const expected = c.req.header('X-SlowTune-Revision');
-    return c.json(service.previewImport(c.get('owner'), await readSongBody(c.req.raw), mode as 'append' | 'replace', revision(expected === 'null' ? null : expected), c.req.raw.signal));
+    const value=await readSongBody(c.req.raw),base=revision(expected==='null'?null:expected);
+    const response=service.store.fileResponse({type:'import-preview',owner:c.get('owner'),value,mode:mode as 'append'|'replace',revision:base},c.req.raw.signal);
+    return response?c.body(await response,200,{'Content-Type':'application/json; charset=UTF-8'}):c.json(service.previewImport(c.get('owner'),value,mode as 'append'|'replace',base,c.req.raw.signal));
   });
   app.post('/imports/commit', async c => {
     const input = await json(c.req.raw); object(input, ['token', 'revision']);
-    return c.json(service.commitImport(c.get('owner'), input.token, revision(input.revision), c.req.raw.signal));
+    const expected=revision(input.revision);
+    const response=service.store.fileResponse({type:'import-commit',owner:c.get('owner'),token:input.token,revision:expected},c.req.raw.signal);
+    return response?c.body(await response,200,{'Content-Type':'application/json; charset=UTF-8'}):c.json(service.commitImport(c.get('owner'),input.token,expected,c.req.raw.signal));
   });
   app.onError((error, c) => {
     const code = c.req.raw.signal.aborted&&c.req.raw.signal.reason?.name==='TimeoutError'?'timeout':error instanceof SongLibraryError || error instanceof MusicSourceError || error instanceof MusicSearchError || error instanceof SongCatalogError ? error.code : c.req.raw.signal.aborted ? 'cancelled' : 'storage';

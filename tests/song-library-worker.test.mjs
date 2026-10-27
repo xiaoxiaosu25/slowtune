@@ -4,10 +4,13 @@ import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadSongModule } from './helpers/song-services.mjs';
 import { developmentPaths } from '../scripts/workspace-paths.mjs';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
 
 const { SongLibraryStore } = await loadSongModule('song-library-store');
 const { SongLibraryService } = await loadSongModule('song-library-service');
 const { createSongLibraryRouter } = await loadSongModule('song-library-http');
+const { SongLibrarySync } = await loadSongModule('song-library-sync');
 const decode = bytes => JSON.parse(new TextDecoder().decode(bytes));
 async function setup(t) {
   const parent = join(developmentPaths().testRuntime, 'library-worker-tests');
@@ -89,4 +92,72 @@ test('large desktop edits leave the host responsive; cancellation drains without
   await close(); await closed;
   const reopened = new SongLibraryStore(store.path, store.userSpace);
   try { assert.deepEqual(new SongLibraryService(reopened).read(), last); } finally { await reopened.close(); }
+});
+
+test('desktop import previews and commits keep owner, revision, validation and cancellation boundaries',async t=>{
+  const {store,service,request}=await setup(t);
+  const created=service.execute(null,[{type:'create-song',id:'s',title:'Preserved'},{type:'favorite',songId:'s'}]);
+  const value=service.export(),preview=decode(await request({type:'import-preview',owner:'one',value,mode:'append',revision:created.revision}));
+  await assert.rejects(request({type:'import-commit',owner:'two',token:preview.token,revision:preview.revision}),{code:'expired'});
+  service.execute(created.revision,[{type:'edit-song',songId:'s',title:'Concurrent'}]);
+  await assert.rejects(request({type:'import-commit',owner:'one',token:preview.token,revision:preview.revision}),{code:'conflict'});
+  const current=service.read(),next=decode(await request({type:'import-preview',owner:'one',value:service.export(),mode:'replace',revision:current.revision}));
+  const full=Array.from({length:16},()=>request({type:'read'}));service.cancelOwner('one');await Promise.all(full);
+  await assert.rejects(request({type:'import-commit',owner:'one',token:next.token,revision:next.revision}),{code:'expired'});
+  await assert.rejects(request({type:'import-preview',owner:'one',value:'{"format":"unexpected"}',mode:'append',revision:current.revision}),{code:'invalid-input'});
+  const stop=new AbortController();stop.abort();await assert.rejects(request({type:'import-preview',owner:'one',value,mode:'append',revision:current.revision},stop.signal),{code:'cancelled'});
+  const valid=decode(await request({type:'import-preview',owner:'one',value:service.export(),mode:'append',revision:current.revision}));
+  const committed=decode(await request({type:'import-commit',owner:'one',token:valid.token,revision:valid.revision}));
+  assert.equal(committed.snapshot.songs[0].title,'Concurrent');assert.equal(committed.revision,store.revision());
+});
+
+test('file import tokens remain valid when the same session changes its surface',async t=>{
+  const {service}=await setup(t),router=createSongLibraryRouter(service,()=> 'one');
+  service.execute(null,[{type:'create-song',id:'s',title:'Preserved'}]);
+  for(const surface of ['desktop','mobile']){
+    const previewResponse=await router.request('/imports/preview?mode=append',{method:'POST',headers:{'X-Music-App':'1','X-SlowTune-Surface':surface,'X-SlowTune-Revision':service.revision()},body:service.export()});
+    assert.equal(previewResponse.status,200);const preview=await previewResponse.json();
+    const committed=await router.request('/imports/commit',{method:'POST',headers:{'Content-Type':'application/json','X-Music-App':'1','X-SlowTune-Surface':surface==='desktop'?'mobile':'desktop'},body:JSON.stringify({token:preview.token,revision:preview.revision})});
+    assert.equal(committed.status,200);assert.equal((await committed.json()).snapshot.songs[0].title,'Preserved');
+  }
+});
+
+test('desktop sync plans validate off-thread and recheck account authority and CAS before committing',async t=>{
+  const {store,service,request}=await setup(t);const signal=new AbortController().signal;
+  service.transaction(null,({document})=>document.syncLinks.push({id:'link',accountId:'123',folderId:'10',targetId:'system:favorites',state:'ready',issues:[]}));
+  await request({type:'read'});
+  const operation=()=>({type:'complete',revision:store.revision(),linkId:'link',accountId:'123',now:123});
+  const run=(operation,check=()=>{},signalOverride=signal)=>store.onSurface(true,()=>store.desktopSyncTransaction(operation,signalOverride,check));
+  const initial=service.read();await assert.rejects(run(operation(),()=>{throw Object.assign(new Error('account changed'),{code:'cancelled'});}),{code:'cancelled'});
+  assert.deepEqual(service.read(),initial);
+  const stale=operation(),pending=run(stale);service.execute(stale.revision,[{type:'create-song',id:'other',title:'Concurrent'}]);
+  await assert.rejects(pending,{code:'conflict'});
+  await assert.rejects(run({...operation(),now:-1}),{code:'invalid-input'});
+  const cancelled=new AbortController();cancelled.abort();await assert.rejects(run(operation(),()=>{},cancelled.signal),{code:'cancelled'});
+  await run(operation());assert.equal(store.read().document.syncLinks[0].lastSync,123);
+  assert.equal(store.events().filter(event=>event.type==='library-changed').length,1);
+});
+
+test('file-backed sync observation keeps exact source mappings and independent local retention',async t=>{
+  const {store,service}=await setup(t),signal=new AbortController().signal;
+  const bvid='BV0000000001';let videos=[{bvid,aid:'1'}];
+  service.transaction(null,({document})=>document.syncLinks.push({id:'link',accountId:'123',folderId:'10',targetId:'system:favorites',state:'ready',issues:[],observed:[]}));
+  const remote={context:async signal=>({accountId:'123',credential:{revision:'one'},signal}),check:c=>c.signal.throwIfAborted(),folders:async()=>[{id:'10',title:'Fixture',private:true,count:videos.length}],videos:async()=>videos,aid:async()=>{throw Error('unexpected lookup');},change:async()=>{throw Error('unexpected remote write');},createFolder:async()=>{throw Error('unexpected create');}};
+  const sync=new SongLibrarySync(service,remote,async ref=>({ref:{...ref,part:'10'},resourceId:bvid+':10',title:'Exact source'}));t.after(()=>sync.dispose());
+  await store.onSurface(true,()=>sync.run('link',signal));
+  const saved=store.read();assert.equal(saved.document.syncMappings.length,1);assert.equal(saved.document.snapshot.versions[0].ref.part,'10');assert.equal(saved.document.origins[0].local,'absent');
+  service.execute(saved.revision,[{type:'favorite',songId:saved.document.snapshot.songs[0].id}]);videos=[];
+  await store.onSurface(true,()=>sync.run('link',signal));
+  const after=store.read();assert.equal(after.document.snapshot.favorites.length,1);assert.equal(after.document.syncMappings.length,0);assert.equal(after.document.origins[0].local,'present');assert.equal(after.document.snapshot.songs.length,1);
+  assert.equal(store.events().filter(event=>event.type==='sync-intent').length,0);
+});
+
+test('a competing SQLite writer leaves sync commit waiting cancellable without blocking host timers',async t=>{
+  const {store,service,request}=await setup(t);
+  service.transaction(null,({document})=>document.syncLinks.push({id:'link',accountId:'123',folderId:'10',targetId:'system:favorites',state:'ready',issues:[]}));await request({type:'read'});
+  const script=`import{DatabaseSync}from'node:sqlite';const db=new DatabaseSync(${JSON.stringify(store.path)});db.exec('BEGIN IMMEDIATE');process.stdout.write('locked\\n');setTimeout(()=>{db.exec('ROLLBACK');db.close()},250);`;
+  const child=spawn(process.execPath,['--input-type=module','-e',script],{stdio:['ignore','pipe','ignore'],windowsHide:true}),exited=once(child,'exit');t.after(()=>{if(child.exitCode===null)child.kill();});await once(child.stdout,'data');
+  const revision=store.revision(),stop=new AbortController();let ticks=0;const timer=setInterval(()=>ticks++,5);
+  try{const pending=store.onSurface(true,()=>store.desktopSyncTransaction({type:'complete',revision,linkId:'link',accountId:'123',now:123},stop.signal,()=>{}));setTimeout(()=>stop.abort(),40);await assert.rejects(pending,{code:'cancelled'});}finally{clearInterval(timer);}
+  assert(ticks>=2);await exited;assert.equal(store.revision(),revision);assert.equal(store.read().document.syncLinks[0].lastSync,undefined);
 });

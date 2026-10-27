@@ -18,7 +18,7 @@ const { createSongLibraryRouter } = await load('song-library-http');
 
 test('new backup panel reads files, previews and restores only the new format with explicit replacement consent', { timeout: 60000 }, async t => {
   const directory = await mkdtemp(join(tmpdir(), 'slowtune-song-panel-')), store = new SongLibraryStore(join(directory, 'songs.sqlite'), 'fixture'), service = new SongLibraryService(store);
-  t.after(async () => { store.close(); assert(directory.startsWith(join(tmpdir(), 'slowtune-song-panel-'))); await rm(directory, { recursive: true, force: true }); });
+  t.after(async () => { await store.close(); assert(directory.startsWith(join(tmpdir(), 'slowtune-song-panel-'))); await rm(directory, { recursive: true, force: true }); });
   const artifacts = await build({ configFile: false, logLevel: 'silent', define: { 'process.env.NODE_ENV': '"production"' }, esbuild: { jsx: 'automatic' }, build: { write: false, minify: false, target: 'esnext', lib: { entry: join(project, 'tests/helpers/song-library-panel.tsx'), formats: ['es'] }, rollupOptions: { output: { inlineDynamicImports: true } } } });
   const output = (Array.isArray(artifacts) ? artifacts : [artifacts]).flatMap(a => a.output), script = output.find(a => a.type === 'chunk' && a.isEntry).code, css = output.filter(a => a.type === 'asset' && a.fileName.endsWith('.css')).map(a => a.source).join('\n');
   const app = new Hono(); app.route('/api/song-library', createSongLibraryRouter(service, c => c.req.header('Cookie') === 'session=fixture' ? 'browser' : ''));

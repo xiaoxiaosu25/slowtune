@@ -202,7 +202,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     const leave=()=>{owned.prefetch?.cancel();operation.current?.abort();player.pause();void player.stop().finally(()=>bridge.dispose()).catch(()=>{});};
     window.addEventListener('pagehide',leave);
     const offline=()=>owned.prefetch?.cancel();window.addEventListener('offline',offline);
-    return()=>{alive=false;owned.prefetch?.cancel();operation.current?.abort();unsubs.forEach(fn=>fn());window.removeEventListener('pagehide',leave);window.removeEventListener('offline',offline);sleep.removeEventListener('change',onSleep);sleep.removeEventListener('expire',onSleepExpire);sleep.removeEventListener('complete',onSleepComplete);queue.removeEventListener('change',update);queue.removeEventListener('change',prefetchQueue);queue.removeEventListener('error',queueError);queue.destroy();system.destroy();sleep.destroy();setSleepTimer(null);setSleep(idleSleep);void player.destroyAsync().finally(()=>{analysis.dispose();tracks.clear();aliases.clear();committed.clear();return bridge.dispose();}).catch(()=>{});audio.remove();engine.current=null;analysisRef.current=null;};
+    return()=>{alive=false;owned.prefetch?.cancel();operation.current?.abort();unsubs.forEach(fn=>fn());window.removeEventListener('pagehide',leave);window.removeEventListener('offline',offline);sleep.removeEventListener('change',onSleep);sleep.removeEventListener('expire',onSleepExpire);sleep.removeEventListener('complete',onSleepComplete);queue.removeEventListener('change',update);queue.removeEventListener('change',prefetchQueue);queue.removeEventListener('error',queueError);queue.destroy();system.destroy();sleep.destroy();setSleepTimer(null);setSleep(idleSleep);void player.destroyAsync().finally(async()=>{await analysis.dispose();tracks.clear();aliases.clear();committed.clear();return bridge.dispose();}).catch(()=>{});audio.remove();engine.current=null;analysisRef.current=null;};
   },[client]);
   const nextPlayable=(e:PlaybackEngine,direction:1|-1)=>{
     const q=e.queue.snapshot,items=q.items;
@@ -547,7 +547,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     reset:()=>run(e=>{if(e.chartSession)e.chartSession.allowed=false;return e.player.stopAndReset();},false),
     sourceChanged:()=>{if(desktopSurface()){const e=engine.current;e?.prefetch?.reset();e?.recovery.cancelEnvironment();}},
     records:()=>{const e=engine.current;return {tracks:e?.tracks.size??0,aliases:e?.aliases.size??0,committed:e?.committed.size??0,preparing:e?.pendingRecords.size??0,prefetch:e?.prefetch?.size??0};},
-    release:async()=>{operation.current?.abort();const e=engine.current;if(!e)return;e.releasing=true;e.prefetch?.cancel();e.recovery.dispose();e.queue.destroy();e.system.destroy();e.sleep.destroy();try{await e.player.destroyAsync();}finally{e.tracks.clear();e.aliases.clear();e.committed.clear();analysisRef.current?.dispose();try{await e.bridge.dispose();}catch(err){setError(errorText(err));}}},
+    release:async()=>{operation.current?.abort();const e=engine.current;if(!e)return;e.releasing=true;e.prefetch?.cancel();e.recovery.dispose();e.queue.destroy();e.system.destroy();e.sleep.destroy();try{await e.player.destroyAsync();}finally{e.tracks.clear();e.aliases.clear();e.committed.clear();await analysisRef.current?.dispose();try{await e.bridge.dispose();}catch(err){setError(errorText(err));}}},
     dismiss:()=>{setError('');setChartSearchTitle('');},dismissChartFailures:()=>setChartFailures([])
   };
 }

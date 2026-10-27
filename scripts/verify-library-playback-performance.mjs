@@ -29,9 +29,13 @@ if(process.argv.includes('--host')){
       document.snapshot.favorites.push({favoriteId:member.favoriteId,songId,position:i,addedAt:1});document.origins.push({member,local:'present'});document.syncMappings.push({linkId:'link',member,bvid:bv(i+1),versionId});
     }
   }));
-  let transactions=[],chunkGaps=[],lastChunk=0;
+  let transactions=[],syncLocalWork=[],chunkGaps=[],lastChunk=0;
   const transaction=store.transaction.bind(store);
   store.transaction=(...args)=>{const start=performance.now();try{return transaction(...args);}finally{transactions.push(performance.now()-start);}};
+  if(typeof store.desktopSyncTransaction==='function'){
+    const local=store.desktopSyncTransaction.bind(store);
+    store.desktopSyncTransaction=(...args)=>{const start=performance.now(),work=local(...args);return work?.finally(()=>syncLocalWork.push(performance.now()-start));};
+  }
   // Remote reads are synthetic; any attempted remote mutation fails the measurement.
   const remote={context:async signal=>({accountId:'123',credential:{revision:'synthetic'},signal}),check:c=>c.signal.throwIfAborted(),folders:async()=>[{id:'10',title:'合成收藏夹',count,private:true}],videos:async()=>videos.map(v=>({...v})),aid:async()=>{throw Error('Unexpected aid lookup');},change:async()=>{throw Error('Remote mutation is outside this measurement');},createFolder:async()=>{throw Error('Remote creation is outside this measurement');}};
   const sync=new SongLibrarySync(library,remote,async()=>{throw Error('Unexpected metadata read');}),router=createSongLibraryRouter(library,()=> 'measurement',undefined,undefined,sync);
@@ -46,8 +50,8 @@ if(process.argv.includes('--host')){
     try{
       if(url.pathname==='/') {res.setHeader('Content-Type','text/html');res.end('<!doctype html><audio src="/media.wav" preload="none"></audio>');return;}
       if(url.pathname==='/ping'){json({ok:true});return;}
-      if(url.pathname==='/measure/start'){histogram.reset();transactions=[];chunkGaps=[];lastChunk=0;json({ok:true});return;}
-      if(url.pathname==='/measure/end'){json({eventLoop:{p95Ms:histogram.percentile(95)/1e6,p99Ms:histogram.percentile(99)/1e6,maxMs:histogram.max/1e6},transactionMs:transactions,mediaChunkMaxGapMs:Math.max(0,...chunkGaps)});return;}
+      if(url.pathname==='/measure/start'){histogram.reset();transactions=[];syncLocalWork=[];chunkGaps=[];lastChunk=0;json({ok:true});return;}
+      if(url.pathname==='/measure/end'){json({eventLoop:{p95Ms:histogram.percentile(95)/1e6,p99Ms:histogram.percentile(99)/1e6,maxMs:histogram.max/1e6},transactionMs:transactions,syncPlanAndCommitMs:syncLocalWork,mediaChunkMaxGapMs:Math.max(0,...chunkGaps)});return;}
       if(url.pathname==='/media.wav'){
         const range=/^bytes=(\d+)-(\d*)$/.exec(req.headers.range??''),start=Number(range?.[1]??0),end=range?.[2]?Math.min(Number(range[2]),audio.length-1):audio.length-1;
         res.writeHead(range?206:200,{'Content-Type':'audio/wav','Content-Length':end-start+1,'Accept-Ranges':'bytes',...(range?{'Content-Range':`bytes ${start}-${end}/${audio.length}`}:{})});
@@ -91,7 +95,7 @@ if(process.argv.includes('--host')){
       },{operation,revision});
       reports.push({name,...result});await writeFile(join(output,'report.partial.json'),JSON.stringify({songs:count,versions:count*2,reports},null,2));assert.equal(result.status,200,name);assert.equal(result.playback.mediaError,null,name);console.log(JSON.stringify({name,durationMs:result.durationMs,maxRequestMs:result.requestLatency.maxMs,eventLoopMaxMs:result.server.eventLoop.maxMs}));
     }
-    const report={node:process.version,platform:process.platform,songs:count,versions:count*2,favorites:count,backupBytes:ready.backupBytes,reports,scope:'Synthetic file SQLite and read-only remote fixture; streamed PCM in Edge. Transaction duration includes computation and persistence, not a separate measurement of lock waiting. No daily data, accounts, device sleep, speakers or real remote writes.'};
+    const report={node:process.version,platform:process.platform,songs:count,versions:count*2,favorites:count,backupBytes:ready.backupBytes,reports,scope:'Synthetic file SQLite and read-only remote fixture; streamed PCM in Edge. transactionMs measures main-store synchronous transactions only; syncPlanAndCommitMs includes worker calculation, waiting and local commit. Neither separates SQLite lock waiting; absent synchronous samples do not mean zero write cost. No daily data, accounts, device sleep, speakers or real remote writes.'};
     await writeFile(join(output,'report.json'),JSON.stringify(report,null,2));console.log('Report: '+join(output,'report.json'));
   }finally{await browser?.close();if(child.connected)child.send('stop');await Promise.race([new Promise(resolve=>child.once('exit',resolve)),sleep(10000).then(()=>{if(child.exitCode===null)child.kill();})]);}
 }

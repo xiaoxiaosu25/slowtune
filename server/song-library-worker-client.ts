@@ -1,7 +1,13 @@
 import { Worker } from 'node:worker_threads';
 import { SongLibraryError, type SongLibraryErrorCode } from './song-library-errors.js';
+import type { SyncLocalOperation } from './song-library-sync-local.js';
 
-export type DesktopLibraryOperation = { type: 'read' } | { type: 'export' } | { type: 'edit'; revision: string | null; edits: unknown };
+export type DesktopLibraryOperation = { type: 'read' } | { type: 'export' } | { type: 'edit'; revision: string | null; edits: unknown }
+  | {type:'import-preview';owner:string;value:string;mode:'append'|'replace';revision:string|null}
+  | {type:'import-commit';owner:string;token:string;revision:string|null}
+  | {type:'cancel-owner';owner:string}
+  | {type:'sync-state';accountId:string;busy:boolean}
+  | {type:'sync-plan';operation:SyncLocalOperation};
 type Reply = { id: number; bytes?: ArrayBuffer; error?: { code: SongLibraryErrorCode; currentRevision?: string | null } };
 type Pending = { cancel: Int32Array; resolve: (bytes: Uint8Array) => void; reject: (error: unknown) => void; detach: () => void };
 
@@ -31,6 +37,12 @@ export class DesktopLibraryWorker {
       try { worker.postMessage({ id, operation, cancel: cancel.buffer }); }
       catch { this.pending.delete(id); pending.detach(); reject(new SongLibraryError('invalid-input')); if (!this.pending.size) worker.unref(); }
     });
+  }
+
+  /** Owner revocation must also drain when ordinary admission is full. */
+  cancelOwner(owner:string){
+    if(this.closed||!this.worker)return;
+    try{this.worker.postMessage({id:0,operation:{type:'cancel-owner',owner},cancel:new SharedArrayBuffer(4)});}catch{/* A failed worker no longer owns usable preview tokens. */}
   }
 
   private start() {

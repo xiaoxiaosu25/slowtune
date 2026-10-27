@@ -71,7 +71,7 @@ test('choices survive restart and cache refresh, are scoped to exact part and us
 
 function fixture(t, fetcher) {
   const store = new LyricsStore(':memory:', 'test'), provider = new LyricProviders(store, fetcher);
-  t.after(() => { provider.dispose(); store.close(); });
+  t.after(async () => { await provider.dispose(); store.close(); });
   return { store, provider };
 }
 const lrcRow = { id: 123, trackName: '测试歌曲', artistName: '歌手', duration: 60, albumName: '专辑', syncedLyrics: '[00:01]第一行\n[00:03]第二行', plainLyrics: '第一行\n第二行' };

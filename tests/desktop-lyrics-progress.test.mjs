@@ -5,7 +5,7 @@ import {loadSongModule} from './helpers/song-services.mjs';
 const {LyricsStore}=await loadSongModule('lyrics-store'),{LyricProviders}=await loadSongModule('lyrics-providers'),{createLyricsRouter}=await loadSongModule('lyrics-http');
 const row={id:123,trackName:'晴天',artistName:'周杰伦',duration:270,syncedLyrics:'[00:01]歌词'};
 const query={title:'晴天',artist:'周杰伦',durationSeconds:270},signal=()=>new AbortController().signal;
-function setup(t,fetcher,budgets){const store=new LyricsStore(':memory:','progress'),provider=new LyricProviders(store,fetcher,Date.now,budgets);t.after(()=>{provider.dispose();store.close();});return {store,provider};}
+function setup(t,fetcher,budgets){const store=new LyricsStore(':memory:','progress'),provider=new LyricProviders(store,fetcher,Date.now,budgets);t.after(async()=>{await provider.dispose();store.close();});return {store,provider};}
 test('desktop progressive search publishes fast success before the slow provider; partial failures retry',async t=>{
   let release,calls=0;const gate=new Promise(resolve=>release=resolve),seen=[];
   const {provider}=setup(t,async url=>{calls++;if(new URL(url).hostname==='music.163.com'){await gate;return new Response('',{status:503});}return Response.json([row]);});
@@ -48,7 +48,7 @@ test('uncached document consumers cancel independently; the final departure canc
   const {provider}=setup(t,async(_url,{signal})=>{calls++;signal.addEventListener('abort',()=>aborts++,{once:true});await gate;return Response.json(row);});
   const target={provider:'lrclib',id:'123'},stop=new AbortController(),one=provider.document(target,stop.signal,true),two=provider.document(target,signal(),true),rejected=assert.rejects(one,{code:'cancelled'});
   await delay(5);stop.abort();await rejected;assert.equal(aborts,0);release();assert.equal((await two).id,'123');assert.equal(calls,1);
-  aborts=0;gate=new Promise(resolve=>release=resolve);const lastStop=new AbortController(),last=provider.document({provider:'lrclib',id:'124'},lastStop.signal,true),cancelled=assert.rejects(last,{code:'cancelled'});await delay(5);lastStop.abort();await cancelled;assert.equal(aborts,1);release();await delay(5);
+  aborts=0;gate=new Promise(resolve=>release=resolve);const lastStop=new AbortController(),last=provider.document({provider:'lrclib',id:'124'},lastStop.signal,true),cancelled=assert.rejects(last,{code:'cancelled'});await delay(5);lastStop.abort();await delay(5);assert.equal(aborts,1);release();await cancelled;
   await assert.rejects(provider.document({provider:'lrclib',id:'124'},signal(),true),{code:'not-found'});assert.equal(calls,3);
 });
 test('one HTTP budget covers search plus document and cannot commit a late automatic choice',async t=>{

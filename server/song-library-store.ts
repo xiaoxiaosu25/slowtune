@@ -5,6 +5,7 @@ import { SongLibraryError as LibraryError } from './song-library-errors.js';
 import { decodeSongLibrarySnapshot, emptySongLibrary, object, text, list } from './song-library-codec.js';
 import type { SongLibraryDocument, SongLibraryEvent, SongMember } from './song-library-types.js';
 import { DesktopLibraryWorker, type DesktopLibraryOperation } from './song-library-worker-client.js';
+import type { SyncLocalOperation } from './song-library-sync-local.js';
 
 export const memberKey = (member: SongMember) => member.kind === 'favorite' ? JSON.stringify(['favorite', member.favoriteId]) : JSON.stringify(['playlist-entry', member.playlistId, member.entryId]);
 export const emptySongDocument = (): SongLibraryDocument => ({ snapshot: emptySongLibrary(), origins: [], syncMappings: [], syncLinks: [] });
@@ -155,9 +156,55 @@ export class SongLibraryStore {
   events(): SongLibraryEvent[] { return this.db.prepare('SELECT document FROM song_library_events WHERE scope=? ORDER BY rowid').all(this.userSpace).map(r => JSON.parse(String(r.document))); }
   /** File-backed desktop HTTP only; private in-memory fixtures keep their own store. */
   desktopResponse(operation: DesktopLibraryOperation, signal?: AbortSignal) {
-    if (!this.surface.getStore() || !this.path || this.path === ':memory:' || this.now !== Date.now) return undefined;
+    if(!this.surface.getStore())return undefined;
+    return this.fileResponse(operation,signal);
+  }
+  /** Import tokens share one owner across desktop and mobile requests. */
+  fileResponse(operation:DesktopLibraryOperation,signal?:AbortSignal){
+    if (!this.path || this.path === ':memory:' || this.now !== Date.now) return undefined;
     this.desktopWorker ??= new DesktopLibraryWorker(this.path, this.userSpace);
     return this.desktopWorker.request(operation, signal);
+  }
+  /** Only this store's worker can prepare these validated, credential-free local facts. */
+  desktopSyncTransaction(operation:SyncLocalOperation,signal:AbortSignal,check:()=>void):Promise<void>|undefined {
+    const prepared=this.desktopResponse({type:'sync-plan',operation},signal);if(!prepared)return undefined;
+    return prepared.then(async bytes=>{
+      const plan=JSON.parse(new TextDecoder().decode(bytes)) as {revision:string|null;encoded:string;reviewed:string[]};
+      this.check(signal);check();
+      const deadline=performance.now()+1000;
+      while(true){
+        this.check(signal);check();
+        let busy=false;
+        try{this.db.exec('PRAGMA busy_timeout=0');this.db.exec('BEGIN IMMEDIATE');}
+        catch(error){
+          if(![5,6].includes((error as {errcode?:number}).errcode??0))throw error;
+          busy=true;
+        }finally{this.db.exec('PRAGMA busy_timeout=1000');}
+        if(!busy)break;
+        if(performance.now()>=deadline)throw new LibraryError('busy');
+        await new Promise<void>(resolve=>setTimeout(resolve,10));
+      }
+      try{
+        const current=this.revision();
+        if(current!==operation.revision||plan.revision!==operation.revision)throw new LibraryError('conflict',current);
+        const row=this.db.prepare('SELECT document FROM song_library WHERE scope=?').get(this.userSpace);
+        let revision=current;
+        if(!row||row.document!==plan.encoded){
+          revision=randomUUID();
+          this.db.prepare('INSERT INTO song_library VALUES(?,?,?) ON CONFLICT(scope) DO UPDATE SET revision=excluded.revision,document=excluded.document').run(this.userSpace,revision,plan.encoded);
+          this.db.prepare("DELETE FROM song_library_events WHERE scope=? AND json_extract(document,'$.type')='library-changed'").run(this.userSpace);
+          for(const linkId of plan.reviewed)this.db.prepare("DELETE FROM song_library_events WHERE scope=? AND json_extract(document,'$.type')='sync-intent' AND json_extract(document,'$.linkId')=?").run(this.userSpace,linkId);
+          const event:SongLibraryEvent={type:'library-changed',id:randomUUID(),revision,createdAt:this.now()};
+          this.db.prepare('INSERT INTO song_library_events VALUES(?,?,?,?)').run(this.userSpace,event.id,revision,JSON.stringify(event));
+          if(Number(this.db.prepare('SELECT COUNT(*) AS n FROM song_library_events WHERE scope=?').get(this.userSpace)!.n)>100000)throw new LibraryError('invalid-input');
+        }
+        this.check(signal);check();this.db.exec('COMMIT');this.cached=undefined;
+        this.encoded={revision,json:'{"modelVersion":1,"revision":'+JSON.stringify(revision)+',"document":'+plan.encoded+'}'};
+      }catch(error){this.db.exec('ROLLBACK');throw error;}
+    });
+  }
+  cancelDesktopOwner(owner:string){
+    this.desktopWorker?.cancelOwner(owner);
   }
   close() { const stopped = this.desktopWorker?.close(); this.db.close(); return stopped; }
 }
