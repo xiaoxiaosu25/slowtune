@@ -9,7 +9,7 @@
 | 包 | 安装制品 | 对应源码 |
 | --- | --- | --- |
 | `@studio/lyrics@0.1.0` | [studio-lyrics-0.1.0.tgz](studio-lyrics-0.1.0.tgz) | [studio-lyrics-0.1.0.tar.gz](sources/studio-lyrics-0.1.0.tar.gz) |
-| `@studio/player@0.12.13` | [studio-player-0.12.13.tgz](studio-player-0.12.13.tgz) | [studio-player-0.12.13.tar.gz](sources/studio-player-0.12.13.tar.gz) |
+| `@studio/player@0.12.15` | [studio-player-0.12.15.tgz](studio-player-0.12.15.tgz) | [studio-player-0.12.15.tar.gz](sources/studio-player-0.12.15.tar.gz) |
 | `@studio/music-sources@0.2.13` | [studio-music-sources-0.2.13.tgz](studio-music-sources-0.2.13.tgz) | [studio-music-sources-0.2.13.tar.gz](sources/studio-music-sources-0.2.13.tar.gz) |
 | `@studio/recommendation@0.3.5` | [studio-recommendation-0.3.5.tgz](studio-recommendation-0.3.5.tgz) | [studio-recommendation-0.3.5.tar.gz](sources/studio-recommendation-0.3.5.tar.gz) |
 

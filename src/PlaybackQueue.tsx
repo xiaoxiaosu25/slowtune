@@ -1,12 +1,14 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ArrowDownIcon, ArrowUpIcon, DotsThreeIcon, MusicNotesIcon, QueueIcon, ShuffleIcon, TrashIcon, UsersIcon, XIcon } from '@phosphor-icons/react';
+import { ArrowDownIcon, ArrowUpIcon, DotsThreeIcon, MusicNotesIcon, PlayIcon, QueueIcon, ShuffleIcon, SkipForwardIcon, TrashIcon, UsersIcon, XIcon } from '@phosphor-icons/react';
 import { creator, time, type Track } from './api';
 import { ControlPopover } from './ControlPopover';
+import { ActionMenu, type MenuAction } from './ActionMenu';
 import { isTrack, type QueueTrack } from './chart-playback';
 import { PlayAllButton, AddToPlaylistButton } from './ListActions';
 import type { DisabledDisplay } from './source-settings';
 
-export function PlaybackQueue({items,currentId,playing,order,renderCover,title,onClose,onPlayAll,onSelect,onMove,onRemove,onClear,onSearch,onCreator,authorBusy,onImport,youtubeEnabled=true,disabledDisplay='dim'}:{
+export function PlaybackQueue({items,currentId,playing,order,renderCover,title,onClose,onPlayAll,onSelect,onMove,onRemove,onClear,onSearch,onCreator,authorBusy,onImport,youtubeEnabled=true,disabledDisplay='dim',desktop=false,onMoveNext,onMoveLast,trackActions}:{
+  desktop?:boolean;onMoveNext?:(id:string)=>void;onMoveLast?:(id:string)=>void;trackActions?:(track:Track)=>MenuAction[];
   youtubeEnabled?:boolean;disabledDisplay?:DisabledDisplay;
   onImport?:()=>void;
   items:QueueTrack[];currentId?:string;playing:boolean;order:string;renderCover:(track:QueueTrack)=>ReactNode;title:(track:QueueTrack)=>string;
@@ -28,12 +30,21 @@ export function PlaybackQueue({items,currentId,playing,order,renderCover,title,o
           <span className="queue-number" aria-hidden="true">{isCurrent?<MusicNotesIcon size={18} weight={playing?'fill':'regular'}/>:String(index+1).padStart(2,'0')}</span>
           {renderCover(track)}<span className="queue-track-copy"><strong title={track.title}>{title(track)}</strong><small>{blocked(track)?'YouTube 已关闭 · ':isCurrent?<span className="queue-current-label">{playing?'正在播放':'当前歌曲'} · </span>:null}{isTrack(track)?creator(track):(track.artists?.join(' / ')||'歌手未知')+' · 播放时搜索'}</small></span><time>{time(track.durationSeconds)}</time>
         </button>
-        <ControlPopover className="queue-actions" label={'队列操作 '+track.title} icon={<DotsThreeIcon size={24}/>} side="bottom">
+        {desktop?<ActionMenu className="queue-actions" label={'队列操作 '+track.title} title={title(track)} subtitle={isCurrent?'当前歌曲':isTrack(track)?creator(track):'播放时自动匹配来源'} target=".queue-track" actions={[
+          {id:'play',label:'播放此项',icon:<PlayIcon size={18}/>,disabled:blocked(track),hint:blocked(track)?'YouTube 已关闭':undefined,onSelect:()=>onSelect(track.resourceId)},
+          {id:'next',label:'移到下一首',icon:<SkipForwardIcon size={18}/>,disabled:isCurrent||blocked(track),onSelect:()=>onMoveNext?.(track.resourceId)},
+          {id:'last',label:'移到队尾',icon:<QueueIcon size={18}/>,disabled:isCurrent||items.indexOf(track)===items.length-1,onSelect:()=>onMoveLast?.(track.resourceId)},
+          ...(isTrack(track)&&trackActions?trackActions(track).filter(action=>'separator' in action||!['play','next','last'].includes(action.id)):[]),
+          {separator:true},
+          {id:'up',label:'上移',icon:<ArrowUpIcon size={18}/>,disabled:index===0,onSelect:()=>onMove(track.resourceId,items.indexOf(visible[index-1]))},
+          {id:'down',label:'下移',icon:<ArrowDownIcon size={18}/>,disabled:index===visible.length-1,onSelect:()=>onMove(track.resourceId,items.indexOf(visible[index+1]))},
+          {id:'remove',label:'从播放队列移除',icon:<TrashIcon size={18}/>,danger:true,onSelect:()=>onRemove(track.resourceId)},
+        ]}/>:<ControlPopover className="queue-actions" label={'队列操作 '+track.title} icon={<DotsThreeIcon size={24}/>} side="bottom">
           <button disabled={authorBusy||!isTrack(track)||blocked(track)} onClick={()=>{if(isTrack(track))onCreator(track);}}><UsersIcon size={18}/>查看 UP / 博主</button>
           <button disabled={index===0} onClick={()=>onMove(track.resourceId,items.indexOf(visible[index-1]))}><ArrowUpIcon size={18}/>上移</button>
           <button disabled={index===visible.length-1} onClick={()=>onMove(track.resourceId,items.indexOf(visible[index+1]))}><ArrowDownIcon size={18}/>下移</button>
           <button className="danger" onClick={()=>onRemove(track.resourceId)}><TrashIcon size={18}/>移除</button>
-        </ControlPopover>
+        </ControlPopover>}
       </div>;
     })}</div>:<div className="queue-empty"><QueueIcon size={40}/><h3>队列还是空的</h3><p>播放一首音乐，或在歌曲菜单中加入队列。</p><button className="btn btn-secondary" onClick={onSearch}>去搜索音乐</button></div>}</div>
     {items.length>0&&<div className="queue-footer"><span>{visible.length} 首音乐</span><button className="btn btn-ghost btn-sm queue-clear" onClick={onClear}><TrashIcon size={17}/>清空队列并停止</button></div>}

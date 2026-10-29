@@ -267,7 +267,7 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   assert.equal(await page.locator('.bottom-lyrics').count(), 0, 'reload keeps the desktop lyric preference out of mobile');
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
   await page.getByRole('button',{name:'搜索歌曲或视频',exact:true}).click(); await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('未收藏来源'); await page.getByRole('button', { name: '搜索', exact: true }).click(); await page.getByRole('button', { name: '播放 未收藏来源', exact: true }).click();
-  await page.waitForFunction(() => /part=902/.test(document.querySelector('audio').currentSrc)); await page.getByRole('button', { name: '保持本 P', exact: true }).click(); await page.keyboard.press('Escape'); await page.getByRole('button', { name: '打开正在播放', exact: true }).click(); await openSettings(page); await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
+  await page.waitForFunction(() => /part=902/.test(document.querySelector('audio').currentSrc)); assert.equal(await page.getByRole('button', { name: '保持本 P', exact: true }).count(),0); await page.getByRole('button', { name: '关闭搜索', exact: true }).click(); await page.getByRole('button', { name: '打开正在播放', exact: true }).click(); await openSettings(page); await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   dialog = page.getByRole('dialog', { name: '选择歌词', exact: true }); await dialog.getByText('导入或粘贴歌词', { exact: true }).click();
   await dialog.getByLabel('导入歌词文件').setInputFiles({ name: 'lyrics.lrc', mimeType: 'text/plain', buffer: Buffer.from('纯文本歌词\n第二行文本') });
   await dialog.getByRole('button', { name: '使用导入歌词', exact: true }).click(); await dialog.waitFor({ state: 'detached' });

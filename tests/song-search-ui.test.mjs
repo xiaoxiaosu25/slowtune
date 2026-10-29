@@ -45,7 +45,7 @@ test('desktop song search includes artists while manual text and mobile requests
     if(width===1440)assert(audioSupport.some(type=>type.includes('mp4a')));else assert.equal(audioSupport,undefined);
     if(width===1440){
       await page.getByRole('button',{name:'更多操作 恋人',exact:true}).click();
-      await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 恋人',exact:true}).click();
+      await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'编辑歌曲 恋人',exact:true}).click();
       await page.getByRole('button',{name:'搜索并添加版本',exact:true}).click();const adding=page.getByRole('dialog',{name:'添加播放版本',exact:true});await adding.locator('.search-filter-notice').waitFor();
       assert.equal(await adding.getByLabel('弹窗搜索关键词').inputValue(),'恋人 李荣浩');
       assert.equal(fixture.state.searchQueries.at(-1).request.query,'恋人 李荣浩');

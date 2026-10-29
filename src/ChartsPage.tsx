@@ -8,6 +8,7 @@ import { artworkUrl } from '../server/artwork-url';
 import { cachedChart, cacheChart } from './chart-cache';
 import { PlayAllButton } from './ListActions';
 import { PagedList } from './Pagination';
+import { ActionMenu } from './ActionMenu';
 
 const sources: Record<ChartSource,string> = {netease:'网易云',qq:'QQ',bilibili:'B站',apple:'Apple Music'};
 const sourceIcons = { netease: RecordIcon, qq: WaveformIcon, bilibili: TelevisionSimpleIcon, apple: MusicNoteIcon };
@@ -22,7 +23,7 @@ function ChartFavoriteButton({context,state,onFavorite}:{context:ChartSongContex
   const key=catalogSongKey(context),saved=state.saved.has(key),busy=state.busy===key;
   return <button className={'btn btn-icon '+(saved?'saved':'')} title={saved?'取消收藏':'收藏'} aria-label={(saved?'取消收藏榜单歌曲 ':'收藏榜单歌曲 ')+context.title} aria-pressed={saved} aria-busy={busy||undefined} disabled={state.disabled||busy} onClick={()=>onFavorite(context)}>{busy?<SpinnerGapIcon size={18} className="favorite-spinner"/>:<HeartIcon size={18} weight={saved?'fill':'regular'}/>}</button>;
 }
-export function ChartsPage({onSearch,onPlay,onPlayAll,onFavorite,favoriteState,mobile=false}:{onSearch:(item:ChartItem,context?:ChartSongContext)=>void;onPlay:(item:ChartItem,context?:ChartSongContext)=>void;onPlayAll:(items:ChartItem[],contexts?:ChartSongContext[])=>void;onFavorite?:(context:ChartSongContext)=>void;favoriteState?:ChartFavoriteState;mobile?:boolean}) {
+export function ChartsPage({onSearch,onPlay,onPlayAll,onFavorite,favoriteState,mobile=false,onEnqueue}:{onSearch:(item:ChartItem,context?:ChartSongContext)=>void;onPlay:(item:ChartItem,context?:ChartSongContext)=>void;onPlayAll:(items:ChartItem[],contexts?:ChartSongContext[])=>void;onFavorite?:(context:ChartSongContext)=>void;favoriteState?:ChartFavoriteState;mobile?:boolean;onEnqueue?:(item:ChartItem,context:ChartSongContext,next:boolean)=>void}) {
   const tabsId=useId();
   const [source,setSource]=useState<ChartSource>(lastChartView.source),[kind,setKind]=useState(lastChartView.kind),[period,setPeriod]=useState(lastChartView.period);
   const [data,setData]=useState<Record<string,MusicChart>>(():Record<string,MusicChart>=>{const {source,kind,period}=lastChartView,chart=source==='netease'?kind as ChartKind:source==='apple'?'most-played':'hot',saved=cachedChart(source,chart,period);return saved?{[source+':'+chart]:saved}:{};}),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -67,6 +68,13 @@ export function ChartsPage({onSearch,onPlay,onPlayAll,onFavorite,favoriteState,m
         {onFavorite&&(favoriteState?<ChartFavoriteButton context={context(item)} state={favoriteState} onFavorite={onFavorite}/>:<button className="btn btn-icon" aria-label={'收藏榜单歌曲 '+item.title} onClick={()=>onFavorite(context(item))}><HeartIcon size={18}/></button>)}
         <button className="btn btn-icon chart-song-search" title={'搜索其他版本 · '+item.title} aria-label={'搜索 '+item.title} onClick={()=>onSearch(item,context(item))}><MagnifyingGlassIcon size={18}/></button>
         <button className="btn btn-icon chart-song-play" title={'直接播放 '+item.title} aria-label={'直接播放 '+item.title} onClick={()=>onPlay(item,context(item))}><PlayIcon size={16} weight="fill"/></button>
+        {!mobile&&<ActionMenu label={'更多操作 '+item.title} title={item.title} subtitle="榜单歌曲 · 播放时自动匹配来源" target=".chart-song" actions={[
+          {id:'play',label:'立即播放',onSelect:()=>onPlay(item,context(item))},
+          ...(onEnqueue?[{id:'next',label:'下一首播放',onSelect:()=>onEnqueue(item,context(item),true)},{id:'last',label:'加入队尾',onSelect:()=>onEnqueue(item,context(item),false)}]:[]),
+          {separator:true},
+          ...(onFavorite?[{id:'favorite',label:favoriteState?.saved.has(catalogSongKey(context(item)))?'取消收藏':'收藏',disabled:favoriteState?.disabled||favoriteState?.busy===catalogSongKey(context(item)),onSelect:()=>onFavorite(context(item))}]:[]),
+          {id:'search',label:'搜索其他版本…',onSelect:()=>onSearch(item,context(item))},
+        ]}/>}
       </div>)}</div>}</PagedList></>}
     </div>}</div>
   </section>;
