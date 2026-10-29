@@ -60,6 +60,7 @@ export function YoutubeDiscovery({ available, refreshToken, renderCovers, render
   const shelf: Shelf = current?.shelf ?? { id: 'youtube-music-selection', title: 'YouTube 音乐精选', kind: 'recommendation' };
   const retry = <button className="btn btn-secondary btn-sm" onClick={() => void load(true)}>重试音乐精选</button>;
   return <DiscoveryShelf mobile={mobile} shelf={shelf} displayActive={displayActive} loading={busy} renderCovers={renderCovers} renderList={renderList}
+    issue={failure??(!available?{code:'youtube-unavailable'}:undefined)} onCancel={()=>{active.current?.abort();setBusy(false);}}
     feedback={mobile&&<>{!available&&<p className="feedback" role="alert">YouTube 视频来源暂不可用，请在设置中检查取源工具。</p>}{!!failure&&<p className="feedback" role="alert">{errorText(failure)} {retry}</p>}{recommendation?.issue&&<p className="feedback" role="alert">{errorText({code:recommendation.issue})} {retry}</p>}{!!current?.warnings.length&&<p className="muted" role="status">部分歌单暂时无法读取，已展示可用歌曲。</p>}</>}
     renderError={error => <p role="alert">{errorText(error)} {retry}</p>}
     onRefresh={available ? () => void load(true) : undefined}
@@ -72,11 +73,11 @@ export function YoutubeDiscovery({ available, refreshToken, renderCovers, render
     </>}
     status={<>
       {current && <span>{message} · 获取于 {new Date(current.fetchedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
-      {busy && <span>正在获取 YouTube 音乐精选… <button className="btn btn-ghost btn-sm" onClick={() => { active.current?.abort(); setBusy(false); }}>取消</button></span>}
+      {mobile&&<>{busy && <span>正在获取 YouTube 音乐精选… <button className="btn btn-ghost btn-sm" onClick={() => { active.current?.abort(); setBusy(false); }}>取消</button></span>}
       {!available && <span className="error-text" role="alert">YouTube 视频来源暂不可用，请在设置中检查取源工具。</span>}
       {available && !!failure && <span className="error-text" role="alert">{errorText(failure)} {retry}</span>}
       {recommendation?.updating&&<span>启动时正在准备新推荐，先展示上次内容。</span>}
-      {recommendation?.issue&&<span className="error-text" role="alert">{errorText({code:recommendation.issue})} {recommendation.retained?'已保留上次内容。':'已展示可用歌曲。'}{retry}</span>}
+      {recommendation?.issue&&<span className="error-text" role="alert">{errorText({code:recommendation.issue})} {recommendation.retained?'已保留上次内容。':'已展示可用歌曲。'}{retry}</span>}</>}
       {!!current?.warnings.length && <span>部分歌单暂时无法读取，已展示可用歌曲。可换一批或选择其他地区。</span>}
       {saveFailed && <span>当前浏览器无法保存地区选择。</span>}
     </>}

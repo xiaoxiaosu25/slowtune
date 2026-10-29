@@ -2,6 +2,8 @@ import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode } fro
 import { HeartIcon, MusicNotesIcon, PlayIcon, DotsThreeIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, PlusIcon, CameraIcon, PencilSimpleIcon, ArrowsDownUpIcon, ListBulletsIcon, CaretDownIcon, CheckIcon, QueueIcon, UsersIcon, LinkIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState, SongPlaybackSelection, SongPlaylistEntry, SongVersion } from '../server/song-library-types';
 import { Modal } from './Modal';
+import { PlayAllButton } from './ListActions';
+import { MobileBrowseTitle } from './MobileBrowseTitle';
 import { errorText, availabilityText } from './api';
 import { PagedList } from './Pagination';
 import './song-library.css';
@@ -156,7 +158,7 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
   const openEditor = (row: typeof rows[number]) => desktop ? setDesktopContext({ songId: row.songId, ...(row.entry ? { playlistId: selected, entryId: row.id } : {}), versionId: chosenFor(row)?.id }) : setEditing(row.songId);
   const PlaylistHeading = 'h1';
   const playlistName = favorites ? '我的收藏' : playlist?.name;
-  const playAllButton=<button className="btn btn-primary play-all" disabled={!visible.some(row=>!blocked(row))} onClick={()=>onPlayAll(visible.map(({selection,song})=>({selection,song})))}><PlayIcon size={18}/>播放全部</button>;
+  const playAllButton=<PlayAllButton count={visible.length} disabled={!visible.some(row=>!blocked(row))} onClick={()=>onPlayAll(visible.map(({selection,song})=>({selection,song})))}/>;
   return <section className="catalog list-view song-library-page" hidden={hidden}>
     {loadError && <div className="feedback" role="status"><p>歌单更新暂时失败，当前内容保留。{loadError}</p><button className="btn btn-secondary" onClick={onRetry}>重试读取歌单</button></div>}
     {desktop&&<div className="segmented playlist-switcher" aria-label="选择歌单"><button className={favorites ? 'selected' : ''} onClick={() => onSelect(songFavoritesId)}>我的收藏<small>{state.snapshot.favorites.length} 首</small></button>{state.snapshot.playlists.map(playlist => <button key={playlist.id} className={selected === playlist.id ? 'selected' : ''} onClick={() => onSelect(playlist.id)}>{playlist.name}<small>{playlist.entries.length} 首</small></button>)}</div>}
@@ -175,7 +177,7 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
         <span className="row-number">{row.position + 1}</span>
         <button className="row-cover" aria-label={'播放 ' + row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}><SongCover song={row.song}/></button>
         <div className="row-info">
-          <button className="track-name" title={row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}>{row.song.title}</button>
+          {desktop ? <button className="track-name" title={row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}>{row.song.title}</button> : <MobileBrowseTitle className="track-name" title={row.song.title} disabled={blocked(row)} onPlay={() => onPlay(row.selection, row.song)}/>}
           <p className="row-sub">{row.song.artists?.join(' / ') || '歌手待整理'}</p>
           {!desktop && versions.length > 1 && <button className="song-version-link" aria-label={'选择播放版本 ' + row.song.title} title={chosen?.label || chosen?.facts.title} onClick={() => openEditor(row)}>{versions.length} 个版本</button>}
           {row.entry?.pinnedVersionId && chosen && <span className="row-status">固定 · {chosen.label || chosen.facts.title}</span>}

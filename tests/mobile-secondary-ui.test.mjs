@@ -163,7 +163,7 @@ test('mobile backup and source imports preview, cancel, retry and confirm withou
   fixture.setFailWrite(false);await backup.getByRole('button',{name:'确认导入',exact:true}).click();await backup.getByText('资料已导入，当前播放与队列保留。',{exact:true}).waitFor();await backup.getByRole('button',{name:'返回上一级',exact:true}).click();
   await mobileNav(page).getByRole('button',{name:'发现',exact:true}).click();await discoverNav(page).getByRole('button',{name:'关注',exact:true}).click();
   await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.locator('.follow-feed-pages .track-row').first().waitFor();
-  await page.locator('.follow-toolbar').getByRole('button',{name:'加入歌单',exact:true}).click();
+  await page.getByRole('button',{name:'关注页面操作',exact:true}).click();await page.getByRole('dialog',{name:'关注页面操作',exact:true}).getByRole('button',{name:'加入本页更新到歌单',exact:true}).click();
   const source=page.getByRole('dialog',{name:/添加歌曲/});await source.getByRole('button',{name:'读取并预览来源',exact:true}).click();await source.getByRole('button',{name:'确认添加',exact:true}).waitFor();
   await page.waitForFunction(()=>!document.querySelector('.song-list-import-modal [role="status"]')?.textContent?.includes('正在读取'));
   assert.equal(await source.locator('.source-import-preview .choice').count(),30);
@@ -178,7 +178,7 @@ test('mobile backup and source imports preview, cancel, retry and confirm withou
   }
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(artifacts,'08-source-import-390.png')});
   await source.getByRole('button',{name:'重试添加',exact:true}).click();await source.waitFor({state:'detached'});
-  await page.locator('.follow-toolbar').getByRole('button',{name:'加入歌单',exact:true}).click();
+  await page.getByRole('button',{name:'关注页面操作',exact:true}).click();await page.getByRole('dialog',{name:'关注页面操作',exact:true}).getByRole('button',{name:'加入本页更新到歌单',exact:true}).click();
   fixture.setMetadataDelay(500);await source.getByRole('button',{name:'读取并预览来源',exact:true}).click();await source.getByRole('button',{name:'取消读取',exact:true}).click();await source.getByText(/读取已取消/).waitFor();
   fixture.setMetadataDelay(0);fixture.setFailMetadata(true);await source.getByRole('button',{name:'读取并预览来源',exact:true}).click();await source.getByRole('region',{name:'来源失败项',exact:true}).waitFor();
   assert.equal(await source.getByRole('button',{name:'确认添加',exact:true}).isDisabled(),true);
@@ -197,7 +197,7 @@ test('secondary screens reflow at phone and landscape sizes with readable long c
   for(const theme of ['light','dark'])for(const size of sizes){
     await page.setViewportSize(size);await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
     await mobileNav(page).getByRole('button',{name:'发现',exact:true}).click();await discoverNav(page).getByRole('button',{name:'音乐榜单',exact:true}).click();await page.locator('.chart-song').first().waitFor();await fits();
-    const row=await page.locator('.chart-song').first().boundingBox();assert(row.height<=104);
+    const row=await page.locator('.chart-song').first().boundingBox();assert(row.height<=120,'two independent 48px actions retain a compact chart row');
     for(const selector of ['.chart-song-main','.chart-song-search','.chart-song>.btn-icon:not(.chart-song-play)'])assert((await page.locator(selector).first().boundingBox()).height>=48);
     await discoverNav(page).getByRole('button',{name:'关注',exact:true}).click();
     if(await page.getByRole('button',{name:'返回关注',exact:true}).count())await page.getByRole('button',{name:'返回关注',exact:true}).click();

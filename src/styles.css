@@ -512,6 +512,7 @@ h3 { font-size:var(--fs-lg); line-height:1.5; font-weight:600; }
 .search-playing>span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-sm); }
 .search-playing .transport { flex-shrink:0; }
 .chart-source-tabs { margin-bottom:var(--sp-4); flex-wrap:wrap; }
+.mobile-chart-kind,.mobile-chart-details { display:none; }
 .charts-page[data-chart-source="netease"] { --chart-tone:var(--platform-netease); }
 .charts-page[data-chart-source="qq"] { --chart-tone:var(--platform-qq); }
 .charts-page[data-chart-source="bilibili"] { --chart-tone:var(--platform-bilibili); }
