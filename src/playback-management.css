@@ -47,14 +47,12 @@
   .playback-version-search .toolbar { margin-top:10px; }
   .embedded-lyrics-settings .lyrics-search { grid-template-columns:1fr; }
   .embedded-lyrics-settings .lyrics-candidates { max-height:none; }
-  .embedded-lyrics-settings .lyrics-candidate { grid-template-columns:minmax(0,1fr) auto; padding-inline:0; }
   .embedded-lyrics-settings .desktop-lyric-font { padding-inline:0; }
   .lyrics-display-options { margin-bottom:16px; color:var(--muted); }
   .lyrics-display-options summary { cursor:pointer; padding:6px 0; }
   .lyrics-display-options>.choice { display:flex; margin-top:8px; }
   .embedded-lyrics-settings .lyrics-preview { margin:16px 0; }
   .embedded-lyrics-settings .lyrics-offset-buttons>.btn { padding-inline:8px; }
-  .lyrics-offset-preview { margin-top:10px; color:var(--muted); font-size:12px; }
   .current-lyrics-text { margin-top:12px; }
   .current-lyrics-text summary { cursor:pointer; }
   .current-lyrics-text>div { max-height:280px; overflow:auto; padding:12px 0; white-space:pre-wrap; }

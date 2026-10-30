@@ -6,7 +6,7 @@ export type DesktopLyricsPreferences = { visible: boolean; locked: boolean; font
 type HostState = { preferences: DesktopLyricsPreferences };
 export type DesktopPreferenceState = { pending: boolean; error: string | null };
 export type DesktopRuntimeInfo = { appVersion: string; electron: string; chromium: string; node: string; platform: string; arch: string; preferences: DesktopPreferenceState };
-type HostDocument = { sourceKey: string; title: string; status: string; offsetMs: number; synced: boolean; instrumental: boolean; lines: NonNullable<LyricsController['document']>['lines'] };
+type HostDocument = { sourceKey: string; title: string; status: string; offsetMs: number; synced: boolean; instrumental: boolean; durationMs?:number; lines: NonNullable<LyricsController['document']>['lines'] };
 type DesktopAPI = {
   getState(): Promise<HostState>;
   restoreLocalSession(): Promise<boolean>;
@@ -61,9 +61,9 @@ export function useDesktopHost(lyrics: LyricsController, playback: LyricPlayback
   useEffect(() => {
     if (!api) return;
     const document = active ? lyrics.document : undefined;
-    api.publishDocument({ sourceKey, title: active ? lyrics.track?.title ?? '' : '', status: !active ? empty.status : lyrics.busy ? '正在寻找歌词…' : lyrics.error ? '歌词暂不可用' : '暂无匹配歌词', offsetMs: lyrics.offsetMs, synced: document?.synced === true, instrumental: document?.instrumental === true, lines: document?.lines ?? [] });
+    api.publishDocument({ sourceKey, title: active ? lyrics.track?.title ?? '' : '', status: !active ? empty.status : lyrics.busy ? '正在寻找歌词…' : lyrics.error ? '歌词暂不可用' : '暂无匹配歌词', offsetMs: lyrics.offsetMs, synced: document?.synced === true, instrumental: document?.instrumental === true,...(playback.duration&&playback.duration>0?{durationMs:playback.duration*1000}:{}), lines: document?.lines ?? [] });
     publishClock();
-  }, [api, sourceKey, active, lyrics.document, lyrics.offsetMs, lyrics.busy, lyrics.error, lyrics.track?.title]);
+  }, [api, sourceKey, active, lyrics.document, lyrics.offsetMs, lyrics.busy, lyrics.error, lyrics.track?.title,playback.duration]);
   useEffect(() => {
     if (!api) return;
     publishClock();

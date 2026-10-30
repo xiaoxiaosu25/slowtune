@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /** Native popovers keep light dismissal, Escape and focus return consistent. */
-export function ControlPopover({label,icon,children,className='',buttonClassName='btn-icon',side='top'}:{label:string;icon:ReactNode;children:ReactNode;className?:string;buttonClassName?:string;side?:'top'|'bottom'}) {
+export function ControlPopover({label,icon,children,className='',buttonClassName='btn-icon',side='top',closeOnAction=true,onOpenChange}:{label:string;icon:ReactNode;children:ReactNode;className?:string;buttonClassName?:string;side?:'top'|'bottom';closeOnAction?:boolean;onOpenChange?:(open:boolean)=>void}) {
   const id=useId(),button=useRef<HTMLButtonElement>(null),panel=useRef<HTMLDivElement>(null);
+  const changed=useRef(onOpenChange);changed.current=onOpenChange;
   const [open,setOpen]=useState(false);
   useEffect(()=>{
     const element=panel.current;
@@ -21,15 +22,15 @@ export function ControlPopover({label,icon,children,className='',buttonClassName
       else {element.style.bottom='auto';element.style.top=Math.max(12,anchor.bottom+8)+'px';}
     };
     const before=(event:Event)=>{if((event as ToggleEvent).newState==='open')place();};
-    const toggle=(event:Event)=>{const isOpen=(event as ToggleEvent).newState==='open';setOpen(isOpen);if(isOpen)place();};
+    const toggle=(event:Event)=>{const isOpen=(event as ToggleEvent).newState==='open';setOpen(isOpen);if(isOpen)place();changed.current?.(isOpen);};
     // Independent list scrolling does not move this popover's trigger.
     const dismiss=(event:Event)=>{if(event.type==='scroll'&&event.target instanceof Node&&!event.target.contains(button.current))return;if(element.matches(':popover-open'))element.hidePopover();};
     element.addEventListener('beforetoggle',before);element.addEventListener('toggle',toggle);
     window.addEventListener('resize',dismiss);window.addEventListener('scroll',dismiss,true);
-    return()=>{element.removeEventListener('beforetoggle',before);element.removeEventListener('toggle',toggle);window.removeEventListener('resize',dismiss);window.removeEventListener('scroll',dismiss,true);};
+    return()=>{if(element.matches(':popover-open'))changed.current?.(false);element.removeEventListener('beforetoggle',before);element.removeEventListener('toggle',toggle);window.removeEventListener('resize',dismiss);window.removeEventListener('scroll',dismiss,true);};
   },[side]);
   return <div className={'control-popover '+className} data-open={open||undefined}>
     <button ref={button} type="button" className={'btn '+buttonClassName+(open?' saved':'')} aria-label={label} title={label} aria-expanded={open} aria-controls={id} popoverTarget={id}>{icon}</button>
-    <div ref={panel} id={id} popover="auto" className="control-popover-panel" aria-label={label} onClick={event=>{const button=(event.target as HTMLElement).closest('button');if(button&&!button.hasAttribute('popovertarget'))panel.current?.hidePopover();}}>{children}</div>
+    <div ref={panel} id={id} popover="auto" className="control-popover-panel" aria-label={label} onClick={event=>{const button=(event.target as HTMLElement).closest('button');if(closeOnAction&&button&&!button.hasAttribute('popovertarget'))panel.current?.hidePopover();}}>{children}</div>
   </div>;
 }

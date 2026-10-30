@@ -1,10 +1,13 @@
 import { currentLines, hasDisplayableLyrics } from './model.mjs';
+import { floatingLineEnd, floatingLinePan } from './lyric-layout.mjs';
 const api = window.slowTuneLyrics;
 const current = document.querySelector('#current'), secondary = document.querySelector('#secondary');
 const options = document.querySelector('#options'), panel = document.querySelector('#display-options');
 const unlock = document.querySelector('#unlock'), fontSize = document.querySelector('#font-size'), feedback = document.querySelector('#feedback');
 const lyrics = document.querySelector('#lyrics'), controls = document.querySelector('#controls'), lockNotice = document.querySelector('#lock-notice');
 let doc = null, clock = null, prefs, identity = '', wordFills = [];
+let primaryContent, lastFrame, metrics, lineEnd;
+const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
 let pointer, dwellOrigin, dwellTimer, noticeTimer, unlockVisible = false;
 const report = error => { feedback.textContent = error?.message || '设置未保存，请重试'; };
 const update = value => api.updatePreferences(value).catch(report);
@@ -57,16 +60,33 @@ function render() {
   const secondaryText = !hasLyrics ? '' : line ? prefs?.translations && line.translation ? line.translation : doc.lines[(index >= 0 ? index : firstIndex) + 1]?.text || '' : waiting ? '前奏 · 等待第一句' : '';
   const nextIdentity = JSON.stringify([doc?.sourceKey, index, primaryText, secondaryText, line?.words]);
   if (nextIdentity !== identity) {
-    identity = nextIdentity; wordFills = []; current.replaceChildren();
+    const advance=lastFrame?.source===doc?.sourceKey&&lastFrame.index+1===index&&time>=lastFrame.time&&time-lastFrame.time<1500&&clock?.playing;
+    identity = nextIdentity; wordFills = []; current.replaceChildren();metrics=undefined;
+    primaryContent=document.createElement('span');primaryContent.className='line-content';current.append(primaryContent);
     if (line?.words?.length) for (const word of line.words) {
       const element = document.createElement('span'); element.className = 'word';
       const base = document.createElement('span'), fill = document.createElement('span');
       base.textContent = fill.textContent = word.text; fill.className = 'fill'; fill.setAttribute('aria-hidden', 'true');
-      element.append(base, fill); current.append(element); wordFills.push({ element, word });
-    } else current.textContent = primaryText;
+      element.append(base, fill); primaryContent.append(element); wordFills.push({ element, word });
+    } else primaryContent.textContent = primaryText;
+    current.title=primaryText;
     secondary.textContent = secondaryText; current.classList.toggle('active', !!doc?.synced && !!line && !line.words?.length);
+    secondary.title=secondaryText;
+    if(advance&&!reducedMotion.matches)primaryContent.animate([{opacity:.65,transform:'translateY(2px)'},{opacity:1,transform:'translateY(0)'}],{duration:180,easing:'ease-out'});
   }
+  lineEnd=floatingLineEnd(doc,index);
   for (const { element, word } of wordFills) element.style.setProperty('--fill', String(Math.max(0, Math.min(1, (time - word.startMs) / (word.endMs - word.startMs)))));
+  if(primaryContent){
+    if(!metrics){metrics={width:current.clientWidth,overflow:Math.max(0,primaryContent.scrollWidth-current.clientWidth)};if(metrics.overflow)for(const entry of wordFills){entry.left=entry.element.offsetLeft;entry.width=entry.element.offsetWidth;}}
+    current.dataset.overflow=String(metrics.overflow>0);
+    let shift=0;
+    if(metrics.overflow>0&&!reducedMotion.matches&&line){
+      if(wordFills.length){const entry=wordFills.find(entry=>entry.word.endMs>time)??wordFills.at(-1),fraction=Math.max(0,Math.min(1,(time-entry.word.startMs)/(entry.word.endMs-entry.word.startMs)));shift=-Math.max(0,Math.min(metrics.overflow,entry.left+entry.width*fraction-metrics.width*.55));}
+      else shift=floatingLinePan(time,line.startMs,lineEnd,metrics.overflow);
+    }
+    primaryContent.style.setProperty('--line-shift',shift+'px');
+  }
+  lastFrame={source:doc?.sourceKey,index,time};
   current.dataset.line = String(index); current.dataset.time = String(time);
   document.body.dataset.empty = String(!line && !waiting);
   document.querySelector('#toggle').title = clock?.playing ? '暂停' : '播放';
@@ -78,6 +98,7 @@ function applyState(state) {
   prefs = state.preferences; doc = state.document; clock = state.clock;
   document.body.dataset.locked = String(prefs.locked); document.body.dataset.lines = String(prefs.lines);
   if (!previous || previous.locked !== prefs.locked || previous.visible !== prefs.visible || previous.fontSize !== prefs.fontSize || previous.lines !== prefs.lines) resetUnlock();
+  if(!previous||previous.fontSize!==prefs.fontSize)metrics=undefined;
   if (!prefs.locked || !prefs.visible) clearLockNotice();
   else if (previous && !previous.locked && hasDisplayableLyrics(doc)) {
     clearLockNotice(); lockNotice.textContent = '已锁定 · 悬停或从托盘解锁'; document.body.dataset.lockNotice = 'true';
@@ -95,7 +116,7 @@ function applyState(state) {
   render();
 }
 api.onState(applyState);
-api.onDocument(value => { if (doc?.sourceKey !== value.sourceKey) clock = null; doc = value; identity = ''; render(); });
+api.onDocument(value => { if (doc?.sourceKey !== value.sourceKey) clock = null; doc = value; render(); });
 api.onClock(value => { clock = value; render(); });
 void api.getState().then(applyState);
 for (const command of ['previous', 'toggle', 'next']) document.querySelector('#' + command).onclick = () => api.command(command);
@@ -137,4 +158,5 @@ options.onclick = async event => {
 };
 panel.addEventListener('beforetoggle', event => { if (event.newState === 'open') placeOptions(); });
 panel.addEventListener('toggle', event => { const open = event.newState === 'open'; options.setAttribute('aria-expanded', String(open)); if (open) placeOptions(); else void api.setOptionsOpen(false).catch(report); });
-window.addEventListener('resize', () => { resetUnlock(); if (panel.matches(':popover-open')) placeOptions(); });
+window.addEventListener('resize', () => { metrics=undefined;render();resetUnlock(); if (panel.matches(':popover-open')) placeOptions(); });
+reducedMotion.addEventListener('change',()=>{primaryContent?.getAnimations().forEach(animation=>animation.cancel());render();});

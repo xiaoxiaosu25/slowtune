@@ -64,6 +64,17 @@ test('viewing a song uploader exposes collections without following and remains 
     assert.equal(store.read().creators.length,0);assert.equal((await app.collections(profile,'browser',signal())).items.length,1);assert.equal((await app.videos(profile,signal())).items.length,1);
   }finally{await app.dispose();}
 });
+test('user search does not follow and only an explicit revision-checked action saves the verified identity',async()=>{
+  const store=new FollowStore(database(),'search'),profile={...author(),artwork:'https://i0.hdslb.com/avatar.jpg'},initial=store.read();
+  const app=new Follows(store,{cancelOwner(){},profile:async()=>assert.fail('search supplies verified profile facts'),search:async request=>({items:[profile],page:request.page??1,pageSize:30,total:1,hasMore:false})},async()=>assert.fail('user search does not resolve video metadata'));
+  try{
+    const page=await app.search({provider:'bilibili',query:'作者'},signal());assert.equal(page.items[0].id,profile.id);assert.deepEqual(store.read(),initial);
+    const saved=await app.change({revision:initial.revision,action:'follow',creator:{provider:'bilibili',id:profile.id,name:'客户端伪造名称'}},signal());
+    assert.equal(saved.creators[0].name,profile.name);assert.equal(saved.creators[0].artwork,profile.artwork);
+    await assert.rejects(app.change({revision:initial.revision,action:'unfollow',creator:profile},signal()),{code:'conflict'});
+    await app.change({revision:saved.revision,action:'unfollow',creator:profile},signal());assert.equal(store.read().creators.length,0);
+  }finally{await app.dispose();}
+});
 
 test('recent updates merge every followed source, sort real dates, preserve snapshots and limit concurrency',async()=>{
   const store=new FollowStore(database(),'a'),youtube=author('UCcvLSRIWJIAGFDyWtzkbiHA','youtube');

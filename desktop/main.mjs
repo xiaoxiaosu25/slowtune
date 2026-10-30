@@ -141,7 +141,8 @@ async function start() {
     // continues to record whether the user enabled desktop lyrics.
     if (visible) overlay.showInactive(); else overlay.hide();
   }
-  const lyricHeight = () => Math.max(170, Math.ceil(prefs.fontSize * (prefs.lines === 2 ? 2.6 : 1.6) + 66));
+  // Reserve both lanes so the current sentence stays anchored when the next line is toggled.
+  const lyricHeight = () => Math.max(170, Math.ceil(prefs.fontSize * 2.6 + 66));
   function compactOverlayBounds() {
     const bounds = overlay.getBounds(), height = lyricHeight();
     // Expanded windows can be clamped at a screen edge. Keep the compact anchor

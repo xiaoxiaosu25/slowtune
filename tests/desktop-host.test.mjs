@@ -6,6 +6,7 @@ import { resolve, join } from 'node:path';
 import { createServer } from 'node:net';
 import { preferences, restoreLyricsPreferences, windowAppearance, fitBounds, lyricDocument, lyricClock, currentLines } from '../desktop/model.mjs';
 import { ensureService, stopService, createDesktopSession } from '../desktop/service.mjs';
+import { floatingLineEnd, floatingLinePan } from '../desktop/lyric-layout.mjs';
 
 const root = resolve('.'), artifacts = join(developmentPaths().testRuntime, 'desktop-tests'); mkdirSync(artifacts, { recursive: true });
 const sleep = ms => new Promise(done => setTimeout(done, ms));
@@ -33,6 +34,11 @@ test('desktop boundary validates snapshots, real word timing, clock source and o
   assert.equal(lyricDocument({ ...doc, lines: Array(5001).fill(doc.lines[0]) }), null);
   assert.equal(lyricClock({ sourceKey: 'a', position: Infinity, playing: true }), null);
   assert.equal(lyricClock({ sourceKey: 'a', position: 1, playing: true, url: 'secret' }).url, undefined);
+  const last=lyricDocument({...doc,durationMs:9000});
+  assert.equal(last.durationMs,9000);assert.equal(floatingLineEnd(last,1),8000,'last line ends at media duration minus saved offset');
+  assert.equal(floatingLineEnd(doc,1),7000,'real word end is the fallback when media duration is unknown');
+  assert.equal(floatingLinePan(8000,5000,floatingLineEnd(last,1),200),-200);
+  assert.equal(lyricDocument({...doc,durationMs:Infinity}).durationMs,undefined);
 });
 
 test('desktop takes over a legacy service, refreshes stale builds and stops only its selected process', { timeout: 90000 }, async t => {

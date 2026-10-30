@@ -11,7 +11,7 @@ export const desktopOperationTimeoutMs = 60000;
 export function desktopSourcePath(path:string){
   return /^\/v1\/(?:handshake|call\/[^/]+)$/.test(path)||[
     '/api/search','/api/search/resolve','/api/song-library/playback','/api/identify','/api/playback/prefetch',
-    '/api/discovery/bilibili','/api/youtube/music','/api/creators/resolve',
+    '/api/discovery/bilibili','/api/youtube/music','/api/creators/resolve','/api/creators/search',
     '/api/song-library/catalog/search','/api/song-library/catalog/backfill',
   ].includes(path);
 }

@@ -9,6 +9,8 @@ import engineUrl from 'virtual:desktop-lyric-engine-url';
 import './desktop-lyrics.css';
 import { DesktopImmersiveChrome } from './desktop-chrome';
 import { useDesktopLyricSize } from './DesktopLyricFont';
+import { ControlPopover } from './ControlPopover';
+import { LyricOffsetControls } from './LyricOffsetControls';
 
 export function LyricsToggle({ active, onClick }: { active: boolean; onClick: () => void }) {
   const label = active ? '关闭沉浸歌词' : '打开沉浸歌词';
@@ -37,6 +39,19 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
   const live = useRef({ playback, offset: lyrics.offsetMs, onSeek }); live.current = { playback, offset: lyrics.offsetMs, onSeek };
   const [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0), [browsing, setBrowsing] = useState(false);
   const browseTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const surface=useRef<HTMLElement>(null),idleTimer=useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [toolsVisible,setToolsVisible]=useState(true);
+  const idleState=useRef({playing:playback.playing,browsing,settings:lyrics.settings});idleState.current={playing:playback.playing,browsing,settings:lyrics.settings};
+  const showTools=()=>{
+    clearTimeout(idleTimer.current);setToolsVisible(true);
+    if(!window.matchMedia('(hover:hover) and (pointer:fine)').matches||!idleState.current.playing)return;
+    idleTimer.current=setTimeout(()=>{
+      const current=idleState.current,focused=window.document.activeElement;
+      if(!current.playing||current.browsing||current.settings||window.document.querySelector(':popover-open,dialog[open],.playback-management')||focused&&surface.current?.contains(focused)&&focused!==reading.current)return;
+      setToolsVisible(false);
+    },3000);
+  };
+  useEffect(()=>{showTools();return()=>clearTimeout(idleTimer.current);},[playback.playing,browsing,lyrics.settings]);
   const document = lyrics.document;
   const synced = document?.synced && !document.instrumental && document.lines.length > 0;
   const resume = () => { clearTimeout(browseTimer.current); setBrowsing(false); engine.current?.resume(); wake.current(true); };
@@ -94,14 +109,15 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
   };
   const hasLines = document && !document.instrumental && document.lines.length > 0;
   const status = document?.instrumental ? '纯音乐，安心听' : lyrics.busy ? '正在寻找歌词…' : lyrics.error ? '歌词暂不可用' : '暂无匹配歌词';
-  return <section className="desktop-lyrics-view" aria-label="沉浸歌词" style={{ '--desktop-lyric-size': fontSize + 'px' } as CSSProperties}>
+  return <section ref={surface} className="desktop-lyrics-view" aria-label="沉浸歌词" data-layout={lyrics.focus?'focus':'split'} data-tools-hidden={!toolsVisible||undefined} onPointerMove={showTools} onPointerDownCapture={showTools} onFocusCapture={showTools} onKeyDownCapture={showTools} style={{ '--desktop-lyric-size': fontSize + 'px' } as CSSProperties}>
     <DesktopImmersiveChrome/>
     <LyricBackdrop artwork={artwork}/>
     <button type="button" className="btn btn-icon desktop-lyrics-close" aria-label="返回普通播放" title="收起歌词模式" onClick={onClose}><CaretDownIcon size={24}/></button>
+    {lyrics.focus&&<div className="desktop-lyrics-focus-heading"><strong>{lyrics.track?.title||'正在聆听'}</strong>{!!lyrics.track?.artists?.length&&<span>{lyrics.track.artists.join(' / ')}</span>}</div>}
     <div className="desktop-lyrics-stage">
-    <aside className="desktop-lyrics-track" aria-label="当前歌曲">{visual}<div className="desktop-lyrics-song">{songInfo}</div></aside>
+    <aside className="desktop-lyrics-track" aria-label="当前歌曲" hidden={lyrics.focus}>{visual}<div className="desktop-lyrics-song">{songInfo}</div></aside>
     <div className="desktop-lyrics-column">
-    <div className="desktop-lyrics-management-tools"><button className="btn btn-ghost btn-sm" onClick={() => onManage('select')}>{hasLines ? '更换歌词' : '查找 / 导入歌词'}</button>{document?.synced && <button className="btn btn-ghost btn-sm" onClick={() => onManage('offset')}>校准时间</button>}</div>
+    <div className="desktop-lyrics-management-tools"><button className="btn btn-ghost btn-sm" aria-label={lyrics.focus?'封面与歌词布局':'纯歌词布局'} aria-pressed={lyrics.focus} onClick={()=>lyrics.updateDisplay({focus:!lyrics.focus})}>{lyrics.focus?'显示封面':'纯歌词'}</button><button className="btn btn-ghost btn-sm" onClick={() => onManage('select')}>{hasLines ? '更换歌词' : '查找 / 导入歌词'}</button>{document?.synced && <ControlPopover key={lyrics.sourceKey} label="校准时间" icon={<>校准时间</>} buttonClassName="btn-ghost btn-sm" className="lyric-offset-popover" side="bottom" closeOnAction={false} onOpenChange={open=>{showTools();if(!open)lyrics.setOffset(String((lyrics.state?.offsetMs??0)/1000));}}><LyricOffsetControls lyrics={lyrics} compact/>{lyrics.error&&<div className="feedback" role="alert"><p>{lyrics.error}</p>{lyrics.stale&&<button className="btn btn-secondary" onClick={()=>void lyrics.load(true)}>重读当前歌词</button>}</div>}</ControlPopover>}</div>
     <div ref={reading} className="desktop-lyrics-reading" tabIndex={-1} aria-label="沉浸歌词正文" onWheelCapture={browse} onKeyDown={event => {
       if (event.defaultPrevented || !['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key) || !engine.current) return;
       event.preventDefault(); event.stopPropagation(); browse();

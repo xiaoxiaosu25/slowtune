@@ -85,7 +85,7 @@ test('desktop versions, source facts, in-place audition and per-source lyric man
   await panel.getByRole('tab', { name: '歌词管理', exact: true }).click();
   assert.equal(await panel.getByLabel('歌词延后秒数', { exact: true }).inputValue(), '0');
   await panel.getByRole('button', { name: '延后 0.5 秒', exact: true }).click(); await panel.getByRole('button', { name: '保存偏移', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('.lyrics-offset-preview')?.textContent.includes('已保存'));
+  await page.waitForFunction(() => document.querySelector('.lyric-offset-value')?.textContent.includes('已保存'));
   await panel.getByRole('button', { name: '更换或导入歌词', exact: true }).click(); await panel.getByRole('button', { name: '查找歌词', exact: true }).click();
   await panel.getByRole('button', { name: /^预览 LRCLIB/ }).click(); await panel.getByText('候选歌词全文第二句', { exact: true }).waitFor();
   assert.equal(stateFor({ id: 'BV0000000006', part: '10' }).document.title, '晴天原歌词');
@@ -126,8 +126,8 @@ test('desktop versions, source facts, in-place audition and per-source lyric man
   await openVersions(page, page.locator('.desktop-lyrics-view'));
   assert.equal(await panel.getByRole('tab', { name: '播放版本', exact: true }).getAttribute('aria-selected'), 'true');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '校准时间', exact: true }).click(); await panel.getByLabel('歌词延后秒数', { exact: true }).waitFor();
-  await page.keyboard.press('Escape'); assert.equal(await panel.count(), 0); assert.equal(await page.locator('.desktop-lyrics-view').isVisible(), true);
+  await page.getByRole('button', { name: '校准时间', exact: true }).click(); await page.locator('.lyric-offset-popover [popover]:popover-open').getByLabel('歌词延后秒数', { exact: true }).waitFor();
+  await page.keyboard.press('Escape'); assert.equal(await page.locator('.lyric-offset-popover [popover]:popover-open').count(), 0); assert.equal(await panel.count(), 0); assert.equal(await page.locator('.desktop-lyrics-view').isVisible(), true);
   await page.getByRole('button', { name: '更换歌词', exact: true }).click(); await panel.getByRole('button', { name: '查找歌词', exact: true }).waitFor();
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await page.screenshot({ path: join(artifacts, 'playing-desktop.png'), animations: 'disabled' });

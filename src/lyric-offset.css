@@ -1,0 +1,17 @@
+.lyric-offset-controls { display:grid; gap:12px; }
+.lyric-offset-controls p { margin:0; line-height:1.7; }
+.lyric-offset-value { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; }
+.lyric-offset-value small { color:var(--muted); font-size:12px; font-weight:400; }
+.lyric-offset-slider { width:100%; min-width:0; height:32px; accent-color:var(--accent); }
+.lyric-offset-controls .lyrics-offset-buttons { display:flex; flex-wrap:wrap; gap:8px; margin:0; }
+.lyric-offset-popover .control-popover-panel { width:336px; max-width:calc(100vw - 24px); padding:16px; }
+.control-popover-panel .lyric-offset-controls .btn { display:inline-flex; width:auto; justify-content:center; padding:0 12px; min-height:36px; border-radius:var(--r-sm); }
+.control-popover-panel .lyric-offset-controls .btn-primary { background:var(--primary); color:var(--on-primary); }
+.control-popover-panel .lyric-offset-controls .btn-secondary { border:1px solid var(--border); background:var(--action-bg); }
+.control-popover-panel .lyric-offset-controls .field { display:grid; padding:0; gap:8px; }
+.control-popover-panel .lyric-offset-controls .input { width:100%; }
+.control-popover-panel .lyric-offset-controls .muted { font-size:12px; }
+@media(max-width:760px) {
+  .lyric-offset-controls .btn { min-height:48px; }
+  .lyric-offset-slider { height:48px; }
+}

@@ -8,15 +8,16 @@ body:hover #toolbar,#toolbar:focus-within,body:has(#display-options:popover-open
 button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:#edf2e8;min-width:30px;height:30px;border-radius:6px;font:12px "Segoe UI","Microsoft YaHei",sans-serif;cursor:pointer;padding:0 7px;app-region:no-drag}
 button:hover{background:#ffffff20}button:focus-visible,input:focus-visible{outline:2px solid #f4cd87;outline-offset:-1px}button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}svg [hidden]{display:none}
 .separator{height:14px;width:1px;background:#ffffff30;margin:0 3px}
-.drag{app-region:drag;width:100%;min-height:116px;display:flex;flex-direction:column;justify-content:center;text-align:center;gap:3px}
+.drag{app-region:drag;width:100%;height:calc(var(--lyric-size)*2.6);flex:none;display:grid;grid-template-rows:calc(var(--lyric-size)*1.45) calc(var(--lyric-size)*1.0875);align-content:center;text-align:center;gap:3px}
 .line{font-size:var(--lyric-size);line-height:1.45;font-weight:650;white-space:pre;overflow:hidden;text-overflow:ellipsis;color:var(--lyric-color);text-shadow:0 2px 5px #000,0 0 2px #000,1px 0 1px #000,-1px 0 1px #000;-webkit-text-stroke:.55px #000b;paint-order:stroke fill}
 .secondary{font-size:calc(var(--lyric-size)*.75);opacity:.90;font-weight:550}.word{position:relative;display:inline-block}.word .fill{position:absolute;inset:0;color:var(--lyric-highlight);clip-path:inset(0 calc((1 - var(--fill,0))*100%) 0 0);overflow:hidden;pointer-events:none}.active{color:var(--lyric-highlight)}
+.line-content{display:inline-block;position:relative;white-space:pre;translate:var(--line-shift,0px) 0}.line[data-overflow=true]{text-align:left;text-overflow:clip}
 #unlock{position:absolute;right:0;top:3px;width:36px;height:36px;padding:0;border:1px solid #ffffff24;border-radius:8px;background:#202922ed;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s,visibility 0s .15s}
 body[data-locked=true][data-unlock-visible=true] #unlock{opacity:1;visibility:visible;pointer-events:auto;transition-delay:0s}
 #lock-notice{position:absolute;left:0;max-width:calc(100% - 44px);margin:0;padding:8px 10px;border-radius:8px;background:#202922ed;color:#edf2e8;font-size:12px;line-height:18px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .15s,visibility 0s .15s}
 body[data-locked=true][data-lock-notice=true] #lock-notice{opacity:1;visibility:visible;transition-delay:0s}
 body[data-locked=true]{pointer-events:none}body[data-locked=true] #toolbar{visibility:hidden;pointer-events:none}body[data-locked=true] .drag{app-region:no-drag}
-body[data-lines="1"] #secondary{display:none}body[data-empty=true] .line{font-size:calc(var(--lyric-size)*.75)}
+body[data-lines="1"] #secondary{visibility:hidden}body[data-empty=true] .line{font-size:calc(var(--lyric-size)*.75)}
 #display-options{position:fixed;inset:auto;margin:0;width:320px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:12px;border:1px solid #ffffff30;border-radius:12px;background:#202922;color:#edf2e8;box-shadow:0 3px 18px #0005;font-size:13px;app-region:no-drag}
 #display-options::backdrop{background:transparent}#display-options h2{margin:0 0 8px;font-size:13px;font-weight:600;color:#bbc6b8}
 .size-heading,.color-row,.check-row,.panel-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px}.size-heading{min-height:22px}.size-heading output{font-size:12px;color:#c8d1c5;font-variant-numeric:tabular-nums}

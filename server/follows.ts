@@ -5,8 +5,9 @@ import { FollowStore, validateCreator } from './follow-store.js';
 import type { CreatorSources } from './creator-sources.js';
 import { creatorKey, type CreatorRef, type CreatorProfile, type FollowFeed, type FollowedCreator } from './follow-types.js';
 import { artworkUrl } from './artwork-url.js';
+import type { CreatorSearchRequest } from '@studio/music-sources/creators';
 
-type Sources = Pick<CreatorSources,'profile'|'videos'|'collections'|'collectionVideos'|'cancelOwner'> & Partial<Pick<CreatorSources,'dispose'>>;
+type Sources = Pick<CreatorSources,'profile'|'videos'|'collections'|'collectionVideos'|'cancelOwner'> & Partial<Pick<CreatorSources,'dispose'|'search'>>;
 // Stop batch reads before the 60-second request deadline so cached results can still be returned.
 const batchReadTimeout=45000;
 interface FeedSnapshot {owner:string;revision:string;provider?:string;items:MusicEntry[];warnings:FollowFeed['warnings'];fetchedAt:number;until:number}
@@ -66,6 +67,12 @@ export class Follows {
       profile=await this.sources.profile(input.input,signal);
     }
     signal.throwIfAborted();return this.enrich(profile,signal);
+  }
+  async search(input:CreatorSearchRequest,signal:AbortSignal) {
+    if(!this.sources.search)throw new MusicSourceError({code:'unsupported',retryable:false});
+    const result=await this.sources.search(input,signal);signal.throwIfAborted();
+    for(const profile of result.items)this.rememberProfile(profile);
+    return result;
   }
   async change(input:any,signal:AbortSignal) {
     if(!input||!['follow','unfollow'].includes(input.action))throw new LibraryError('invalid-input');

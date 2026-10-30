@@ -344,6 +344,7 @@ app.get('/api/follows',async c=>{
   return c.json(profiles==='1'?await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.readProfiles(signal,refresh==='1')):follows.store.read());
 });
 app.post('/api/creators/resolve',async c=>{const input=await json(c.req.raw,4096);return c.json(await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.resolve(input,signal)));});
+app.post('/api/creators/search',async c=>{const input=await json(c.req.raw,4096);return c.json(await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.search(input,signal)));});
 app.get('/api/creators/profile',async c=>{
   const refresh=c.req.query('refresh');if(refresh!==undefined&&!['0','1'].includes(refresh))throw new LibraryError('invalid-input');
   return c.json(await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.creator({provider:c.req.query('provider'),id:c.req.query('id')},signal,refresh==='1')));

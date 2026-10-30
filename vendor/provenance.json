@@ -22,12 +22,12 @@
       "documentation": "README.md"
     },
     {
-      "file": "studio-music-sources-0.2.13.tgz",
+      "file": "studio-music-sources-0.2.14.tgz",
       "name": "@studio/music-sources",
-      "version": "0.2.13",
+      "version": "0.2.14",
       "license": "AGPL-3.0-only",
-      "origin": "Studio platform: packages/audio-video/music-sources; 2026-10-27 chart timeout normalization and cache issue fix",
-      "source": "sources/studio-music-sources-0.2.13.tar.gz",
+      "origin": "Studio platform: packages/audio-video/music-sources; 2026-10-30 Bilibili platform search order and read-only user search",
+      "source": "sources/studio-music-sources-0.2.14.tar.gz",
       "sourceBasis": "Current platform src and tests; standalone package build inputs and existing AGPL license material supplied with this distribution",
       "documentation": "README.md"
     },

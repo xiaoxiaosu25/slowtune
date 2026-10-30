@@ -17,7 +17,7 @@ class DesktopPlayer extends LyricPlayer {
 const hostStyles = `
 :host { display:block; width:100%; height:100%; font:inherit; color:var(--text); }
 .amll-lyric-player.dom { --amll-lp-font-size:inherit; --amll-lp-color:var(--text); --lyric-line-padding-x:8px; --amll-lp-line-width-aspect:1; --amll-lp-hover-bg-color:color-mix(in srgb,var(--text) 5%,transparent); font:inherit; line-height:1.4; mix-blend-mode:normal; }
-.slow-lyric-line { padding:12px 8px !important; cursor:pointer; opacity:var(--slow-line-opacity,.45) !important; filter:blur(var(--slow-line-blur,0px)) !important; }
+.slow-lyric-line { padding:12px 8px !important; cursor:pointer; opacity:var(--slow-line-opacity,.45) !important; filter:blur(var(--slow-line-blur,0px)) !important; transition:opacity 180ms ease,filter 180ms ease; }
 .slow-lyric-line:focus-visible { outline:2px solid var(--accent-text); outline-offset:-2px; }
 .slow-lyric-line:focus-visible,.slow-lyric-line:hover { opacity:1 !important; filter:none !important; }
 .slow-lyric-line [class*="_lyricLine"] { --bright-mask-alpha:1; --dark-mask-alpha:.4; }
@@ -75,7 +75,7 @@ export function mountDesktopLyricEngine(host: HTMLElement, lines: LyricLine[], t
       active = current;
       groups.forEach((row, index) => {
         const distance = Math.abs(index - Math.max(0, current));
-        row.style.setProperty('--slow-line-opacity', index === current ? '1' : index < current ? '.28' : distance <= 1 ? '.54' : '.36');
+        row.style.setProperty('--slow-line-opacity', index === current ? '1' : index < current ? '.36' : distance <= 1 ? '.60' : '.42');
         row.style.setProperty('--slow-line-blur', reduce || distance < 3 ? '0px' : '1px');
         if (index === current) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current');
       });

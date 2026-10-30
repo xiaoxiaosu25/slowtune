@@ -1,7 +1,7 @@
 import { preferenceStorage } from './preference-storage';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { MusicClient } from '@studio/music-sources/client';
-import type { EntryRef, MusicEntry, Shelf } from '@studio/music-sources';
+import type { EntryRef, MusicEntry, Shelf, SearchOrder } from '@studio/music-sources';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, SpeakerHighIcon, QueueIcon, HeartIcon, MagnifyingGlassIcon, CompassIcon, XIcon, PlusIcon, TrashIcon, YoutubeLogoIcon, TelevisionSimpleIcon, DotsThreeIcon, ListBulletsIcon, GearIcon, ShuffleIcon, RepeatIcon, RepeatOnceIcon, ArrowUpIcon, ArrowDownIcon, LinkIcon, StopIcon, ArrowClockwiseIcon, ArrowLeftIcon, RewindIcon, FastForwardIcon, SpeakerSlashIcon, MoonIcon, ArrowCounterClockwiseIcon, MusicNotesIcon, UsersIcon } from '@phosphor-icons/react';
 import { request, availabilityText, type Track, type BilibiliAccountState, type ServerStatus, key, time, creator, errorText, cancelled } from './api';
 import type { SongLibraryState as LibraryData, Song, ChartSongContext, SongPlaybackSelection } from '../server/song-library-types';
@@ -14,8 +14,9 @@ import { MobilePlayerOptions } from './MobilePlayerOptions';
 import { MobilePlayer } from './MobilePlayer';
 import { MobileLibrary } from './MobileLibrary';
 import { mobilePlaylistId, mobilePlaylistRoute } from './mobile-library';
-import { initialFollowView, mobileFollowRoute, readMobileFollowView } from './mobile-follow';
+import { initialFollowView, mobileFollowRoute, readMobileFollowView, type FollowView } from './mobile-follow';
 import { SearchSurface } from './SearchSurface';
+import { CreatorSearchResults, useCreatorSearch } from './CreatorSearch';
 import { readMobileNavigationPage, useMobileNavigationHistory } from './useMobileNavigationHistory';
 import { suspendMobilePages, useMobilePageOpen, useMobilePagesSuspended } from './mobile-pages';
 import { MobileSettings } from './MobileSettings';
@@ -229,6 +230,11 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const [discoveryMessage,setDiscoveryMessage]=useState(''),[discoveryUpdatedAt,setDiscoveryUpdatedAt]=useState<number>();
   const [youtubeRefresh,setYoutubeRefresh]=useState(0);
   const [searchOpen,setSearchOpen]=useState(initialMobileRoute==='search'),[searchSource,setSearchSource]=useState<keyof typeof names>('all');
+  const [searchType,setSearchType]=useState<'video'|'users'>('video'),[searchOrder,setSearchOrder]=useState<SearchOrder>('relevance'),[creatorOrder,setCreatorOrder]=useState<'relevance'|'followers'>('relevance');
+  const creatorSearch=useCreatorSearch();
+  useEffect(()=>{if(!searchOpen)creatorSearch.cancel();},[searchOpen]);
+  const [creatorFromSearch,setCreatorFromSearch]=useState(false);
+  useEffect(()=>{if(page!=='follows')setCreatorFromSearch(false);},[page]);
   const [searchSong,setSearchSong]=useState<SongQuery>(),[showAllSearch,setShowAllSearch]=useState<boolean>();
   const searchTarget=useRef<{context?:ChartSongContext;songId?:string}>({});
   const searchReturn=useRef<(() => void) | undefined>(undefined);
@@ -260,8 +266,13 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const openMobileSettings=(id:MobileSettingsSection)=>{setPreviousPage('profile');navigate(mobileSettingsRoute(id));};
   const returnFromMobileSettings=()=>mobileBack(route=>route==='profile'||!!mobileSettingsSection(route),()=>navigate(mobileSection==='welcome'?mobileSettingsRoute('appearance'):'profile'));
   const returnFromMobileFollow=()=>{
+    if(creatorFromSearch&&!followView.collection){mobileBack('search',()=>{setSearchOpen(true);setPage('search');});return;}
     const target={tab:followView.tab,selected:followView.collection?followView.selected:undefined,view:'collections' as const};
     mobileBack(mobileFollowRoute(target),()=>{setFollowView(target);if(!target.selected)setActiveCreator(undefined);});
+  };
+  const returnFromFollow=(target:FollowView,fallback:()=>void)=>{
+    if(creatorFromSearch&&!target.selected){if(desktop)setSearchOpen(true);else mobileBack('search',()=>{setSearchOpen(true);setPage('search');});}
+    else if(desktop)fallback();else mobileBack(mobileFollowRoute(target),fallback);
   };
   const returnFromPlaying=()=>{if(!desktop&&pagesSuspended){history.back();return;}const restore=()=>{navigate(listeningReturnPage,true);if(!desktop)requestAnimationFrame(()=>window.scrollTo(0,listeningReturnScroll.current));};if(desktop)restore();else mobileBack(listeningReturnPage,restore);};
   const returnFromSearch=()=>{if(desktop)closeSearch();else mobileBack(route=>route!=='search',closeSearch);};
@@ -475,14 +486,14 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const isFavorite=(t:Track)=>{const songId=songForTrack(t);return !!songId&&libraryIndex.favorites.has(songId);};
   const isVideoFavorite=(t:Track)=>{const parts=partsStore.peek(t.ref.id)?.parts;return parts&&parts.length>1?parts.every(isFavorite):isFavorite(t);};
   useEffect(()=>{const c=new AbortController();const native=lib?.snapshot.versions.map(version=>version.ref)??[];const tracks=Object.values(results).flatMap(r=>r.items).filter(t=>t.ref.provider==='bilibili'&&!t.ref.part&&!canonical[key(t.ref)]&&native.some(r=>r.id===t.ref.id));for(const t of tracks)void partsStore.read(t.ref,c.signal,false).then(e=>setCanonical(old=>({...old,[key(t.ref)]:e.ref}))).catch(()=>{});return()=>c.abort();},[lib,results,partsStore]);
-  async function find(provider:'bilibili'|'youtube',text:string,c:AbortController,cursor?:string,ref?:EntryRef,song:SongQuery=searchSong??{title:text}) {
+  async function find(provider:'bilibili'|'youtube',text:string,c:AbortController,cursor?:string,ref?:EntryRef,song:SongQuery=searchSong??{title:text},order:SearchOrder=searchOrder) {
     const target=searchTarget.current;
     if(c.signal.aborted||provider==='youtube'&&!(sourceStateRef.current?.youtube.enabled??youtubeEnabled))return;
     const controller=provider==='youtube'?new AbortController():c,abort=()=>controller.abort(),settingsEpoch=searchSettingsEpoch.current;
     if(provider==='youtube'){youtubeSearch.current?.abort();youtubeSearch.current=controller;c.signal.addEventListener('abort',abort,{once:true});}
     const active=()=>!c.signal.aborted&&!controller.signal.aborted&&(provider!=='youtube'||(sourceStateRef.current?.youtube.enabled??youtubeEnabled));
     setResults(old=>active()?{...old,[provider]:{...(cursor?old[provider]??{items:[]}:{items:[]}),busy:true,error:undefined}}:old);
-    try {const data=ref?await client.list({ref,limit:20,cursor},{signal:controller.signal}):await request<SearchPage>('/api/search',{provider,query:text,cursor,song},controller.signal);
+    try {const data=ref?await client.list({ref,limit:20,cursor},{signal:controller.signal}):await request<SearchPage>('/api/search',{provider,query:text,cursor,song,...(provider==='bilibili'?{order}:{})},controller.signal);
       const changed=settingsEpoch!==searchSettingsEpoch.current?latestSearchSettings.current:undefined;
       const searchData=ref?undefined:{...data as SearchPage,...(changed?{config:changed.config,preferred:preferredSong(changed.preferred,song),preferredVersions:searchPreferredVersions(changed.preferred,song)}:{})};
       if(active())setResults(old=>{if(!active()||!old[provider])return old;const incoming=data.items.map(track=>({...track,...(target.context?{chartContext:target.context}:{}),...(target.songId?{targetSongId:target.songId}:{})}));const entries=cursor?[...(old[provider].items),...incoming]:incoming;return {...old,[provider]:{items:[...new Map(entries.map(t=>[t.resourceId,t])).values()],cursor:data.nextCursor,...(searchData?{config:searchData.config,preferred:searchData.preferred,preferredVersions:searchData.preferredVersions,classificationIssue:searchData.classificationIssue}:{})}};});
@@ -490,15 +501,34 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     finally{if(provider==='youtube')c.signal.removeEventListener('abort',abort);}
   }
   function revealSearch(){if(!desktop){setQueueOpen(false);if(page!=='search')searchOrigin.current=mobileRoute;setPage('search');}setSearchOpen(true);}
-  function openSearch(){searchReturn.current?.();searchReturn.current=undefined;searchTarget.current={};authorWork.current?.abort();setAuthorBusy(false);search.current?.abort();setSearchSource('all');setQuery('');setSearched('');setSearchSong(undefined);setShowAllSearch(undefined);setLinkRef(undefined);setResults({});revealSearch();}
-  function closeSearch(){search.current?.abort();actionWork.current?.abort();setActionBusy(false);setSearchOpen(false);if(!desktop&&page==='search')navigate(searchOrigin.current);setResults(old=>Object.fromEntries(Object.entries(old).map(([p,r])=>[p,{...r,busy:false}])));const back=searchReturn.current;searchReturn.current=undefined;back?.();}
+  function openSearch(){searchReturn.current?.();searchReturn.current=undefined;searchTarget.current={};authorWork.current?.abort();setAuthorBusy(false);search.current?.abort();creatorSearch.clear();setSearchType('video');setSearchOrder('relevance');setCreatorOrder('relevance');setSearchSource('all');setQuery('');setSearched('');setSearchSong(undefined);setShowAllSearch(undefined);setLinkRef(undefined);setResults({});revealSearch();}
+  function closeSearch(){search.current?.abort();creatorSearch.cancel();actionWork.current?.abort();setActionBusy(false);setSearchOpen(false);if(!desktop&&page==='search')navigate(searchOrigin.current);setResults(old=>Object.fromEntries(Object.entries(old).map(([p,r])=>[p,{...r,busy:false}])));const back=searchReturn.current;searchReturn.current=undefined;back?.();}
   function groupSource(track:Track){if(!requireLibrary())return;closeSearch();setPopup(null);setGroupTrack(track);}
-  async function searchFor(text=query,filter: keyof typeof names=searchSource,song?:SongQuery,preserveDisplay=false,context?:ChartSongContext,targetSong?:Song) {
+  async function searchFor(text=query,filter: keyof typeof names=searchSource,song?:SongQuery,preserveDisplay=false,context?:ChartSongContext,targetSong?:Song,order:SearchOrder=searchOrder) {
+    creatorSearch.cancel();setSearchType('video');
     if(!preserveDisplay&&!(desktop&&searchReturn.current&&searchTarget.current.songId&&!targetSong))searchTarget.current={...(context?{context}:{}),...(targetSong?{songId:targetSong.id}:{})};
     if(!text.trim()){if(desktop&&searchReturn.current&&searchTarget.current.songId){search.current?.abort();setQuery('');setSearched('');setResults({});setError('');return;}openSearch();return;}authorWork.current?.abort();setAuthorBusy(false);search.current?.abort();const c=new AbortController();search.current=c;serial.current++;revealSearch();setSearchSource(filter);setSearched(text);setLinkRef(undefined);setResults({});
     const target=song??{title:text};setSearchSong(target);if(!preserveDisplay)setShowAllSearch(undefined);
     const providers=(filter==='all'?['bilibili','youtube']:[filter]).filter(p=>p!=='youtube'||youtubeAvailable);
-    await Promise.all(providers.map(p=>find(p as 'bilibili'|'youtube',text,c,undefined,undefined,target)));
+    await Promise.all(providers.map(p=>find(p as 'bilibili'|'youtube',text,c,undefined,undefined,target,order)));
+  }
+  function submitSearch(){
+    if(searchType==='video'){void searchFor();return;}
+    const text=query.trim();
+    search.current?.abort();setSearched(text);setLinkRef(undefined);
+    if(text!==searched.trim()){setSearchSong(text?{title:text}:undefined);searchTarget.current={};setShowAllSearch(undefined);setResults({});}
+    if(text)void creatorSearch.search(text,1,creatorOrder);else creatorSearch.clear();
+  }
+  function changeSearchType(next:'video'|'users'){
+    if(next===searchType)return;
+    search.current?.abort();creatorSearch.cancel();setSearchType(next);
+    setResults(old=>Object.fromEntries(Object.entries(old).map(([p,r])=>[p,{...r,busy:false}])));
+    if(next==='users'&&searched)void creatorSearch.search(searched,1,creatorOrder);
+    if(next==='video'&&searched)void searchFor(searched,searchSource,searchSong,true);
+  }
+  function changeSearchOrder(order:SearchOrder){setSearchOrder(order);if(searched)void searchFor(searched,searchSource,searchSong,true,undefined,undefined,order);}
+  function openSearchCreator(profile:CreatorProfile){
+    search.current?.abort();creatorSearch.cancel();setSearchOpen(false);navigate('follows');setCreatorFromSearch(true);setSource('bilibili');setActiveCreator(profile);setFollowView({...initialFollowView,selected:profile,view:'videos'});
   }
   function searchForTitle(value:string|(SongQuery&{context?:ChartSongContext})){const song=typeof value==='string'?{title:value}:value,text=desktop?songSearchText(song):song.title;setQuery(desktop?text:'');void searchFor(text,'all',{title:song.title,...(song.artists?.length?{artists:song.artists}:{})},false,'context' in song?song.context:undefined);}
   function searchForLibrarySong(song?:Song,onReturn?:()=>void){
@@ -514,7 +544,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     const input=field.trim();let entryContext:EntryContext='video';try{if(new URL(input).searchParams.has('p'))entryContext='part';}catch{}
     try{
       const data=await request<{entry?:Track;parts?:MusicEntry[];ref?:EntryRef}>('/api/identify',{input},controller.signal);controller.signal.throwIfAborted();
-      if(data.ref){search.current?.abort();const searchController=new AbortController();search.current=searchController;setLinkRef(data.ref);setSearched('公开歌单');setQuery('');setSearchSource(data.ref.provider);revealSearch();setResults({});setPopup(null);await find(data.ref.provider,'',searchController,undefined,data.ref);}
+      if(data.ref){search.current?.abort();creatorSearch.cancel();setSearchType('video');const searchController=new AbortController();search.current=searchController;setLinkRef(data.ref);setSearched('公开歌单');setQuery('');setSearchSource(data.ref.provider);revealSearch();setResults({});setPopup(null);await find(data.ref.provider,'',searchController,undefined,data.ref);}
       else if(data.entry){partsStore.seed(data.entry);open({type:'track',track:data.entry,parts:data.parts??[data.entry],entryContext,intent:(data.parts?.length??1)>1?'parts':'overview'});}
     }catch(issue){if(!cancelled(issue)&&!controller.signal.aborted)setError(errorText(issue));}
     finally{if(linkWork.current===controller){setLinkBusy(false);linkWork.current=null;}}
@@ -767,7 +797,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
 </button>
 </form>
 </>}
-</header>:page!=='search'&&<MobileHeader page={page} playlistTitle={mobilePlaylistTitle} settingsSection={mobileSection} onSearch={openSearch} onLink={()=>open({type:'link'})} onBack={page==='settings'?returnFromMobileSettings:page==='playlist'?()=>mobileBack('library',()=>navigate('library')):returnFromPlaying} options={playerOptions()} followDetail={page==='follows'&&followView.selected?{title:followView.collection?'合集':'作者',backLabel:followView.collection?'返回作者合集':'返回关注',onBack:returnFromMobileFollow}:undefined}/>}
+</header>:page!=='search'&&<MobileHeader page={page} playlistTitle={mobilePlaylistTitle} settingsSection={mobileSection} onSearch={openSearch} onLink={()=>open({type:'link'})} onBack={page==='settings'?returnFromMobileSettings:page==='playlist'?()=>mobileBack('library',()=>navigate('library')):returnFromPlaying} options={playerOptions()} followDetail={page==='follows'&&followView.selected?{title:followView.collection?'合集':'作者',backLabel:followView.collection?'返回作者合集':creatorFromSearch?'返回用户搜索':'返回关注',onBack:returnFromMobileFollow}:undefined}/>}
     <main className="main-content" hidden={!desktop&&page==='search'} inert={desktopLyricsOpen||!desktop&&mobilePageOpen}><DesktopRegion enabled={desktop} resetKey={page} label="当前页面">
 {!desktop&&['discover','charts','follows'].includes(page)&&!(page==='follows'&&followView.selected)&&<MobileDiscoveryNavigation page={page} onNavigate={navigate}/>}
 {['discover','charts','follows'].includes(page)&&(desktop||page!=='charts'&&sourceTabs&&!(page==='follows'&&followView.selected))&&<div className={'page-heading'+(!desktop?' mobile-discovery-heading':'')}><h1>{page==='discover'?'发现音乐':page==='charts'?'音乐榜单':activeCreator?'作者内容':'我的关注'}</h1>{page!=='charts'&&sourceTabs}</div>}
@@ -794,7 +824,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
       <FollowUpdatesShelf mobile={!desktop} youtubeEnabled={youtubeEnabled} state={followState} source={source} renderCovers={covers} renderList={items=>list(items,true)} onPlayAll={items=>void startPlayback(()=>playback.playAll(items),false)} onImport={(items,title)=>importTracks(items,title)} onFollow={()=>navigate('follows')}/>
     </>}
     {page==='charts'&&<ChartsPage mobile={!desktop} onEnqueue={(item,context,next)=>{void playback.enqueueSelection({kind:'chart',context},item,next).then(ok=>{if(ok)flash(next?'已安排下一首播放':'已加入队尾');});}} onSearch={(item,context)=>searchForTitle({...item,...(context?{context}:{})})} onPlay={(item,context)=>void startPlayback(()=>playback.playSelection(context?{kind:'chart',context}:{kind:'query',query:{title:item.title,artists:item.artists}},item))} onPlayAll={(items,contexts)=>void startPlayback(()=>playback.playSelections(items.map((item,index)=>({selection:contexts?.[index]?{kind:'chart' as const,context:contexts[index]}:{kind:'query' as const,query:{title:item.title,artists:item.artists}},song:item}))),false)} onFavorite={context=>desktop?void toggleChartFavorite(context):void mutate({context},false)} favoriteState={desktop?{saved:libraryIndex.chartFavoriteKeys,busy:saving&&pending===chartFavoriteAction?.body?chartFavoriteAction?.key:undefined,disabled:saving||!lib}:undefined}/>}
-    {page==='follows'&&<FollowsPage mobile={!desktop} navigationView={followView} onNavigationViewChange={setFollowView} onMobileBack={desktop?undefined:(target,fallback)=>mobileBack(mobileFollowRoute(target),fallback)} youtubeEnabled={youtubeEnabled} onImportSource={setListImport} client={client} state={followState} onChange={setFollowState} source={source} renderList={(items,timestamps,offset,all)=>list(items,timestamps,undefined,offset,all)} renderCovers={(items,timestamps,offset,all)=>covers(items,timestamps,items.length,all)} onPlayAll={items=>void startPlayback(()=>playback.playAll(items),false)} onImport={(items,title)=>importTracks(items,title)} onSearch={()=>navigate('search')} initialCreator={activeCreator} onClearCreator={()=>setActiveCreator(undefined)}/>}
+    {page==='follows'&&<FollowsPage returnLabel={creatorFromSearch?'返回用户搜索':'返回关注'} mobile={!desktop} navigationView={followView} onNavigationViewChange={setFollowView} onMobileBack={creatorFromSearch||!desktop?returnFromFollow:undefined} youtubeEnabled={youtubeEnabled} onImportSource={setListImport} client={client} state={followState} onChange={setFollowState} source={source} renderList={(items,timestamps,offset,all)=>list(items,timestamps,undefined,offset,all)} renderCovers={(items,timestamps,offset,all)=>covers(items,timestamps,items.length,all)} onPlayAll={items=>void startPlayback(()=>playback.playAll(items),false)} onImport={(items,title)=>importTracks(items,title)} onSearch={()=>navigate('search')} initialCreator={activeCreator} onClearCreator={()=>setActiveCreator(undefined)}/>}
     {!desktop&&(page==='library'||page==='playing'&&pagesSuspended&&listeningReturnPage==='library')&&!playlistPage&&<MobileLibrary active={page==='library'} library={lib} error={libraryError} onRetry={()=>void readLibrary()} onSelect={id=>navigate(mobilePlaylistRoute(id))} onCreate={()=>open({type:'new'})} onBackup={()=>open({type:'backup'})} onChange={updateLibrary}/>}
     {playlistPage&&<SongLibraryWorkspace hidden={!desktop&&page==='playing'} onEnqueue={async(selection,song)=>{const ok=await playback.enqueueSelection(selection,song);if(ok&&desktop)flash('已加入队尾');return ok;}} onEnqueueNext={async(selection,song)=>{const ok=await playback.enqueueSelection(selection,song,true);if(ok)flash('已安排下一首播放');return ok;}} onEnqueueAll={enqueueSongs} onNotice={flash} onCreator={(song,version)=>void openCreator({ref:version.ref,resourceId:version.id,title:version.facts.title||song.title,url:version.facts.url??'',uploader:version.facts.uploader?{name:version.facts.uploader,id:version.facts.uploaderId}:undefined})} versionPlayback={desktop?undefined:mobileVersionPlayback} desktop={desktop} sourceControls={sourceTabs} youtubeEnabled={youtubeEnabled} disabledDisplay={sources?.youtube.disabledDisplay ?? 'dim'} source={source} onChange={updateLibrary} state={lib} loadError={libraryError} onRetry={()=>void readLibrary()} selected={selected} onSelect={id=>{setSelected(id);if(!desktop)navigate(mobilePlaylistRoute(id));}} busy={saving} commit={(edits,revision,localFeedback)=>mutate({edits,...(revision!==undefined?{revision}:{})},false,localFeedback)} onBackup={()=>open({type:'backup'})} onSearch={searchForLibrarySong} onPlay={(selection,song)=>void startPlayback(()=>playback.playSelection(selection,song))} onPlayAll={items=>void startPlayback(()=>playback.playSelections(items),false)}/>}
     {page==='playing'&&!desktop&&<MobilePlayer
@@ -827,7 +857,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     {mobileSettingsOpened&&<MobileSettings {...settingsProps} active={!desktop&&page==='settings'} section={mobileSection} onSection={openMobileSettings}/>}
     </DesktopRegion></main>
 {desktop&&page!=='playing'&&bottomLyricsVisible&&<BottomLyrics lyrics={lyrics} playback={lyricPlayback} compact desktop/>}
-{desktopLyricsOpen&&<DesktopLyricsView onManage={section=>openManagement('lyrics',section)} lyrics={lyrics} playback={lyricPlayback} artwork={currentArtwork} onClose={closeDesktopLyrics} onSeek={seconds=>void playback.seek(seconds)} visual={<PlayingArtwork artwork={currentArtwork} playing={snapshot.playing&&!snapshot.loading} muted={snapshot.muted||snapshot.volume===0} analysis={playback.audioAnalysis} allowLyrics={false} desktop/>} songInfo={<><PlayingTitle key={current?.resourceId} title={current?displayTitle(current):undefined} fullTitle={current?.title}/><div className="playing-song-copy">{desktopSongMeta()}</div></>} controls={<>
+{desktopLyricsOpen&&<DesktopLyricsView onManage={section=>openManagement('lyrics',section)} lyrics={lyrics} playback={lyricPlayback} artwork={currentArtwork} onClose={closeDesktopLyrics} onSeek={seconds=>void playback.seek(seconds)} visual={<PlayingArtwork artwork={currentArtwork} playing={snapshot.playing&&!snapshot.loading&&!lyrics.focus} muted={snapshot.muted||snapshot.volume===0} analysis={playback.audioAnalysis} allowLyrics={false} desktop suspended={lyrics.focus}/>} songInfo={<><PlayingTitle key={current?.resourceId} title={current?displayTitle(current):undefined} fullTitle={current?.title}/><div className="playing-song-copy">{desktopSongMeta()}</div></>} controls={<>
 {progress()}{playbackSlot}<div className="desktop-lyrics-tools">{modeButton()}{volume}</div>{transport(true)}<div className="desktop-lyrics-tools"><button className="btn btn-icon" aria-label="播放队列" title="播放队列" aria-expanded={queueVisible} onClick={toggleQueue}><QueueIcon size={24}/></button>{current&&<button className={'btn btn-icon '+(isFavorite(current)?'saved':'')} title={isFavorite(current)?'取消收藏当前歌曲':'收藏当前歌曲'} aria-label="收藏当前歌曲" aria-pressed={isFavorite(current)} aria-busy={favoritePending(current)||undefined} disabled={saving||!lib||favoritePending(current)} onClick={()=>favorite(current,true,'part')}>{favoritePending(current)?<SpinnerGapIcon size={22} className="favorite-spinner"/>:<HeartIcon size={24} weight={isFavorite(current)?'fill':'regular'}/>}</button>}<LyricsToggle active onClick={toggleDesktopLyrics}/>{playerOptions(true)}</div>
 </>}/>}
 {!managementVisible&&<LyricsSettings lyrics={lyrics} desktopImmersive={desktop} nativeDesktop={desktopHost.available}/>}
@@ -852,23 +882,27 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
 </footer>}
 {!desktop&&(page!=='playing'||mobilePageOpen)&&<><MobileMiniPlayer empty={mobilePlayerEmpty} cover={<Cover track={current}/>} title={current?displayTitle(current):'选择一首音乐'} artist={playback.error?'播放失败，点开重试':current?(currentSong?.artists?.join(' / ')||creator(current)):'好音乐，等你发现'} progress={snapshot.duration?snapshot.position/snapshot.duration:0} transport={transport()} onOpen={()=>{if(mobilePageOpen)suspendMobilePages(true);open({type:'playing'});}}/>{!mobileSecondary&&page!=='playing'&&<MobileNavigation page={page} onNavigate={navigate}/>}</>}
 {!desktop&&mobileEditedSong&&lib&&<SongEditor versionPlayback={mobileVersionPlayback} key={mobileEditedSong.id} song={mobileEditedSong} state={lib} commit={(edits,revision)=>mutate({edits,revision},false,true)} onPlay={(selection,song)=>void playback.playSelection(selection,song,true)} onSearch={searchForLibrarySong} onClose={()=>setMobileSongId(undefined)} onChange={updateLibrary}/>}
-    {searchOpen&&<SearchSurface desktop={desktop} autoFocus={!searched} title={desktop&&searchReturn.current?'添加播放版本':'搜索音乐'} query={query} onQuery={setQuery} onSearch={()=>void searchFor()} onClose={returnFromSearch} onLink={()=>open({type:'link'})}>
+    {searchOpen&&<SearchSurface desktop={desktop} autoFocus={!searched} title={desktop&&searchReturn.current?'添加播放版本':'搜索音乐'} query={query} onQuery={setQuery} onSearch={submitSearch} onClose={returnFromSearch} onLink={()=>open({type:'link'})}>
       {desktop&&searchReturn.current&&<button className="btn btn-ghost btn-sm" onClick={closeSearch}><ArrowLeftIcon size={18}/>返回歌曲与版本</button>}
-      {desktop&&<form className="search-field search-dialog-input" onSubmit={e=>{e.preventDefault();void searchFor();}}><MagnifyingGlassIcon size={21}/><input aria-label="弹窗搜索关键词" placeholder="搜索歌曲或视频" data-autofocus="true" value={query} onChange={e=>setQuery(e.target.value)}/><button aria-label="搜索" type="submit"><MagnifyingGlassIcon size={20}/></button></form>}
-      {youtubeEnabled&&<div className="segmented search-source-tabs" aria-label="搜索来源">{Object.entries(names).map(([id,name])=><button key={id} className={searchSource===id?'selected':''} aria-pressed={searchSource===id} disabled={id==='youtube'&&!status?.providers.youtube.available||!!linkRef&&id!==linkRef.provider} onClick={()=>{setSearchSource(id as keyof typeof names);if(searched&&!linkRef)void searchFor(searched,id as keyof typeof names,searchSong,true);}}>{name}</button>)}</div>}
-      <div className="search-results">{!desktop&&!searched&&!linkRef?<div className="mobile-search-empty"><MusicNotesIcon size={40}/><h1>听点喜欢的</h1><p>搜索歌名、歌手，找到想听的版本。</p></div>:<p className="muted search-description">{searchTarget.current.songId?`为「${lib?.snapshot.songs.find(song=>song.id===searchTarget.current.songId)?.title??searched}」添加版本，点击结果右侧的 ＋ 即可。`:linkRef?'公开视频歌单':searched?`“${searched}” 的搜索结果`:'输入歌名，找到想听的版本。'}</p>}
+      {desktop&&<form className="search-field search-dialog-input" onSubmit={e=>{e.preventDefault();submitSearch();}}><MagnifyingGlassIcon size={21}/><input aria-label="弹窗搜索关键词" placeholder={searchType==='users'?'搜索 B站用户昵称':'搜索歌曲或视频'} data-autofocus="true" value={query} onChange={e=>setQuery(e.target.value)}/><button aria-label="搜索" type="submit"><MagnifyingGlassIcon size={20}/></button></form>}
+      {!linkRef&&!searchTarget.current.songId&&<div className="segmented search-type-tabs" aria-label="搜索类型"><button aria-pressed={searchType==='video'} className={searchType==='video'?'selected':''} onClick={()=>changeSearchType('video')}>视频</button><button aria-pressed={searchType==='users'} className={searchType==='users'?'selected':''} onClick={()=>changeSearchType('users')}>用户</button></div>}
+      {searchType==='video'&&youtubeEnabled&&<div className="segmented search-source-tabs" aria-label="搜索来源">{Object.entries(names).map(([id,name])=><button key={id} className={searchSource===id?'selected':''} aria-pressed={searchSource===id} disabled={id==='youtube'&&!status?.providers.youtube.available||!!linkRef&&id!==linkRef.provider} onClick={()=>{setSearchSource(id as keyof typeof names);if(searched&&!linkRef)void searchFor(searched,id as keyof typeof names,searchSong,true);}}>{name}</button>)}</div>}
+      {searchType==='video'&&!linkRef&&searchSource!=='youtube'&&<div className="search-sort-row"><span>B站排序</span><div className="segmented search-sort-tabs" aria-label="B站搜索排序">{([['relevance','综合排序'],['plays','最多播放'],['favorites','最多收藏'],['newest','最新发布']] as const).map(([order,label])=><button key={order} className={searchOrder===order?'selected':''} aria-pressed={searchOrder===order} onClick={()=>changeSearchOrder(order)}>{label}</button>)}</div></div>}
+      {searchType==='users'&&<label className="creator-search-sort"><span>用户排序</span><select className="select" aria-label="用户搜索排序" value={creatorOrder} onChange={event=>{const order=event.target.value as typeof creatorOrder;setCreatorOrder(order);if(searched)void creatorSearch.search(searched,1,order);}}><option value="relevance">默认排序</option><option value="followers">粉丝最多</option></select></label>}
+      <div className="search-results">{searchType==='video'&&!desktop&&!searched&&!linkRef?<div className="mobile-search-empty"><MusicNotesIcon size={40}/><h1>听点喜欢的</h1><p>搜索歌名、歌手，找到想听的版本。</p></div>:<p className="muted search-description">{searchTarget.current.songId?`为「${lib?.snapshot.songs.find(song=>song.id===searchTarget.current.songId)?.title??searched}」添加版本，点击结果右侧的 ＋ 即可。`:linkRef?'公开视频歌单':searched?`“${searched}” 的搜索结果`:searchType==='users'?'输入昵称，找到喜欢的作者。':'输入歌名，找到想听的版本。'}</p>}
+      {searchType==='users'?<CreatorSearchResults search={creatorSearch} query={searched} order={creatorOrder} state={followState} onChange={setFollowState} onOpen={openSearchCreator}/>:<>
       {!linkRef&&!searchTarget.current.songId&&pinnedSearch.map(item=><section key={item.key} className="search-preferred" aria-label="自动匹配的优先结果"><div><strong>自动匹配「{item.song.title}{item.song.artists?.length?' · '+item.song.artists.join(' / '):''}」时优先选择</strong><p>{item.entry.title}</p>{sourceBlocked(item.entry)&&<p>YouTube 已关闭，可在设置的偏好中管理这个匹配结果。</p>}</div><div className="toolbar"><button className="btn btn-primary btn-sm" disabled={sourceBlocked(item.entry)} onClick={()=>void trackAction(item.entry,'play',undefined,'part')}>播放此结果</button><button className="btn btn-secondary btn-sm" onClick={()=>open({type:'track',track:item.entry,entryContext:'part',searchSong:item.song})}>管理匹配偏好</button></div></section>)}
       {Object.entries(results).filter(([p])=>searchSource==='all'||searchSource===p).map(([p,r])=>{
         const filtered=!linkRef&&r.config?r.items.filter(track=>!searchFilterReasons(track,r.config!,searched).length):r.items;
         const hidden=r.items.length-filtered.length,showAll=showAllSearch??!(r.config?.filterByDefault??true),visible=showAll?r.items:filtered;
         return <section className="catalog" key={p}>
           <div className="section-heading"><h2>{names[p as keyof typeof names]}</h2><div className="toolbar"><PlayAllButton compact count={visible.length} onClick={()=>void startPlayback(()=>playback.playAll(visible),false)}/><AddToPlaylistButton compact count={linkRef?1:visible.length} disabled={r.busy} onClick={()=>linkRef?setListImport({title:'公开歌单',source:{kind:'playlist',ref:linkRef}}):importTracks(visible,'搜索结果 · '+searched)}/>{r.busy&&<button className="btn btn-ghost" onClick={()=>{search.current?.abort();setResults(old=>Object.fromEntries(Object.entries(old).map(([k,v])=>[k,{...v,busy:false}])));}}>取消搜索</button>}</div></div>
-          {!linkRef&&r.config&&<div className="search-filter-notice" role="status"><p>{showAll?`正在显示全部结果。${hidden?`其中 ${hidden} 条不符合当前偏好。`:''}`:`当前已加载 ${r.items.length} 条结果，${hidden} 条被偏好规则筛选。`}<span>保留{p==='bilibili'?' B站':'来源'}原始顺序；切换仅影响本次搜索展示。</span></p><button className="btn btn-secondary btn-sm" onClick={()=>setShowAllSearch(!showAll)}>{showAll?'恢复筛选':'显示全部'}</button></div>}
+          {!linkRef&&r.config&&<div className="search-filter-notice" role="status"><p>{showAll?`正在显示全部结果。${hidden?`其中 ${hidden} 条不符合当前偏好。`:''}`:`当前已加载 ${r.items.length} 条结果，${hidden} 条被偏好规则筛选。`}<span>保留{p==='bilibili'?' B站所选排序':'来源顺序'}；筛选切换仅影响本次展示。</span></p><button className="btn btn-secondary btn-sm" onClick={()=>setShowAllSearch(!showAll)}>{showAll?'恢复筛选':'显示全部'}</button></div>}
           {r.classificationIssue&&<p className="notice" role="status">部分结果的分区暂时无法确认，可点击“显示全部”手动选择。{errorText(r.classificationIssue)}</p>}
           {!!r.error&&errorBox(r.error,()=>{const c=search.current&&!search.current.signal.aborted?search.current:new AbortController();search.current=c;void find(p as 'youtube'|'bilibili',searched,c,r.items.length?r.cursor:undefined,linkRef);})}
           <PagedList id={'search:'+serial.current+':'+p+':'+showAllSearch} group="search" label={names[p as keyof typeof names]+'搜索结果'} items={visible} busy={r.busy} error={!!r.error} cursor={r.cursor} onLoadMore={()=>loadMore(p as 'youtube'|'bilibili')}>{(items,offset)=>items.length?list(items,false,linkRef?undefined:searchSong??{title:searched},offset,visible):r.busy?<div className="loading">正在搜索…</div>:!r.error&&<div className="empty"><h3>{hidden?'当前偏好筛选了所有已加载结果':'没有搜索结果'}</h3><p>{hidden?'点击“显示全部”查看可能被误筛的结果。':'换个关键词或来源试试。'}</p></div>}</PagedList>
         </section>;
-      })}
+      })}</>}
       {error&&!popup&&<div className="feedback" role="alert"><p>{error}</p>{pending&&<button className="btn btn-secondary" onClick={retryWrite}>重试保留编辑</button>}<button className="btn btn-ghost" onClick={()=>setError('')}>关闭提示</button></div>}
       {desktop&&notice&&!popup&&!error&&<div className="action-notice" role="status">{notice}{noticeAction&&<button className="btn btn-ghost btn-sm" onClick={noticeAction.run}>{noticeAction.label}</button>}</div>}
       {!desktop&&playback.error&&!popup&&<p className="feedback" role="alert">{playback.error}</p>}</div>

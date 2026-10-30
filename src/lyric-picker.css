@@ -1,0 +1,28 @@
+.lyric-picker { min-width:0; container:lyric-picker / inline-size; }
+.lyric-query-alternatives { margin:0 0 16px; color:var(--muted); font-size:13px; }
+.lyric-query-alternatives>summary { cursor:pointer; padding:8px 0; }
+.lyric-query-original { line-height:1.8; overflow-wrap:anywhere; margin:4px 0 8px; }
+.lyric-provider-tabs { margin-bottom:16px; max-width:100%; }
+.lyric-provider-tabs>button { gap:6px; }
+.lyric-provider-count { color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; }
+.lyric-candidate-columns { display:none; }
+.lyric-picker .lyrics-candidates { margin-top:8px; }
+.lyric-picker .lyrics-candidate { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 12px; padding:14px 12px; }
+.lyric-picker .lyrics-candidate[data-preview] { background:var(--hover); }
+.lyric-picker .lyric-candidate-name { grid-column:1; grid-row:1; }
+.lyric-picker .lyric-candidate-artist { grid-column:1; grid-row:2; }
+.lyric-picker .lyric-candidate-duration { grid-column:1; grid-row:3; display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px; font-variant-numeric:tabular-nums; font-size:13px; }
+.lyric-picker .lyrics-candidate>.btn { grid-column:2; grid-row:1 / 4; align-self:center; }
+.lyric-picker .lyrics-candidate strong { display:block; line-height:1.7; }
+.lyric-picker .lyrics-candidate p { margin:0; line-height:1.7; }
+.lyric-picker .lyrics-candidate small { display:block; line-height:1.7; margin:2px 0 0; }
+.lyric-picker .lyric-candidate-duration [data-mismatch] { color:var(--danger); }
+.lyric-picker .lyrics-preview>h3:focus-visible { outline:2px solid var(--accent-text); outline-offset:4px; }
+@container lyric-picker (min-width:620px) {
+  .lyric-candidate-columns,.lyric-picker .lyrics-candidate { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 150px 64px; gap:16px; }
+  .lyric-candidate-columns { padding:8px 12px; color:var(--muted); font-size:12px; border-bottom:1px solid var(--border-subtle); }
+  .lyric-picker .lyrics-candidate>.lyric-candidate-name,.lyric-picker .lyrics-candidate>.lyric-candidate-artist,.lyric-picker .lyrics-candidate>.lyric-candidate-duration,.lyric-picker .lyrics-candidate>.btn { grid-column:auto; grid-row:auto; }
+  .lyric-picker .lyric-candidate-duration { display:block; }
+}
+@media(min-width:761px) { .lyrics-dialog:has(.lyric-picker) { width:min(920px,calc(100vw - 48px)); } }
+@media(max-width:760px) { .lyric-provider-tabs>button { min-height:48px; padding-inline:10px; } .lyric-picker .lyrics-candidate>.btn { min-height:48px; } }
