@@ -13,7 +13,8 @@ const original={provider:'local',id:'original',title:'当前歌词',artists:[],s
 test('lyric modal keeps candidates, full preview and adoption visible without scrolling the dialog; stale previews cannot replace a new choice', {timeout:120000}, async t=>{
   mkdirSync(artifacts,{recursive:true});
   const fixture=await createPlayingArtworkFixture(),browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
-  t.after(async()=>{await browser.close();await fixture.close();});
+  const nextDocument={...original,id:'next-source',title:'下一首歌词',lines:[{startMs:0,text:'下一首恢复的歌词'}]},nextState=Promise.withResolvers();
+  t.after(async()=>{nextState.resolve();await browser.close();await fixture.close();});
   const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(10000);
   await page.addInitScript(record=>{if(!localStorage.getItem('slow-listening:playback:v3'))localStorage.setItem('slow-listening:playback:v3',JSON.stringify(record));localStorage.setItem('slow-listening:theme:v1','dark');},queueRecord(fixture.tracks));
   await page.route('https://i1.hdslb.com/**',route=>route.fulfill({contentType:'image/png',body:readFileSync(resolve('public/assets/coast.png'))}));
@@ -21,7 +22,11 @@ test('lyric modal keeps candidates, full preview and adoption visible without sc
   let searches=0,selected=0,finishPreview;
   const pendingPreview=Promise.withResolvers();
   const candidates=Array.from({length:24},(_,i)=>({provider:i%2?'netease':'lrclib',id:String(i),title:'风从远方来 · '+i,artists:['慢听歌手'],album:'同名专辑',synced:i%3!==0,durationSeconds:i===0?24:i===1?28.5:42}));
-  await page.route('**/api/lyrics/state',route=>route.fulfill({json:{revision:'r0',offsetMs:0,document:original}}));
+  await page.route('**/api/lyrics/state',async route=>{
+    const next=route.request().postDataJSON().ref.id===fixture.tracks[1].ref.id;
+    if(next)await nextState.promise;
+    return route.fulfill({json:{revision:next?'next':'r0',offsetMs:0,document:next?nextDocument:original}});
+  });
   await page.route('**/api/lyrics/search-progress',route=>{searches++;return route.fulfill({contentType:'application/x-ndjson',body:JSON.stringify({candidates,issues:[],complete:true})+'\n'});});
   await page.route('**/api/lyrics/document',route=>{
     const id=route.request().postDataJSON().id,reply=()=>route.fulfill({json:{...candidates.find(item=>item.id===id),lines:Array.from({length:30},(_,i)=>({startMs:i*1000,text:'预览的歌词 '+i,translation:i===0?'Translation':undefined}))}});
@@ -83,11 +88,15 @@ test('lyric modal keeps candidates, full preview and adoption visible without sc
   assert.equal(await panel.evaluate(dialog=>{const box=dialog.getBoundingClientRect(),adopt=dialog.querySelector('.lyric-adopt').getBoundingClientRect();return dialog.scrollHeight===dialog.clientHeight&&adopt.bottom<=box.bottom&&adopt.top>=box.top;}),true,'short windows retain a fixed adoption action');
   await page.screenshot({path:join(artifacts,'lyric-picker-short.png'),animations:'disabled'});
   await panel.getByRole('button',{name:'返回候选',exact:true}).click();
+  const nextStateRequest=page.waitForRequest(request=>new URL(request.url()).pathname==='/api/lyrics/state'&&request.postDataJSON().ref.id===fixture.tracks[1].ref.id);
   await page.locator('audio').evaluate(async audio=>{audio.currentTime=audio.duration-.15;await audio.play();});
+  await nextStateRequest;
   await panel.waitFor({state:'hidden'});
-  await page.locator('.desktop-lyrics-host .slow-lyric-line').first().waitFor();
+  await page.locator('audio[src$="/media/1.wav"]').waitFor({state:'attached'});
   assert.match(await page.locator('audio').getAttribute('src'),/\/media\/1\.wav/);
-  assert((await page.locator('.desktop-lyrics-host .slow-lyric-line').allTextContents()).some(text=>original.lines.some(line=>line.text===text)),'the next source restores its lyric document after closing the picker');
+  nextState.resolve();
+  await page.locator('.desktop-lyrics-host .slow-lyric-line').filter({hasText:nextDocument.lines[0].text}).first().waitFor();
+  assert((await page.locator('.desktop-lyrics-host .slow-lyric-line').allTextContents()).includes(nextDocument.lines[0].text),'the next source restores its lyric document after closing the picker');
   assert.deepEqual(errors,[]);
 });
 
