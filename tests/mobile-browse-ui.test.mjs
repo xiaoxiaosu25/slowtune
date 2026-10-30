@@ -24,17 +24,18 @@ test('recommendation confirmations follow mobile expansion and desktop display',
   await page.goto(fixture.base);await initial;
   const shelf=page.locator('[data-shelf-id="account-recommendation"]');await shelf.locator('.music-card').last().waitFor();
   assert(confirmations.length>0,'the displayed recommendation batch is confirmed');
-  assert(confirmations.every(value=>value.ids.length===4),'collapsed recommendations never confirm the other eight tracks');
+  assert(confirmations.every(value=>value.ids.length===6),'collapsed recommendations only confirm the six displayed tracks');
   const previewIds=confirmations.at(-1).ids;
   const expanded=page.waitForResponse(response=>response.url().endsWith('/api/recommendation/confirm')&&response.request().postDataJSON().ids.length===12);
-  await shelf.getByRole('button',{name:'查看全部 12 首',exact:true}).click();await expanded;
-  assert.deepEqual(confirmations.at(-1).ids.slice(0,4),previewIds,'expansion includes the previously displayed preview');
+  await shelf.getByRole('button',{name:'展开更多 · 还有 6 首',exact:true}).click();await expanded;
+  assert.deepEqual(confirmations.at(-1).ids.slice(0,6),previewIds,'expansion includes the previously displayed preview');
   assert.equal(await shelf.locator('.music-card').count(),12);
-  const collapsed=page.waitForResponse(response=>response.url().endsWith('/api/recommendation/confirm')&&response.request().postDataJSON().ids.length===4);
+  const collapsed=page.waitForResponse(response=>response.url().endsWith('/api/recommendation/confirm')&&response.request().postDataJSON().ids.length===6);
   await shelf.getByRole('button',{name:'收起',exact:true}).click();await collapsed;
+  await page.waitForFunction(()=>{const h=document.querySelector('[data-shelf-id="account-recommendation"] .mobile-shelf-heading')?.getBoundingClientRect();return h&&h.top>=0&&h.bottom<=innerHeight;});
   const refreshed=page.waitForResponse(response=>response.url().endsWith('/api/recommendation/confirm')&&response.request().postDataJSON().token==='mobile-2');
   await shelf.getByRole('button',{name:'换一批音乐',exact:true}).click();await refreshed;
-  assert(confirmations.filter(value=>value.token==='mobile-2').every(value=>value.ids.length===4),'a new collapsed batch only confirms its preview');
+  assert(confirmations.filter(value=>value.token==='mobile-2').every(value=>value.ids.length===6),'a new collapsed batch only confirms its preview');
   const desktop=page.waitForResponse(response=>response.url().endsWith('/api/recommendation/confirm')&&response.request().postDataJSON().ids.length===12);
   await page.setViewportSize({width:1280,height:800});await desktop;
   assert.equal(confirmations.at(-1).ids.length,12,'desktop continues confirming the full displayed batch');
@@ -80,23 +81,23 @@ test('mobile discovery, library details and search keep navigation context and o
   await shelf.locator('.music-card').last().waitFor();
   assert((await shelf.locator('.cover-button').first().boundingBox()).y<240,'music comes before desktop tools');
   assert.equal(await shelf.locator('.catalog-display-controls,.catalog-meta,.catalog-empty-slot').count(),0);
-  assert.equal(await shelf.locator('.music-card').count(),4,'discovery starts with two rows');
+  assert.equal(await shelf.locator('.music-card').count(),6,'discovery starts with one feature and five supporting tracks');
   assert(await shelf.locator('.mobile-shelf-covers').evaluate(e=>e.scrollWidth<=e.clientWidth),'recommendations use the page width');
   const cards=await shelf.locator('.cover-button').evaluateAll(elements=>elements.map(e=>e.getBoundingClientRect().toJSON()));
-  assert.equal(cards[0].y,cards[1].y);assert(cards[2].y>cards[0].y);assert(Math.abs(cards[1].x-cards[0].x-cards[0].width-12)<1);
+  assert(cards[1].y>cards[0].y+cards[0].height);assert(cards[2].y>cards[1].y);assert(cards[0].width>cards[1].width*2,'the first artwork is the feature');
   await shelf.getByRole('button',{name:'换一批音乐',exact:true}).waitFor();
   await shelf.getByRole('button',{name:'为你推荐 · B站账号栏目操作',exact:true}).click();
   const actions=page.getByRole('dialog',{name:'为你推荐 · B站账号栏目操作',exact:true});
   await actions.getByRole('button',{name:'歌曲列表',exact:true}).click();
-  assert.equal(await shelf.locator('.track-row').count(),4);
-  await shelf.getByRole('button',{name:'查看全部 12 首',exact:true}).click();assert.equal(await shelf.locator('.track-row').count(),12);
+  assert.equal(await shelf.locator('.track-row').count(),6);
+  await shelf.getByRole('button',{name:'展开更多 · 还有 6 首',exact:true}).click();assert.equal(await shelf.locator('.track-row').count(),12);
   await shelf.getByRole('button',{name:'收起',exact:true}).click();
   await shelf.getByRole('button',{name:'为你推荐 · B站账号栏目操作',exact:true}).click();await actions.getByRole('button',{name:'封面浏览',exact:true}).click();
   await page.setViewportSize({width:1280,height:800});
   await shelf.getByRole('button',{name:'为你推荐 · B站账号列表视图',exact:true}).click();
   await page.setViewportSize({width:390,height:844});await shelf.locator('.mobile-shelf-covers').waitFor();
-  assert.equal(await shelf.locator('.music-card').count(),4,'mobile cover browsing keeps its own preference across the desktop breakpoint');
-  await shelf.getByRole('button',{name:'查看全部 12 首',exact:true}).click();assert.equal(await shelf.locator('.music-card').count(),12);
+  assert.equal(await shelf.locator('.music-card').count(),6,'mobile cover browsing keeps its own preference across the desktop breakpoint');
+  await shelf.getByRole('button',{name:'展开更多 · 还有 6 首',exact:true}).click();assert.equal(await shelf.locator('.music-card').count(),12);
   await shelf.getByRole('button',{name:'收起',exact:true}).click();
   await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:join(artifacts,'discovery-390.png')});
   await nav.getByRole('button',{name:'音乐库',exact:true}).click();
@@ -106,13 +107,17 @@ test('mobile discovery, library details and search keep navigation context and o
   assert.equal(await playlists.getByRole('button').count(),2,'favorites belong to the same playlist group');
   const favoriteRow=await playlists.getByRole('button',{name:'我的收藏 2 首歌曲',exact:true}).boundingBox();
   const playlistRow=await playlists.getByRole('button',{name:'晚风与散步 2 首歌曲',exact:true}).boundingBox();
-  assert(Math.abs(favoriteRow.width-playlistRow.width)<2,'favorites and custom playlists share the same grid');
-  assert.equal(favoriteRow.y,playlistRow.y,'favorites and custom playlists fill the same two-column row');
-  await library.getByRole('button',{name:'导入',exact:true}).waitFor();
+  assert(Math.abs(favoriteRow.width-playlistRow.width)<2,'favorites and custom playlists share the same full width');
+  assert(playlistRow.y>=favoriteRow.y+favoriteRow.height+15,'collections are separated vertically');
+  assert.equal(await library.getByRole('button',{name:'导入',exact:true}).count(),0,'secondary backup operations live in management');
+  await library.getByRole('button',{name:'音乐库管理',exact:true}).click();
+  const management=page.getByRole('dialog',{name:'音乐库管理',exact:true});
+  await management.getByRole('button',{name:'导入 / 导出',exact:true}).waitFor();
+  await management.getByRole('button',{name:'关闭',exact:true}).click();
   assert.equal(await page.locator('.song-library-page').count(),0,'the overview is separate from playlist details');
   await page.screenshot({path:join(artifacts,'library-390.png')});
   await library.getByRole('button',{name:'晚风与散步 2 首歌曲',exact:true}).click();
-  await page.getByRole('heading',{name:'晚风与散步',exact:true}).waitFor();
+  await page.locator('.song-library-page').getByRole('heading',{name:'晚风与散步',exact:true}).waitFor();
   await page.locator('.song-library-page').getByRole('button',{name:'播放 风从远方来',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>.1&&!document.querySelector('audio').paused);
   const audio=await page.locator('audio').elementHandle(),prepared=fixture.preparations.length;
@@ -136,10 +141,10 @@ test('mobile discovery, library details and search keep navigation context and o
   assert.equal(await page.locator('.song-library-page h1').textContent(),'晚风与散步','desktop search keeps the original playlist underneath');
   await page.setViewportSize({width:390,height:844});await search.waitFor();
   assert.equal(await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).inputValue(),'晚风');
-  await page.goBack();await page.getByRole('heading',{name:'晚风与散步',exact:true}).waitFor();
+  await page.goBack();await page.locator('.song-library-page').getByRole('heading',{name:'晚风与散步',exact:true}).waitFor();
   await page.goForward();await search.waitFor();assert.equal(await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).inputValue(),'晚风');
   await search.getByRole('button',{name:'关闭搜索',exact:true}).click();await search.waitFor({state:'detached'});
-  await page.reload();await page.getByRole('heading',{name:'晚风与散步',exact:true}).waitFor();
+  await page.reload();await page.locator('.song-library-page').getByRole('heading',{name:'晚风与散步',exact:true}).waitFor();
   await page.getByRole('button',{name:'返回音乐库',exact:true}).click();await library.waitFor();
   await library.getByRole('button',{name:'新建歌单',exact:true}).click();const create=page.getByRole('dialog',{name:'新建歌单',exact:true});
   await create.getByLabel('歌单名称').fill('手机新歌单');await create.getByRole('button',{name:'保存歌单',exact:true}).click();await create.waitFor({state:'detached'});
@@ -165,7 +170,7 @@ test('playlist rename drafts survive both layout transitions', {timeout:60000},a
     assert.equal(await page.locator('input[aria-label="搜索歌单内音乐"]').inputValue(),'风');
   }
   await dialog.getByRole('button',{name:'保存歌单',exact:true}).click();await dialog.waitFor({state:'detached'});
-  await page.getByRole('heading',{name:'尚未保存的晚风歌单',exact:true}).waitFor();
+  await page.locator('.song-library-page').getByRole('heading',{name:'尚未保存的晚风歌单',exact:true}).waitFor();
 });
 
 test('mobile song actions, next track and editor returns retain audio, queue and drafts', {timeout:90000},async t=>{
@@ -212,7 +217,8 @@ test('mobile import drafts survive a failed mini-player start and expose retry i
   const page=await browser.newPage({viewport:{width:390,height:844},hasTouch:true});page.setDefaultTimeout(8000);
   await page.route('**/v1/call/**',route=>new URL(route.request().url()).pathname.endsWith('/prepare')?route.fulfill({status:503,json:{protocol:2,error:{code:'upstream',retryable:true}}}):route.continue());
   await page.goto(fixture.base);await page.getByRole('navigation',{name:'手机导航'}).getByRole('button',{name:'音乐库',exact:true}).click();
-  await page.getByRole('button',{name:'导入',exact:true}).click();
+  await page.getByRole('button',{name:'音乐库管理',exact:true}).click();
+  await page.getByRole('dialog',{name:'音乐库管理',exact:true}).getByRole('button',{name:'导入 / 导出',exact:true}).click();
   const backup=page.getByRole('dialog',{name:'备份与恢复',exact:true}),draft=backup.getByRole('textbox',{name:'新资料库快照内容',exact:true});
   await draft.fill('保留尚未提交的导入草稿');
   await page.locator('.mobile-mini-player').getByRole('button',{name:'播放',exact:true}).click();
@@ -233,8 +239,8 @@ test('mobile browse surfaces fit light and dark compact screens', {timeout:90000
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),JSON.stringify({theme,viewport,destination}));
       if(destination==='发现'){
         const cover=await page.locator('[data-shelf-id="account-recommendation"] .cover-button').first().boundingBox();
-        assert(Math.abs(cover.width-(viewport.width-44)/2)<10,'mobile covers fill exactly two columns');
-        assert(Math.abs(cover.width-cover.height)<1,'compact artwork stays square');
+        assert(Math.abs(cover.width-(viewport.width-32))<2,'the feature fills the content width');
+        assert(cover.width>cover.height*1.8,'featured artwork stays landscape');
       }
     }
     await page.locator('.mobile-library').getByRole('button').filter({hasText:'我的收藏'}).click();

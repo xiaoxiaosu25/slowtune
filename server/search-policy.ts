@@ -1,5 +1,8 @@
 import type { EntryRef, MusicEntry, Page, ErrorData } from '@studio/music-sources';
 import type { VerifiedMusicEntry } from './audio-quality.js';
+import { songIdentityReasons } from '@studio/music-sources/song-match';
+export { normalizeSongText } from '@studio/music-sources/song-match';
+import { normalizeSongText } from '@studio/music-sources/song-match';
 
 export type SearchRule = 'allow' | 'requested' | 'manual';
 export const partitionLabels = {
@@ -40,7 +43,6 @@ export interface SearchPage extends Page<SearchEntry> {config:SearchConfig;revis
 export class SearchCandidateMismatch extends Error {constructor(){super('candidate-mismatch');this.name='SearchCandidateMismatch';}}
 
 // Identity comparisons normalize typography, never remove version words or infer aliases.
-export const normalizeSongText=(text:string)=>text.normalize('NFKC').toLocaleLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');
 export const songKey=(song:SongQuery)=>JSON.stringify([normalizeSongText(song.title),[...new Set((song.artists??[]).map(normalizeSongText).filter(Boolean))].sort()]);
 export function songSearchText(song:SongQuery):string {
   let query=song.title.trim();const seen=new Set<string>();
@@ -105,15 +107,7 @@ export function desktopSongMatchReasons(entry:SearchEntry,config:SearchConfig,so
   const baseTitle=song.title.replace(/\s*(?:[(（][^()（）]*(?:live|现场|翻唱|cover|remix|混音)[^()（）]*[)）]|(?:\s+|·)(?:live|现场|翻唱|cover|remix|混音))\s*$/iu,'').trim();
   const reasons=searchFilterReasons(entry,config,[song.title,...song.artists??[]].join(' '),checkPartition);
   if(!config.strictMatch)return reasons;
-  reasons.push(...songMatchReasons(entry,config,{...song,title:baseTitle},false).filter(reason=>['歌名不符','歌手不符','短歌名缺少歌手信息'].includes(reason)));
-  const title=entry.title.normalize('NFKC'),wanted=normalizeSongText(baseTitle);
-  const quoted=[...title.matchAll(/《([^《》]+)》/gu)].map(match=>normalizeSongText(match[1]));
-  // Do not turn a title embedded in another song name into an exact identity.
-  if(quoted.length&&(!quoted.includes(wanted)||new Set(quoted).size>1))reasons.push('歌名歧义');
-  if(!quoted.length&&wanted.length<=3){
-    const escaped=baseTitle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-    if(!new RegExp('(?:^|[\\s\\p{P}\\p{S}])'+escaped+'(?=$|[\\s\\p{P}\\p{S}])','iu').test(title))reasons.push('短歌名边界不符');
-  }
+  const title=entry.title.normalize('NFKC');
   for(const version of Object.keys(versionTerms) as (keyof typeof versionTerms)[]){
     if(checkPartition&&requestsVersion(song.title,version)&&!requestsVersion(title,version)&&partitionVersion[entry.searchPartition??'unknown']!==version)reasons.push('缺少指定版本证据');
   }
@@ -128,13 +122,9 @@ export function desktopSongMatchReasons(entry:SearchEntry,config:SearchConfig,so
   for(const terms of [/风格|仿作|模仿|致敬之作|片段|预告|试听版/iu, /(?:^|[^a-z0-9])(?:style|teaser|preview|snippet)(?=$|[^a-z0-9])/iu]){
     if(terms.test(annotations))reasons.push('仿作或片段');
   }
-  const artists=(song.artists??[]).map(normalizeSongText).filter(Boolean);
   const performanceTitle=requestsVersion(title,'cover')||requestsVersion(title,'ai')?title.replace(/原唱\s*[:：]?\s*[^《》()（）【】\n]+/gu,''):title;
-  const facts=[performanceTitle,...entry.artists??[]].join(' ');
-  if(artists.some(name=>!normalizeSongText(facts).includes(name)))reasons.push('歌手证据不全');
-  // A reliable source artist field must corroborate every requested performer.
-  if(entry.artists?.length&&artists.length&&artists.some(name=>!entry.artists!.some(value=>normalizeSongText(value)===name)))reasons.push('演唱者不符');
-  if(song.durationSeconds!==undefined&&entry.durationSeconds!==undefined&&Math.abs(song.durationSeconds-entry.durationSeconds)>Math.max(12,song.durationSeconds*.08))reasons.push('时长不符');
+  const labels={title:'歌名不符',artist:'歌手不符','short-title-artist':'短歌名缺少歌手信息','ambiguous-title':'歌名歧义','short-title-boundary':'短歌名边界不符','incomplete-artists':'歌手证据不全',performer:'演唱者不符',duration:'时长不符'};
+  reasons.push(...songIdentityReasons(entry,{...song,title:baseTitle},{performerTitle:performanceTitle}).map(code=>labels[code]));
   return [...new Set(reasons)];
 }
 export const sameVideoPart=(a:EntryRef,b:EntryRef)=>a.provider===b.provider&&a.kind===b.kind&&a.id===b.id&&a.part===b.part;

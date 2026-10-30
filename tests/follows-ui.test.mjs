@@ -5,6 +5,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { resolve, join, extname } from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import { DEFAULT_CONFIG } from '@studio/recommendation';
+import { openSourceDetails } from '../scripts/browser-ui.mjs';
 const build=resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
 test('follow UI: song entry, creator collections, recent updates, retry and responsive navigation',async t=>{
   const bili={provider:'bilibili',id:'101',name:'测试 UP',url:'https://space.bilibili.com/101',artwork:'http://i0.hdslb.com/bfs/face/up-avatar.jpg',followedAt:1};
@@ -72,7 +73,10 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
       return json({items:items.slice((page-1)*pageSize,page*pageSize),total:items.length,fetchedAt:1,warnings:[],snapshot:'feed-'+current.revision,page,pageSize});
     }
     if(url.pathname==='/v1/handshake')return json({protocol:2,capabilities:[{provider:'bilibili',operations:['metadata','discover','search','prepare'],limitations:[],anonymous:true},{provider:'youtube',operations:['metadata','list','prepare'],limitations:[],anonymous:true}]});
-    if(url.pathname==='/v1/call/metadata')return json({protocol:2,result:{...first,parts:[first]}});
+    if(url.pathname==='/v1/call/metadata'){
+      const body=await readBody(request),entry=body.ref.provider==='youtube'?second:first;
+      return json({protocol:2,result:{...entry,parts:[entry]}});
+    }
     if(url.pathname==='/v1/call/list')return json({protocol:2,result:{items:[second]}});
     if(url.pathname.startsWith('/v1/'))return json({protocol:2,error:{code:'unsupported',retryable:false}},400);
     try{const path=join(build,'dist/client',url.pathname==='/'?'index.html':url.pathname);response.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2'})[extname(path)] ?? 'application/octet-stream');response.end(readFileSync(path));}catch{response.writeHead(404);response.end();}
@@ -104,19 +108,19 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
     await nav('发现');creatorFailure=true;await page.getByRole('button',{name:'查看 UP / 博主 · 合集里的音乐',exact:true}).click();await page.getByText(/网络或服务连接中断/).waitFor();assert.equal(state.creators.length,0);
     creatorFailure=false;await page.getByRole('button',{name:'关闭操作提示',exact:true}).click();
     creatorDelay=400;await page.getByRole('button',{name:'查看 UP / 博主 · 合集里的音乐',exact:true}).click();await nav('歌单');await new Promise(resolve=>setTimeout(resolve,450));assert.equal(await page.locator('.playlist-copy h1').textContent(),'我的收藏');creatorDelay=0;
-    await nav('发现');await page.getByRole('button',{name:'更多操作 合集里的音乐',exact:true}).first().click();
+    await nav('发现');await openSourceDetails(page,'合集里的音乐');
     creatorDelay=400;await page.getByRole('button',{name:'查看 UP / 博主',exact:true}).click();await page.getByRole('button',{name:'关闭',exact:true}).click();await new Promise(resolve=>setTimeout(resolve,450));assert.equal(await page.locator('h1').textContent(),'发现音乐');creatorDelay=0;
   });
   await t.test('empty follow area and following a real song author',async()=>{
     await nav('关注');await page.getByText('关注喜欢的 UP 和博主',{exact:true}).waitFor();
-    await nav('发现');await page.getByRole('button',{name:'更多操作 合集里的音乐',exact:true}).first().click();
+    await nav('发现');await openSourceDetails(page,'合集里的音乐');
     await page.getByRole('button',{name:'关注 测试 UP',exact:true}).click();
     await page.getByRole('button',{name:'取消关注 测试 UP',exact:true}).waitFor();
     assert.equal(state.creators.length,1);await page.getByRole('button',{name:'关闭',exact:true}).click();
     const before={revision:state.revision,followedAt:state.creators[0].followedAt};state.creators=state.creators.map(({artwork,...rest})=>rest);
     await nav('关注');await page.getByRole('button',{name:'查看 测试 UP 的合集',exact:true}).waitFor();
     await page.getByAltText('测试 UP的头像').waitFor();assert.equal(state.revision,before.revision);assert.equal(state.creators[0].followedAt,before.followedAt,'backfill keeps the original follow record');
-    await page.reload();await nav('发现');await page.getByRole('button',{name:'更多操作 合集里的音乐',exact:true}).first().click();
+    await page.reload();await nav('发现');await openSourceDetails(page,'合集里的音乐');
     await page.getByRole('button',{name:'取消关注 测试 UP',exact:true}).waitFor();assert.equal(state.creators.length,1,'missing cached author IDs resolve without adding another follow');
     await page.getByRole('button',{name:'关闭',exact:true}).click();await nav('关注');
   });
@@ -163,7 +167,7 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
     feedPagination=true;
     await page.getByRole('button',{name:'刷新',exact:true}).click();await page.getByRole('textbox',{name:'最近更新页码',exact:true}).waitFor();
     const readsBefore=feedReads.length;feedDelay=400;
-    await page.getByRole('button',{name:'更多操作 合集里的音乐',exact:true}).first().click();
+    await openSourceDetails(page,'合集里的音乐');
     await page.getByRole('button',{name:'取消关注 测试 UP',exact:true}).click();
     await page.getByRole('button',{name:'关注 测试 UP',exact:true}).waitFor();
     assert.equal(await page.locator('.follows-page').getByTitle('合集里的音乐',{exact:true}).count(),0);
@@ -194,7 +198,7 @@ test('follow UI: song entry, creator collections, recent updates, retry and resp
     await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.getByTitle('博主最新发布',{exact:true}).waitFor();
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile content does not overflow horizontally');
     await page.screenshot({path:join(directory,'mobile-updates.png'),fullPage:true});
-    await page.getByRole('button',{name:'查看 UP / 博主 · 博主最新发布',exact:true}).click();await page.getByRole('button',{name:'打开合集 测试博主 的合集',exact:true}).waitFor();assert.equal(state.creators.length,2);
+    await openSourceDetails(page,'博主最新发布');await page.getByRole('button',{name:'查看 UP / 博主',exact:true}).click();await page.getByRole('button',{name:'打开合集 测试博主 的合集',exact:true}).waitFor();assert.equal(state.creators.length,2);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.equal(await page.getByRole('navigation',{name:'发现栏目'}).count(),0,'author details use the dedicated mobile header');await page.screenshot({path:join(directory,'mobile-author-preview.png'),fullPage:true});await page.getByRole('button',{name:'返回关注',exact:true}).click();
     await page.getByRole('button',{name:'关注的 UP',exact:true}).click();await page.getByRole('button',{name:'取消关注 测试 UP',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.follow-creator-card').length===1);
     await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.follows-page .track-row').length===1);

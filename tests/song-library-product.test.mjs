@@ -9,7 +9,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { streamSSE } from 'hono/streaming';
 import { chromium } from './helpers/browser.mjs';
 import { startupFixture } from './helpers/startup-fixture.mjs';
-import { libraryAction, navigate } from '../scripts/browser-ui.mjs';
+import { libraryAction, navigate, openSourceDetails } from '../scripts/browser-ui.mjs';
 const root = resolve(process.env.MUSIC_APP_TEST_BUILD ?? '.');
 const load = name => import(pathToFileURL(join(root, 'dist/server', name + '.js')));
 const { SongLibraryStore } = await load('song-library-store'), { SongLibraryService } = await load('song-library-service'), { SongLibrarySources } = await load('song-library-sources'), { createSongLibraryRouter } = await load('song-library-http');
@@ -61,7 +61,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
     const row=page.locator('.song-library-row').filter({has:page.getByRole('button',{name:title,exact:true})}).first();
     if(await row.locator('.song-row-menu').count()){
       await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
-      await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();return;
+      await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'编辑歌曲 '+title,exact:true}).click();return;
     }
     await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
     await page.getByRole('dialog',{name:'歌曲操作',exact:true}).getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();
@@ -123,7 +123,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   const pinnedRow=page.locator('.song-library-row').nth(1);
   assert.match(await pinnedRow.innerText(),/固定 ·/);
   await pinnedRow.getByRole('button',{name:'更多操作 人工新名',exact:true}).click();
-  await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 人工新名',exact:true}).click();
+  await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'编辑歌曲 人工新名',exact:true}).click();
   assert.equal(await page.getByRole('combobox', { name: '本条歌单记录播放版本',exact:true }).inputValue(), versionId);
   await page.keyboard.press('Escape');
   const snapshot = service.read().snapshot;
@@ -137,9 +137,9 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   await navigate(page,'搜索');await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('七里香');await page.getByRole('button',{name:'搜索',exact:true}).click();
   await page.getByRole('button',{name:'播放 来源原标题 902',exact:true}).click();
   await page.waitForFunction(()=>/part=902/.test(document.querySelector('audio').currentSrc)&&!document.querySelector('audio').paused);
-  await page.getByRole('button',{name:'保持本 P',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'保持本 P',exact:true}).count(),0);
   const sourceQueue=await page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
-  await page.getByRole('button',{name:'更多操作 来源原标题 902',exact:true}).click();await page.getByRole('button',{name:'归入歌曲 · 添加版本',exact:true}).click();
+  await openSourceDetails(page,'来源原标题 902');await page.getByRole('button',{name:'归入歌曲 · 添加版本',exact:true}).click();
   const group=page.getByRole('dialog',{name:'归入歌曲',exact:true});await group.getByLabel('归组歌名').fill('七里香');await group.getByLabel('归组歌手').fill('周杰伦');await group.getByLabel('归组版本名称').fill('无损版');
   await group.screenshot({path:join(directory,'simple-group-mobile.png')});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await group.getByRole('button',{name:'保存歌曲与版本',exact:true}).click();await group.waitFor({state:'detached'});

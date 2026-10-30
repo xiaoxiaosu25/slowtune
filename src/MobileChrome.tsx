@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowLeftIcon, CaretDownIcon, CaretRightIcon, CompassIcon, DatabaseIcon, HeadphonesIcon, InfoIcon, LinkIcon, ListBulletsIcon, LockKeyIcon, MagnifyingGlassIcon, PaletteIcon, PlugsConnectedIcon, SlidersHorizontalIcon, UserCircleIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon, CaretDownIcon, CaretRightIcon, CompassIcon, DatabaseIcon, HeadphonesIcon, InfoIcon, LinkIcon, ListBulletsIcon, LockKeyIcon, MagnifyingGlassIcon, MusicNotesIcon, PaletteIcon, PlugsConnectedIcon, SlidersHorizontalIcon, UserCircleIcon } from '@phosphor-icons/react';
 import type { BilibiliAccountState } from './api';
 import { mobileSettingsTitles, type MobileSettingsSection } from './mobile-settings';
 
@@ -9,7 +9,7 @@ const destinations = [
   { id: 'profile', label: '我的', icon: UserCircleIcon },
 ];
 
-export function MobileHeader({ page, settingsSection, onSearch, onLink, onBack, options, followDetail }: { page: string; settingsSection: MobileSettingsSection; onSearch: () => void; onLink: () => void; onBack: () => void; options: ReactNode; followDetail?: { title: string; backLabel: string; onBack: () => void } }) {
+export function MobileHeader({ page, playlistTitle, settingsSection, onSearch, onLink, onBack, options, followDetail }: { page: string; playlistTitle?: string; settingsSection: MobileSettingsSection; onSearch: () => void; onLink: () => void; onBack: () => void; options: ReactNode; followDetail?: { title: string; backLabel: string; onBack: () => void } }) {
   return <header className={'topbar mobile-header' + (page === 'playing' ? ' listening-header' : followDetail || ['settings','playlist'].includes(page) ? ' mobile-subpage-header' : '')}>
     {page === 'playing' ? <>
       <button className="btn btn-icon" aria-label="返回浏览音乐" onClick={onBack}><CaretDownIcon size={25}/></button>
@@ -20,7 +20,7 @@ export function MobileHeader({ page, settingsSection, onSearch, onLink, onBack, 
       <button className="btn btn-icon mobile-detail-search" aria-label="搜索歌曲或视频" onClick={onSearch}><MagnifyingGlassIcon size={23}/></button>
     </> : ['settings','playlist'].includes(page) ? <>
       <button className="btn btn-icon" aria-label={page==='playlist'?'返回音乐库':'返回上一级'} onClick={onBack}><ArrowLeftIcon size={24}/></button>
-      <h1>{page==='playlist'?'歌单':mobileSettingsTitles[settingsSection]}</h1>
+      <h1 title={playlistTitle}>{page==='playlist'?playlistTitle||'歌单':mobileSettingsTitles[settingsSection]}</h1>
       {page==='playlist'&&<button className="btn btn-icon mobile-detail-search" aria-label="搜索歌曲或视频" onClick={onSearch}><MagnifyingGlassIcon size={23}/></button>}
     </> : <>
       <div className="mobile-header-title"><HeadphonesIcon size={23}/><h1>{page === 'library' ? '音乐库' : page === 'profile' ? '我的' : '慢听'}</h1></div>
@@ -43,7 +43,8 @@ export function MobileDiscoveryNavigation({ page, onNavigate }: { page: string; 
   return <nav className="mobile-discovery-nav" aria-label="发现栏目">{[{id:'discover', label:'推荐'}, {id:'charts', label:'音乐榜单'}, {id:'follows', label:'关注'}].map(item => <button key={item.id} aria-current={page === item.id ? 'page' : undefined} className={page === item.id ? 'active' : ''} onClick={() => onNavigate(item.id)}>{item.label}</button>)}</nav>;
 }
 
-export function MobileMiniPlayer({ cover, title, artist, progress, transport, onOpen }: { cover: ReactNode; title: string; artist: string; progress: number; transport: ReactNode; onOpen: () => void }) {
+export function MobileMiniPlayer({ cover, title, artist, progress, transport, onOpen, empty=false }: { cover: ReactNode; title: string; artist: string; progress: number; transport: ReactNode; onOpen: () => void; empty?: boolean }) {
+  if (empty) return <footer className="mobile-mini-player is-empty" aria-label="播放器"><button aria-label="打开正在播放" onClick={onOpen}><MusicNotesIcon size={20}/><span>选择一首，开始听</span><CaretRightIcon size={17}/></button></footer>;
   return <footer className="mobile-mini-player" aria-label="播放器">
     <div className="mobile-mini-progress" aria-hidden="true"><span style={{width:Math.min(100,Math.max(0,progress*100))+'%'}}/></div>
     <div className="mobile-mini-row">

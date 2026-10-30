@@ -1,0 +1,76 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+import { copyFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { chromium } from './helpers/browser.mjs';
+import { createPlayingArtworkFixture } from './helpers/playing-artwork-fixture.mjs';
+import { queueRecord } from './helpers/song-fixture.mjs';
+import { developmentPaths } from '../scripts/workspace-paths.mjs';
+
+const artifacts=join(developmentPaths().artifacts,'lyric-motion-review-20261030');
+const texts=['当天上星河转','我命已定盘','待绝笔墨痕干','宿敌已来犯','我借你的孤单','今生恐怕难还','缠扰孤岛的雪雨','飘飘洒洒谁来停','摘取一颗海上星','陪我终夜不孤寂','灵枢长埋深谷底','借一缕晚风送给你'];
+
+test('ordinary LRC visibly grows and settles at the centre on a real line change, while seeks and reduced motion snap', {timeout:60000}, async t=>{
+  mkdirSync(artifacts,{recursive:true});
+  const fixture=await createPlayingArtworkFixture(),browser=await chromium.launch({headless:true,args:['--autoplay-policy=no-user-gesture-required']});
+  const context=await browser.newContext({viewport:{width:1200,height:800},reducedMotion:'no-preference',...(process.env.MUSIC_APP_MOTION_VIDEO==='1'?{recordVideo:{dir:join(artifacts,'recordings'),size:{width:1200,height:800}}}:{})});
+  t.after(async()=>{await context.close();await browser.close();await fixture.close();});
+  await context.addInitScript(record=>{
+    localStorage.setItem('slow-listening:playback:v3',JSON.stringify(record));localStorage.setItem('slow-listening:theme:v1','dark');
+    localStorage.setItem('slow-listening:lyrics-display:v1',JSON.stringify({bottom:false,translations:true,focus:true}));
+  },queueRecord(fixture.tracks,{volume:0}));
+  await context.route('https://i1.hdslb.com/**',route=>route.abort());
+  await context.route('**/api/lyrics/state',route=>route.fulfill({json:{revision:'motion',offsetMs:0,document:{provider:'local',id:'motion',title:'核心动效回归',artists:[],synced:true,lines:texts.map((text,index)=>({startMs:index*1800,text}))}}}));
+  const videoStart=Date.now(),page=await context.newPage();page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(fixture.base);await page.getByRole('button',{name:'打开正在播放',exact:true}).click();await page.getByRole('button',{name:'播放',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>.1);await page.getByRole('button',{name:'打开沉浸歌词',exact:true}).click();
+  const reading=page.locator('.desktop-lyrics-reading'),rows=page.locator('.desktop-lyrics-host .slow-lyric-line');await rows.first().waitFor();
+  await page.getByRole('region',{name:'沉浸歌词',exact:true}).getByRole('button',{name:'暂停',exact:true}).click();
+  const seek=time=>page.locator('audio').evaluate((audio,time)=>{audio.currentTime=time;audio.dispatchEvent(new Event('timeupdate'));},time);
+  await seek(8.65);await page.waitForFunction(()=>document.querySelector('.desktop-lyrics-host')?.dataset.activeLine==='4');await page.waitForTimeout(350);
+  const typography=()=>rows.evaluateAll(rows=>Object.fromEntries(rows.map(row=>{const main=row.querySelector('[class*="_lyricMainLine"]'),style=getComputedStyle(main),bounds=main.getBoundingClientRect();return [row.dataset.lineIndex,{current:row.getAttribute('aria-current'),scale:Number(style.scale),weight:Number(style.fontWeight),top:bounds.top,height:bounds.height,mask:style.maskImage}];})));
+  let styles=await typography();assert.equal(styles[4].scale,1);assert(Math.abs(styles[5].scale-2/3)<.001);assert.equal(styles[4].weight,800);assert.equal(styles[5].weight,400);assert.equal(styles[4].mask,'none','ordinary lines have no fabricated word sweep');
+  const audio=await page.locator('audio').elementHandle(),source=await page.locator('audio').getAttribute('src'),prepares=fixture.preparations.length;
+  const motionStart=Date.now();
+  await page.getByRole('region',{name:'沉浸歌词',exact:true}).getByRole('button',{name:'播放',exact:true}).click();
+  const samples=await page.evaluate(async()=>{
+    const host=document.querySelector('.desktop-lyrics-host'),root=host.shadowRoot,rows=[...root.querySelectorAll('.slow-lyric-line')],result=[],start=performance.now();
+    while(performance.now()-start<1250){await new Promise(requestAnimationFrame);const main=rows[5].querySelector('[class*="_lyricMainLine"]'),bounds=main.getBoundingClientRect();result.push({elapsed:performance.now()-start,active:host.dataset.activeLine,scale:Number(getComputedStyle(main).scale),weight:Number(getComputedStyle(main).fontWeight),centre:bounds.top+bounds.height/2});}return result;
+  });
+  await writeFile(join(artifacts,'motion-frames.json'),JSON.stringify(samples,null,2));
+  assert(samples.some(sample=>sample.active==='5'&&sample.scale>2/3+.02&&sample.scale<.98),'the incoming current line interpolates in size instead of only changing opacity');
+  assert(samples.some(sample=>sample.active==='5'&&sample.weight>420&&sample.weight<780),'font emphasis transitions with size');
+  const finish=samples.at(-1);assert.equal(finish.active,'5');assert.equal(finish.scale,1);assert.equal(finish.weight,800);
+  const bounds=await reading.boundingBox();assert(Math.abs(finish.centre-(bounds.y+bounds.height/2))<20,'the new line settles at the reading centre');
+  const tail=samples.filter(sample=>sample.elapsed>1000).map(sample=>sample.centre);assert(Math.max(...tail)-Math.min(...tail)<1,'the scroll settles without continued bouncing');
+  if(process.env.MUSIC_APP_MOTION_VIDEO==='1')await page.waitForTimeout(3600);
+  const motionEnd=Date.now();
+  await page.getByRole('region',{name:'沉浸歌词',exact:true}).getByRole('button',{name:'暂停',exact:true}).click();await page.mouse.move(0,0);await page.waitForTimeout(350);
+  await page.screenshot({path:join(artifacts,'02-after.png')});
+  await page.getByRole('button',{name:texts[8],exact:true}).click();await page.waitForFunction(()=>document.querySelector('.desktop-lyrics-host')?.dataset.activeLine==='8');
+  const clicked=await page.locator('.desktop-lyrics-host [aria-current="true"]').boundingBox();
+  assert(Math.abs(clicked.y+clicked.height/2-(bounds.y+bounds.height/2))<2,'click focus must not introduce native scrolling on top of virtual lyric positioning');
+  await seek(2);await page.waitForFunction(()=>document.querySelector('.desktop-lyrics-host')?.dataset.activeLine==='1');
+  styles=await typography();assert.equal(styles[1].scale,1,'a paused seek uses the requested line immediately');
+  await page.emulateMedia({reducedMotion:'reduce'});await page.waitForFunction(()=>document.querySelector('.desktop-lyrics-host')?.shadowRoot.querySelector('.amll-lyric-player')?.dataset.reduced==='true');
+  styles=await typography();assert(Object.values(styles).every(style=>style.scale===1),'reduced motion keeps readable static text without zoom');assert.equal(styles[1].weight,800);
+  await seek(18.5);await page.waitForFunction(()=>document.querySelector('.desktop-lyrics-host')?.dataset.activeLine==='10');styles=await typography();assert.equal(styles[10].scale,1);
+  const engine=await page.locator('.desktop-lyrics-host').elementHandle();
+  await page.getByRole('region',{name:'沉浸歌词',exact:true}).getByRole('button',{name:'更多播放选项',exact:true}).click();
+  await page.getByRole('combobox',{name:'歌词动效',exact:true}).selectOption('full');
+  await page.waitForFunction(()=>document.querySelector('.desktop-lyrics-host')?.shadowRoot.querySelector('.amll-lyric-player')?.dataset.reduced==='false');
+  await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.desktop-lyrics-host').shadowRoot.querySelector('[data-line-index="9"] [class*="_lyricMainLine"]')).scale)<.668);
+  styles=await typography();assert(Math.abs(styles[9].scale-2/3)<.001,'explicit full motion overrides the system preference');
+  assert.equal(await engine.evaluate(host=>host===document.querySelector('.desktop-lyrics-host')),true,'changing motion keeps the mounted lyric engine');
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:lyrics-display:v1')).motion),'full');
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.getByRole('combobox',{name:'歌词动效',exact:true}).selectOption('reduced');
+  await page.waitForFunction(()=>document.querySelector('.desktop-lyrics-host')?.shadowRoot.querySelector('.amll-lyric-player')?.dataset.reduced==='true');
+  styles=await typography();assert(Object.values(styles).every(style=>style.scale===1),'explicit reduced motion also works when system animation is enabled');
+  await page.keyboard.press('Escape');await page.getByRole('button',{name:'返回普通播放',exact:true}).click();
+  await page.getByRole('button',{name:'打开沉浸歌词',exact:true}).click();
+  await page.waitForFunction(()=>{const host=document.querySelector('.desktop-lyrics-host'),row=host?.shadowRoot?.querySelector('[aria-current="true"]');return !!row&&row.getBoundingClientRect().height>0&&row.getBoundingClientRect().top>=0&&row.getBoundingClientRect().top<innerHeight;});
+  assert.equal(await page.getByRole('button',{name:'灵枢长埋深谷底',exact:true}).isVisible(),true,'a paused reduced-motion view commits its measured rows on opening');
+  assert.equal(await audio.evaluate(audio=>audio===document.querySelector('audio')&&audio.paused),true);assert.equal(await page.locator('audio').getAttribute('src'),source);assert.equal(fixture.preparations.length,prepares);assert.deepEqual(errors,[]);
+  const video=page.video();await page.close();if(video){await copyFile(await video.path(),join(artifacts,'motion-regression.webm'));await writeFile(join(artifacts,'motion-video.json'),JSON.stringify({start:(motionStart-videoStart)/1000,duration:(motionEnd-motionStart)/1000}));}
+});

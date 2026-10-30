@@ -76,6 +76,13 @@ test('search retains raw pagination/order, reports facts for all items, and limi
   const page=await service.search({provider:'bilibili',query:'两难',cursor:'page-2'},signal());assert.equal(page.items.length,8);assert.equal(page.nextCursor,'page-3');assert.deepEqual(page.items.map(x=>x.ref.id),items.map(x=>x.ref.id));assert.equal(max,3);
   await service.search({provider:'bilibili',query:'两难',cursor:'page-2'},signal());assert.equal(reads,8);
 });
+test('manual platform order is forwarded without changing automatic matching defaults',async t=>{
+  const store=storeFor(t),requests=[],items=[track(1)];
+  const service=new MusicSearch(store,{search:async(_provider,request)=>{requests.push(request);return {items};},metadata:async()=>items[0]},async()=>({tid_v2:2024}),()=>false,()=> 'same');
+  await service.search({provider:'bilibili',query:'两难',order:'favorites'},signal());assert.equal(requests.at(-1).order,'favorites');
+  await service.resolve({title:'两难',artists:['加木']},signal());assert.equal(requests.at(-1).order,undefined);
+  const count=requests.length;await assert.rejects(service.search({provider:'bilibili',query:'两难',order:'invalid'},signal()),{code:'invalid-input'});assert.equal(requests.length,count);
+});
 test('automatic playback selects the first eligible upstream item and invalidates cached choices when settings change',async t=>{
   const store=storeFor(t),items=[track(1,'两难 教学'),track(2),track(3,'加木《两难》官方MV')],calls=[];
   const service=new MusicSearch(store,{search:async(provider,request)=>{calls.push({provider,request});return {items};},metadata:async()=>items[0]},async ref=>({tid_v2:ref.id===items[0].ref.id?2025:2024}),()=>false,()=> 'same');

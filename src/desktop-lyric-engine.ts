@@ -4,7 +4,18 @@ import stylesheet from '@applemusic-like-lyrics/core/style.css?inline';
 // Suppress AMLL's early automatic return while the host's five-second browse timer runs.
 class DesktopPlayer extends LyricPlayer {
   browsing = false;
+  snapLayout = false;
   override resetScroll() { if (!this.browsing) super.resetScroll(); }
+  override setLinePosYSpringParams() {
+    // AMLL otherwise replaces this policy on every new line. Keep the whole
+    // paragraph moving at one settled pace instead of varying with line length.
+    super.setLinePosYSpringParams({mass:1,stiffness:180,damping:27});
+  }
+  override calcLayout(reason:Parameters<LyricPlayer['calcLayout']>[0]) {
+    // PlaybackTick adds a per-row stagger; the reference scrolls as one block.
+    super.calcLayout(reason==='playback-tick'?'config-change':reason);
+    if(this.snapLayout)for(const group of this.currentLyricGroups)group.setTransform(group.top,true,group.delay,group.isActive,group.opacity,group.blur);
+  }
   syncWordClock(time: number, timedWords: boolean[]) {
     // AMLL's word animations otherwise run at wall-clock speed. The media clock
     // owns active timed rows, including rate changes, seeks and stalled playback.
@@ -16,15 +27,18 @@ class DesktopPlayer extends LyricPlayer {
 
 const hostStyles = `
 :host { display:block; width:100%; height:100%; font:inherit; color:var(--text); }
-.amll-lyric-player.dom { --amll-lp-font-size:inherit; --amll-lp-color:var(--text); --lyric-line-padding-x:8px; --amll-lp-line-width-aspect:1; --amll-lp-hover-bg-color:color-mix(in srgb,var(--text) 5%,transparent); font:inherit; line-height:1.4; mix-blend-mode:normal; }
-.slow-lyric-line { padding:12px 8px !important; cursor:pointer; opacity:var(--slow-line-opacity,.45) !important; filter:blur(var(--slow-line-blur,0px)) !important; }
+.amll-lyric-player.dom { --amll-lp-font-size:inherit; --amll-lp-color:var(--text); --lyric-line-padding-x:8px; --amll-lp-line-width-aspect:1; --amll-lp-hover-bg-color:transparent; font:inherit; line-height:1.4; mix-blend-mode:normal; overflow:clip; }
+.slow-lyric-line { padding:8px !important; cursor:pointer; opacity:var(--slow-line-opacity,.6) !important; filter:none !important; transition:opacity 300ms ease-out; }
 .slow-lyric-line:focus-visible { outline:2px solid var(--accent-text); outline-offset:-2px; }
 .slow-lyric-line:focus-visible,.slow-lyric-line:hover { opacity:1 !important; filter:none !important; }
 .slow-lyric-line [class*="_lyricLine"] { --bright-mask-alpha:1; --dark-mask-alpha:.4; }
-.slow-lyric-line [class*="_lyricMainLine"] { line-height:1.4; overflow-wrap:break-word; }
-.slow-lyric-line [class*="_lyricSubLine"] { font-size:18px; line-height:1.6; opacity:.65; margin-top:8px; font-weight:400; }
-.slow-static-line [class*="_lyricMainLine"],.slow-static-line [class*="_lyricMainLine"] * { mask-image:none !important; -webkit-mask-image:none !important; opacity:1 !important; filter:none !important; transform:none !important; text-shadow:none !important; }
-.amll-lyric-player[data-reduced="true"] * { transition:none !important; animation:none !important; }
+.slow-lyric-line [class*="_lyricMainLine"] { line-height:1.4; overflow-wrap:break-word; font-weight:400; scale:.666667; transform-origin:left center; transition:scale 300ms cubic-bezier(.2,0,0,1),font-weight 300ms ease-out,text-shadow 300ms ease-out; }
+.slow-lyric-line[aria-current="true"] [class*="_lyricMainLine"] { scale:1; font-weight:800; text-shadow:0 4px 24px color-mix(in srgb,var(--text) 12%,transparent); }
+.slow-lyric-line [class*="_lyricSubLine"] { font-size:14px; line-height:1.6; opacity:.8; margin-top:4px; font-weight:400; }
+.slow-static-line [class*="_lyricMainLine"],.slow-static-line [class*="_lyricMainLine"] * { mask-image:none !important; -webkit-mask-image:none !important; opacity:1 !important; filter:none !important; transform:none !important; }
+.slow-static-line [class*="_lyricMainLine"] * { text-shadow:inherit !important; }
+.amll-lyric-player[data-snap="true"] *,.amll-lyric-player[data-reduced="true"] * { transition:none !important; animation:none !important; }
+.amll-lyric-player[data-reduced="true"] [class*="_lyricMainLine"] { scale:1; }
 .amll-lyric-player[data-reduced="true"] [class*="_lyricMainLine"],.amll-lyric-player[data-reduced="true"] [class*="_lyricMainLine"] * { mask-image:none !important; -webkit-mask-image:none !important; text-shadow:none !important; }
 `;
 
@@ -37,9 +51,11 @@ export function mountDesktopLyricEngine(host: HTMLElement, lines: LyricLine[], t
   const element = player.getElement();
   shadow.append(element);
   player.setOptimizeOptions({ normalizeSpaces: false, resetLineTimestamps: false });
-  player.setAlignPosition(.45); player.setAlignAnchor('center');
+  player.setAlignPosition(.5); player.setAlignAnchor('center');
   player.setEnableBlur(false); player.setOverscanPx(240);
-  player.setLinePosYSpringParams({ mass: 1, stiffness: 130, damping: 23 });
+  // One typography transition owns emphasis for both LRC and timed-word rows.
+  // Keep the measured line box stable so growing text cannot kick the scroll target.
+  player.setEnableScale(false);
   player.setLyricLines(lines, initialTime);
   const groups = player.currentLyricGroups.map((group, index) => {
     const row = group.getElement();
@@ -56,16 +72,19 @@ export function mountDesktopLyricEngine(host: HTMLElement, lines: LyricLine[], t
     if (row) { event.preventDefault(); event.stopPropagation(); onSeek(Number(row.dataset.lineIndex)); }
   };
   player.addEventListener('line-click', click); element.addEventListener('keydown', keyboard);
-  let active = -2, playing = false, reduced = false;
+  let active = -2, playing = false, reduced = false, previousTime = initialTime;
   const sync = (time: number, isPlaying: boolean, reduce: boolean, seek = false, delta = 0) => {
+    const snap=seek||reduce||time<previousTime||Math.abs(time-previousTime)>1200;
+    player.snapLayout=snap;
+    element.dataset.snap=String(snap);previousTime=time;
     if (playing !== isPlaying) { playing = isPlaying; if (playing) player.resume(); else player.pause(); }
     if (element.dataset.reduced === undefined || reduced !== reduce) {
       reduced = reduce; element.dataset.reduced = String(reduce);
-      player.setEnableSpring(!reduce); player.setEnableScale(!reduce);
+      player.setEnableSpring(!reduce);
       active = -2;
       if (!reduce && playing) player.resume();
     }
-    player.setCurrentTime(time, seek || reduce);
+    player.setCurrentTime(time, snap);
     player.update(delta);
     player.syncWordClock(time, timedWords);
     let lo = 0, hi = lines.length;
@@ -74,9 +93,7 @@ export function mountDesktopLyricEngine(host: HTMLElement, lines: LyricLine[], t
     if (active !== current) {
       active = current;
       groups.forEach((row, index) => {
-        const distance = Math.abs(index - Math.max(0, current));
-        row.style.setProperty('--slow-line-opacity', index === current ? '1' : index < current ? '.28' : distance <= 1 ? '.54' : '.36');
-        row.style.setProperty('--slow-line-blur', reduce || distance < 3 ? '0px' : '1px');
+        row.style.setProperty('--slow-line-opacity', index === current ? '1' : '.6');
         if (index === current) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current');
       });
     }

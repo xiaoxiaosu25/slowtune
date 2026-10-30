@@ -4,20 +4,21 @@ import type { BilibiliFavorites, FavoriteContext } from './bilibili-favorites.js
 import { SongLibraryError } from './song-library-errors.js';
 import { object, text, list } from './song-library-codec.js';
 import { memberKey, validateMember } from './song-library-store.js';
-import { adoptSongSource } from './song-library-sources.js';
 import { applySongEdits } from './song-library-edits.js';
 import { pruneUnretainedMembers, syncProjection } from './song-library-relations.js';
 import type { SongLibraryService } from './song-library-service.js';
 import type { SongLibraryDocument, SongMember, SongSyncMapping } from './song-library-types.js';
 import type { SongSyncPreview, SongSyncState } from './song-library-sync-types.js';
+import {applySyncLocal,localSyncState,type SyncLocalOperation} from './song-library-sync-local.js';
 
 type Remote = Pick<BilibiliFavorites, 'context' | 'check' | 'folders' | 'videos' | 'aid' | 'change' | 'createFolder'>;
 const fail = (code: 'invalid-input' | 'not-found' | 'duplicate' | 'cancelled' | 'busy' = 'invalid-input'): never => { throw new SongLibraryError(code); };
 function targetMembers(document: SongLibraryDocument, target: string) {
   const s = document.snapshot;
-  if (target === 'system:favorites') return s.favorites.map(f => ({ member: { kind: 'favorite', favoriteId: f.favoriteId } as SongMember, songId: f.songId, versionId: s.songs.find(song => song.id === f.songId)?.defaultVersionId }));
+  const defaults = new Map(s.songs.map(song => [song.id, song.defaultVersionId]));
+  if (target === 'system:favorites') return s.favorites.map(f => ({ member: { kind: 'favorite', favoriteId: f.favoriteId } as SongMember, songId: f.songId, versionId: defaults.get(f.songId) }));
   const playlist = s.playlists.find(p => p.id === target) ?? fail('not-found');
-  return playlist.entries.map(entry => ({ member: { kind: 'playlist-entry', playlistId: target, entryId: entry.entryId } as SongMember, songId: entry.songId, versionId: entry.pinnedVersionId ?? s.songs.find(song => song.id === entry.songId)?.defaultVersionId }));
+  return playlist.entries.map(entry => ({ member: { kind: 'playlist-entry', playlistId: target, entryId: entry.entryId } as SongMember, songId: entry.songId, versionId: entry.pinnedVersionId ?? defaults.get(entry.songId) }));
 }
 /** All authority and pending work live with songs in the same SQLite aggregate. No sidecar or old model. */
 export class SongLibrarySync {
@@ -30,12 +31,8 @@ export class SongLibrarySync {
   cancelOwner(owner: string) { for (const [id, preview] of this.previews) if (preview.owner === owner) this.previews.delete(id); }
   async state(signal: AbortSignal, folders = false): Promise<SongSyncState> {
     const c = await this.remote.context(AbortSignal.any([signal, this.stop.signal]));
-    const stored = this.library.store.read();
-    const result: SongSyncState = { accountId: c.accountId, revision: stored.revision, busy: !!this.work, links: stored.document.syncLinks.filter(link => link.accountId === c.accountId).map(link => {
-      const mappings = stored.document.syncMappings.filter(mapping => mapping.linkId === link.id);
-      let unmapped = 0; try { unmapped = targetMembers(stored.document, link.targetId).filter(entry => !mappings.some(mapping => memberKey(mapping.member) === memberKey(entry.member))).length; } catch {}
-      return { ...link, mappings, unmapped };
-    }) };
+    const response=this.library.store.desktopResponse({type:'sync-state',accountId:c.accountId,busy:!!this.work},c.signal);
+    const result:SongSyncState=response?JSON.parse(new TextDecoder().decode(await response)):localSyncState(this.library.store.read(),c.accountId,!!this.work);
     if (folders) result.folders = await this.remote.folders(c);
     this.remote.check(c); return result;
   }
@@ -57,25 +54,33 @@ export class SongLibrarySync {
     const remote = input.create ? [] : await this.remote.videos(folder.id, c); this.remote.check(c);
     const newPlaylist = input.targetId === 'new', targetId = newPlaylist ? randomUUID() : input.targetId;
     const members = newPlaylist ? [] : targetMembers(stored.document, targetId);
+    const versions = new Map(stored.document.snapshot.versions.map(version => [version.id, version]));
     if (input.assignments !== undefined) {
       list(input.assignments, 10000); const keys = new Set<string>();
+      const memberIndex = new Map(members.map(member => [memberKey(member.member), member]));
       for (const assignment of input.assignments) {
         object(assignment, ['member', 'versionId']); text(assignment.versionId, 200); validateMember(assignment.member);
-        const member = members.find(item => memberKey(item.member) === memberKey(assignment.member)) ?? fail();
-        if (!stored.document.snapshot.versions.some(version => version.id === assignment.versionId && version.songId === member.songId && version.ref.provider === 'bilibili')) fail();
+        const member = memberIndex.get(memberKey(assignment.member)) ?? fail();
+        const version = versions.get(assignment.versionId);
+        if (!version || version.songId !== member.songId || version.ref.provider !== 'bilibili') fail();
         if (keys.has(memberKey(member.member))) fail(); keys.add(memberKey(member.member)); member.versionId = assignment.versionId;
       }
       // Explicit selection can narrow membership; omitted entries have no remote mapping.
       for (const member of members) if (!keys.has(memberKey(member.member))) member.versionId = null;
-    } else if (existing) for (const member of members) {
-      // An established mapping survives default changes. Only unmapped members get a proposal.
-      const mapping = stored.document.syncMappings.find(m => m.linkId === existing.id && memberKey(m.member) === memberKey(member.member));
-      if (mapping) member.versionId = mapping.versionId;
+    } else if (existing) {
+      const previous = new Map<string, SongSyncMapping>();
+      for (const mapping of stored.document.syncMappings) if (mapping.linkId === existing.id && !previous.has(memberKey(mapping.member))) previous.set(memberKey(mapping.member), mapping);
+      for (const member of members) {
+        // An established mapping survives default changes. Only unmapped members get a proposal.
+        const mapping = previous.get(memberKey(member.member));
+        if (mapping) member.versionId = mapping.versionId;
+      }
     }
+    const songs = new Map(stored.document.snapshot.songs.map(song => [song.id, song]));
     const assignments = members.flatMap(member => {
-      const version = stored.document.snapshot.versions.find(version => version.id === member.versionId && version.songId === member.songId && version.ref.provider === 'bilibili');
-      if (!version) return [];
-      return [{ member: member.member, versionId: version.id, title: stored.document.snapshot.songs.find(song => song.id === member.songId)!.title, version: version.label || version.facts.title, bvid: version.ref.id }];
+      const version = member.versionId ? versions.get(member.versionId) : undefined;
+      if (!version || version.songId !== member.songId || version.ref.provider !== 'bilibili') return [];
+      return [{ member: member.member, versionId: version.id, title: songs.get(member.songId)!.title, version: version.label || version.facts.title, bvid: version.ref.id }];
     });
     const wanted = new Set(assignments.map(a => a.bvid)), previous = existing ? syncProjection(stored.document, existing.id) : new Set<string>(), actual = new Set(remote.map(v => v.bvid));
     if (assignments.length > 10000 || new Set([...wanted, ...actual]).size > 10000) fail();
@@ -164,6 +169,7 @@ export class SongLibrarySync {
   }
   private async perform(linkId: string | undefined, signal: AbortSignal) {
     const c = await this.remote.context(signal), initial = this.library.store.read();
+    await new Promise<void>(resolve=>setImmediate(resolve));this.remote.check(c);
     const links = initial.document.syncLinks.filter(link => link.accountId === c.accountId && link.state === 'ready' && (!linkId || link.id === linkId));
     if (linkId && !links.length) fail('not-found');
     for (const link of links) {
@@ -180,8 +186,16 @@ export class SongLibrarySync {
     this.remote.check(c); const stored = this.library.store.read(), link = stored.document.syncLinks.find(link => link.id === linkId && link.accountId === c.accountId && link.state === 'ready') ?? fail('cancelled');
     return { ...stored, link };
   }
+  private async local(operation:SyncLocalOperation,c:FavoriteContext){
+    this.remote.check(c);
+    const pending=this.library.store.desktopSyncTransaction(operation,c.signal,()=>this.remote.check(c));
+    if(pending)await pending;
+    else this.library.transaction(operation.revision,context=>{this.remote.check(c);applySyncLocal(context,operation);},c.signal);
+    this.remote.check(c);
+  }
   private async reconcile(linkId: string, c: FavoriteContext) {
     const initial = this.current(linkId, c), folders = await this.remote.folders(c);
+    await new Promise<void>(resolve=>setImmediate(resolve));this.remote.check(c);
     if (!folders.some(folder => folder.id === initial.link.folderId)) {
       const current = this.current(linkId, c); this.library.transaction(current.revision, context => { const link = context.document.syncLinks.find(l => l.id === linkId)!; link.state = 'review'; link.issues = ['folder-missing']; context.events.push({ type: 'sync-review', linkId }); }, c.signal); return;
     }
@@ -200,24 +214,7 @@ export class SongLibrarySync {
         const exact = (entry.ref.part ? entry : entry.parts?.[0]) ?? fail(); if (exact.ref.provider !== 'bilibili' || exact.ref.id !== video.bvid || !exact.ref.part) fail(); entries.push(exact);
       } catch (error) { this.remote.check(c); if ((error as { code?: string }).code === 'not-found') unavailable.push(video.bvid); else throw error; }
     }
-    this.library.transaction(before.revision, context => {
-      this.remote.check(c); const link = context.document.syncLinks.find(l => l.id === linkId && l.state === 'ready') ?? fail('cancelled');
-      context.document.syncMappings = context.document.syncMappings.filter(mapping => mapping.linkId !== linkId || !removed.has(mapping.bvid));
-      pruneUnretainedMembers(context);
-      for (const entry of entries) {
-        const version = adoptSongSource(context, entry, this.now()), target = targetMembers(context.document, link.targetId);
-        let member = target.find(m => m.songId === version.songId)?.member;
-        if (!member) {
-          if (link.targetId === 'system:favorites') { applySongEdits(context, [{ type: 'favorite', songId: version.songId }], this.now()); member = { kind: 'favorite', favoriteId: context.document.snapshot.favorites.find(f => f.songId === version.songId)!.favoriteId }; }
-          else { const entryId = randomUUID(); applySongEdits(context, [{ type: 'add-entry', playlistId: link.targetId, entryId, songId: version.songId, pinnedVersionId: version.id }], this.now()); member = { kind: 'playlist-entry', playlistId: link.targetId, entryId }; }
-          context.document.origins.find(origin => memberKey(origin.member) === memberKey(member!))!.local = 'absent';
-        }
-        const mapping: SongSyncMapping = { linkId, member, bvid: entry.ref.id, versionId: version.id };
-        if (!context.document.syncMappings.some(m => m.linkId === linkId && m.bvid === mapping.bvid && memberKey(m.member) === memberKey(member!))) context.document.syncMappings.push(mapping);
-      }
-      link.observed = videos.map(video => video.bvid).filter(id => !unavailable.includes(id) && !deferred.has(id)); link.issues = [...(unavailable.length ? ['content-unavailable'] : []), ...(deferred.size ? ['pending-import'] : [])];
-      if (added.length) link.importCursor = added.at(-1)!.bvid;
-    }, c.signal);
+    await this.local({type:'observe',revision:before.revision,linkId,accountId:c.accountId,now:this.now(),removed:[...removed],entries,videos:videos.map(video=>video.bvid),unavailable,deferred:[...deferred],...(added.length?{importCursor:added.at(-1)!.bvid}:{})},c);
     // Re-read current account, link, mappings and durable intention after every asynchronous step.
     for (const event of this.library.store.events().filter(event => event.type === 'sync-intent' && event.linkId === linkId)) {
       let current = this.current(linkId, c), desired = syncProjection(current.document, linkId).has(event.bvid!);
@@ -237,7 +234,7 @@ export class SongLibrarySync {
         const seen = new Set(link.observed ?? []); if (desired) seen.add(event.bvid!); else seen.delete(event.bvid!); link.observed = [...seen]; context.acknowledge.push(event.id);
       }, c.signal);
     }
-    const final = this.current(linkId, c); this.library.transaction(final.revision, context => { context.document.syncLinks.find(l => l.id === linkId)!.lastSync = this.now(); }, c.signal);
+    const final=this.current(linkId,c);await this.local({type:'complete',revision:final.revision,linkId,accountId:c.accountId,now:this.now()},c);
   }
   async dispose() { this.stop.abort(); clearInterval(this.timer); this.previews.clear(); await Promise.allSettled([this.work]); }
 }

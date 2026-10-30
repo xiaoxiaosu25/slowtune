@@ -1,43 +1,23 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowLeftIcon, MagnifyingGlassIcon, PlayIcon, PlusIcon, XIcon } from '@phosphor-icons/react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowLeftIcon, MagnifyingGlassIcon, PlayIcon, PlusIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState, SongPlaybackSelection, SongVersion } from '../server/song-library-types';
 import { songSearchText, type SearchPage } from '../server/search-policy';
 import { key, request, time, errorText, cancelled, type Track } from './api';
-import { LyricsSettings } from './LyricsSettings';
-import type { LyricsController } from './useLyrics';
+import { Modal } from './Modal';
 import { versionKinds } from './song-management';
 import { VersionStatus } from './VersionStatus';
 
-export type PlaybackManagementTab = 'versions' | 'lyrics';
 type Props = {
-  tab: PlaybackManagementTab; onTab: (tab: PlaybackManagementTab) => void; onClose: () => void;
-  current: Track | null; song?: Song; library: SongLibraryState | null; youtubeEnabled: boolean; nativeDesktop: boolean;
-  lyrics: LyricsController; preparing: boolean; saving: boolean; playbackError: string;
+  onClose: () => void;
+  current: Track | null; song?: Song; library: SongLibraryState | null; youtubeEnabled: boolean;
+  preparing: boolean; saving: boolean; playbackError: string;
+  playbackControl?:ReactNode;
   onPlay: (selection: SongPlaybackSelection, song: Pick<Song, 'title' | 'artists' | 'artwork'>) => Promise<unknown>;
   onSave: (track: Track, song?: Song) => Promise<unknown> | void; onDefault: (song: Song, version: SongVersion) => Promise<unknown>;
 };
 
-/** A nonmodal workspace keeps the real transport available while comparing versions. */
-export function PlaybackManagement(props: Props) {
-  const { tab, onTab, onClose, current, song, library, youtubeEnabled, lyrics } = props;
-  const id = useId(), heading = useRef<HTMLHeadingElement>(null), root = useRef<HTMLElement>(null), close = useRef(onClose); close.current = onClose;
-  useEffect(() => {
-    const origin = document.activeElement as HTMLElement;
-    heading.current?.focus({ preventScroll: true });
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('dialog[open],:popover-open')) { event.preventDefault(); event.stopImmediatePropagation(); close.current(); }
-    };
-    window.addEventListener('keydown', escape, true);
-    return () => { window.removeEventListener('keydown', escape, true); if (origin?.isConnected && origin.getClientRects().length) origin.focus({ preventScroll: true }); };
-  }, []);
-  return <aside ref={root} className="playback-management" role="dialog" aria-modal="false" aria-labelledby={id}>
-    <header className="playback-management-header"><div><h2 ref={heading} tabIndex={-1} id={id}>版本与歌词</h2><p>{song?.title || current?.title || '等待音乐'}</p></div><button className="btn btn-icon" aria-label="关闭版本与歌词" title="关闭 · Esc" onClick={onClose}><XIcon size={22}/></button></header>
-    <div className="segmented playback-management-tabs" role="tablist" aria-label="版本与歌词管理">{(['versions', 'lyrics'] as const).map((value, index) => <button key={value} id={id + '-' + value} role="tab" aria-selected={tab === value} aria-controls={id + '-content-' + value} tabIndex={tab === value ? 0 : -1} onClick={() => onTab(value)} onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 'versions' : event.key === 'End' ? 'lyrics' : index === 0 ? 'lyrics' : 'versions'; onTab(next); document.getElementById(id + '-' + next)?.focus(); } }}>{value === 'versions' ? '播放版本' : '歌词管理'}</button>)}</div>
-    <div className="playback-management-body">
-      <div role="tabpanel" id={id + '-content-versions'} aria-labelledby={id + '-versions'} hidden={tab !== 'versions'}><PlaybackVersions {...props}/></div>
-      <div role="tabpanel" id={id + '-content-lyrics'} aria-labelledby={id + '-lyrics'} hidden={tab !== 'lyrics'}>{tab === 'lyrics' && <LyricsSettings lyrics={lyrics} desktopImmersive nativeDesktop={props.nativeDesktop} embedded/>}</div>
-    </div>
-  </aside>;
+export function PlaybackVersionsDialog(props: Props) {
+  return <Modal title="播放版本" className="playback-versions-dialog" onClose={props.onClose}><p className="playback-versions-title">{props.song?.title||props.current?.title||'等待音乐'}</p><div className="playback-versions-body"><PlaybackVersions {...props}/></div><footer className="playback-versions-footer"><div className="playback-versions-context">{props.playbackControl}<span>试听只切换当前播放，设为默认需单独操作。</span></div><button className="btn btn-secondary" onClick={props.onClose}>完成</button></footer></Modal>;
 }
 
 function PlaybackVersions({ current, song, library, youtubeEnabled, preparing, saving, playbackError, onPlay, onSave, onDefault }: Props) {
@@ -67,7 +47,6 @@ function PlaybackVersions({ current, song, library, youtubeEnabled, preparing, s
   const play = (selection: SongPlaybackSelection) => void onPlay(selection, display);
   return <div className="playback-versions">
     {!searching ? <>
-      <p className="muted">试听只切换当前播放，设为默认需单独操作。</p>
       <button className="btn btn-secondary" onClick={() => setSearching(true)}><MagnifyingGlassIcon size={18}/>搜索其他版本</button>
       {!song && <div className="playback-version-card"><strong>当前音源</strong><p>{current.sourceTitle ?? current.title}</p><small>{current.ref.provider === 'bilibili' ? 'B站' : 'YouTube'} · {current.uploader?.name || '作者未提供'} · {time(current.durationSeconds)}</small><button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void onSave(current)}><PlusIcon size={16}/>归入歌曲并保存版本</button></div>}
       {song && !versions.length && <p className="muted">还没有保存播放版本，可以搜索后添加。</p>}

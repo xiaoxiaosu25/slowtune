@@ -1,13 +1,11 @@
 import { SongLibraryError } from './song-library-errors.js';
 import { object, text } from './song-library-codec.js';
-import { artworkUrl } from './artwork-url.js';
 import { parseTitle } from './song-library-organization.js';
 import type { SongLibraryService } from './song-library-service.js';
 import type { Song, SongCatalogRecord, SongLibrarySnapshot, DesktopSongCatalog } from './song-library-types.js';
+import { NeteaseSongCatalog, SongCatalogError } from '@studio/music-sources/catalog';
+export { NeteaseSongCatalog, SongCatalogError } from '@studio/music-sources/catalog';
 
-export class SongCatalogError extends Error {
-  constructor(readonly code: 'network' | 'timeout' | 'upstream' | 'rate-limited') { super(code); }
-}
 const normalize = (value: string) => value.normalize('NFKC').toLowerCase().replace(/\s+/gu, '').trim();
 const alternate = /\b(?:live|remix|remaster(?:ed)?|instrumental|karaoke|cover|acoustic)\b|现场|演唱会|混音|重制|伴奏|翻唱|不插电/iu;
 const collection = /合集|串烧|精选集|歌单|盘点|\b(?:medley|playlist|compilation|mashup)\b/iu;
@@ -44,73 +42,6 @@ export function automaticCatalogMatch(query: { title: string; artists: string[] 
     && normalize(c.title) === normalize(baseTitle(query.title))
     && JSON.stringify([...new Set(c.artists.map(normalize))].sort()) === JSON.stringify(artists));
   return matching.length === 1 ? matching[0] : undefined;
-}
-
-/** Catalogue-only adapter. It never resolves or changes playable sources. */
-export class NeteaseSongCatalog {
-  private stop = new AbortController();
-  private active = 0;
-  private searches = new Map<string, { until: number; records: SongCatalogRecord[] }>();
-  constructor(private fetcher: typeof fetch = fetch, private now = Date.now) {}
-  private async json(path: string, params: Record<string, string>, requestSignal: AbortSignal) {
-    requestSignal.throwIfAborted();
-    if (this.active >= 4) throw new SongLibraryError('busy');
-    const url = new URL(path, 'https://music.163.com');
-    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
-    const signal = AbortSignal.any([requestSignal, this.stop.signal, AbortSignal.timeout(12000)]);
-    this.active++;
-    try {
-      const response = await this.fetcher(url, { signal, redirect: 'error', headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' } });
-      if (!response.ok) { await response.body?.cancel(); throw new SongCatalogError(response.status === 429 ? 'rate-limited' : 'upstream'); }
-      const reader = response.body?.getReader(); if (!reader) throw new SongCatalogError('upstream');
-      const chunks: Uint8Array[] = []; let length = 0;
-      const abort = () => { void reader.cancel().catch(() => {}); }; signal.addEventListener('abort', abort, { once: true });
-      try {
-        while (true) {
-          signal.throwIfAborted(); const row = await reader.read(); signal.throwIfAborted(); if (row.done) break;
-          length += row.value.byteLength;
-          if (length > 2 * 1024 * 1024) throw new SongCatalogError('upstream');
-          chunks.push(row.value);
-        }
-        const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
-        if (data?.code !== 200) throw new SongCatalogError(data?.code === 429 ? 'rate-limited' : 'upstream');
-        return data;
-      } finally { signal.removeEventListener('abort', abort); await reader.cancel().catch(() => {}); reader.releaseLock(); }
-    } catch (error) {
-      if (requestSignal.aborted || this.stop.signal.aborted) throw new SongLibraryError('cancelled');
-      if (signal.aborted) throw new SongCatalogError('timeout');
-      if (error instanceof SongCatalogError || error instanceof SongLibraryError) throw error;
-      throw new SongCatalogError(error instanceof SyntaxError ? 'upstream' : 'network');
-    } finally { this.active--; }
-  }
-  async records(ids: string[], signal: AbortSignal): Promise<SongCatalogRecord[]> {
-    if (!ids.length || ids.length > 12 || ids.some(id => !validId(id))) throw new SongLibraryError('invalid-input');
-    const data = await this.json('/api/song/detail', { ids: '[' + ids.join(',') + ']' }, signal);
-    if (!Array.isArray(data.songs)) throw new SongCatalogError('upstream');
-    return data.songs.slice(0, 12).flatMap((row: any) => {
-      const id = String(row?.id), title = row?.name, album = row?.album ?? row?.al;
-      const rawArtists = row?.artists ?? row?.ar;
-      const artists = Array.isArray(rawArtists) ? rawArtists.map((artist: any) => artist?.name) : undefined;
-      if (!validId(id) || !ids.includes(id) || typeof title !== 'string' || !title.trim() || title.length > 1000 || !Array.isArray(artists) || !artists.length || artists.length > 100 || artists.some((v: unknown) => typeof v !== 'string' || !v.trim() || v.length > 1000 || /[\u0000-\u001f\u007f]/u.test(v)) || /[\u0000-\u001f\u007f]/u.test(title)) return [];
-      const artwork = artworkUrl(album?.picUrl), duration = (row.duration ?? row.dt) / 1000;
-      return [{ provider: 'netease' as const, id, title: title.trim(), artists, url: 'https://music.163.com/song?id=' + id,
-        ...(typeof album?.name === 'string' && album.name.trim() && album.name.length <= 1000 && !/[\u0000-\u001f\u007f]/u.test(album.name) ? { album: album.name } : {}),
-        ...(artwork ? { artwork } : {}), ...(Number.isFinite(duration) && duration > 0 && duration <= 86400 ? { durationSeconds: duration } : {}) }];
-    });
-  }
-  async search(query: string, signal: AbortSignal): Promise<SongCatalogRecord[]> {
-    text(query, 500); const key = query.trim(), cached = this.searches.get(key);
-    if (cached && cached.until > this.now()) return structuredClone(cached.records);
-    const data = await this.json('/api/search/get/web', { s: key, type: '1', limit: '12', offset: '0' }, signal);
-    const rows = data?.result?.songs ?? (data?.result?.songCount === 0 ? [] : undefined);
-    if (!Array.isArray(rows)) throw new SongCatalogError('upstream');
-    const ids = [...new Set<string>(rows.slice(0, 12).map((row: any) => String(row?.id)).filter(validId))];
-    const records = ids.length ? await this.records(ids, signal) : [];
-    this.searches.set(key, { records: structuredClone(records), until: this.now() + 600000 });
-    while (this.searches.size > 64) this.searches.delete(this.searches.keys().next().value!);
-    return records;
-  }
-  dispose() { this.stop.abort(); this.searches.clear(); }
 }
 
 const fingerprint = (song: Song, snapshot: SongLibrarySnapshot) => JSON.stringify([song, snapshot.versions.filter(v => v.songId === song.id), snapshot.catalogLinks.filter(l => l.songId === song.id)]);
@@ -175,5 +106,5 @@ export class SongCatalogService {
       return { ...this.library.read(), more: true, ...(result.state === 'error' ? { retryAfterMs: 60000 } : {}) };
     } finally { this.working = false; }
   }
-  dispose() { this.stop.abort(); this.provider.dispose(); }
+  async dispose() { this.stop.abort(); await this.provider.dispose(); }
 }

@@ -53,7 +53,7 @@ test('desktop song workspace stages edits, keeps exact members, returns from sea
     const row = page.locator('.song-library-row').nth(index), height = await row.evaluate(el => el.getBoundingClientRect().height);
     await row.getByRole('button', { name: /^更多操作 / }).click();
     assert.equal(await row.evaluate(el => el.getBoundingClientRect().height), height, 'opening the popover never grows the song row');
-    await page.locator('.song-row-menu [popover]:popover-open').getByRole('button', { name: /^编辑歌曲 / }).click();
+    await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem', { name: /^编辑歌曲 / }).click();
   };
   const editor = page.getByRole('dialog', { name: '歌曲与版本', exact: true }), manager = page.getByRole('dialog', { name: '歌曲管理', exact: true });
   const save = () => editor.getByRole('button', { name: '保存更改', exact: true }).click();

@@ -2,12 +2,16 @@ import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode } fro
 import { HeartIcon, MusicNotesIcon, PlayIcon, DotsThreeIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, PlusIcon, CameraIcon, PencilSimpleIcon, ArrowsDownUpIcon, ListBulletsIcon, CaretDownIcon, CheckIcon, QueueIcon, UsersIcon, LinkIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState, SongPlaybackSelection, SongPlaylistEntry, SongVersion } from '../server/song-library-types';
 import { Modal } from './Modal';
+import { PlayAllButton } from './ListActions';
+import { MobileBrowseTitle } from './MobileBrowseTitle';
 import { errorText, availabilityText } from './api';
 import { PagedList } from './Pagination';
 import './song-library.css';
 import { SongMaintenancePanel } from './SongMaintenancePanel';
 import { SongOrganizationPanel } from './SongOrganizationPanel';
-import { ControlPopover } from './ControlPopover';
+import { ActionMenu, type MenuAction } from './ActionMenu';
+import { PlaylistActions } from './PlaylistActions';
+import { copySourceLink } from './source-page-url';
 import { SongCover } from './SongCover';
 import type { ComponentProps } from 'react';
 import { desktopFeature } from './DesktopRegion';
@@ -88,6 +92,9 @@ type Props = {
   versionPlayback?:MobileVersionPlayback;
   onManage?: () => void;
   onEnqueue?: (selection: SongPlaybackSelection, song: Song) => Promise<unknown>;
+  onEnqueueNext?: (selection: SongPlaybackSelection, song: Song) => Promise<unknown>;
+  onEnqueueAll?: (items: {selection: SongPlaybackSelection; song: Song}[]) => Promise<unknown>;
+  onNotice?: (message: string) => void;
   onCreator?: (song: Song, version: SongVersion) => void;
   hidden?: boolean;
 };
@@ -98,12 +105,16 @@ const MemoDesktopSongDialog = memo(DesktopSongDialog);
 export function SongLibraryWorkspace(props: Props) {
   const latest = useRef(props); latest.current = props;
   const [managing, setManaging] = useState(false);
-  const actions = useMemo<Pick<Props, 'onSelect' | 'commit' | 'onBackup' | 'onSearch' | 'onPlay' | 'onPlayAll' | 'onChange' | 'onRetry' | 'onManage'>>(() => ({
+  const actions = useMemo<Pick<Props, 'onSelect' | 'commit' | 'onBackup' | 'onSearch' | 'onPlay' | 'onPlayAll' | 'onChange' | 'onRetry' | 'onManage' | 'onEnqueue' | 'onEnqueueNext' | 'onEnqueueAll' | 'onNotice' | 'onCreator'>>(() => ({
     onSelect: id => latest.current.onSelect(id), commit: (...args) => latest.current.commit(...args),
     onBackup: () => latest.current.onBackup(), onSearch: (...args) => latest.current.onSearch(...args),
     onPlay: (...args) => latest.current.onPlay(...args), onPlayAll: items => latest.current.onPlayAll(items),
     onChange: state => latest.current.onChange(state), onRetry: () => latest.current.onRetry?.(),
     onManage: () => setManaging(true),
+    onEnqueue: (...args) => latest.current.onEnqueue?.(...args) ?? Promise.resolve(false),
+    onEnqueueNext: (...args) => latest.current.onEnqueueNext?.(...args) ?? Promise.resolve(false),
+    onEnqueueAll: items => latest.current.onEnqueueAll?.(items) ?? Promise.resolve(false),
+    onNotice: message => latest.current.onNotice?.(message), onCreator: (...args) => latest.current.onCreator?.(...args),
   }), []);
   const managerActions = useMemo(() => ({ onClose: () => setManaging(false), commit: (edits: unknown[], revision?: string | null) => latest.current.commit(edits, revision, true) }), []);
   // Keep the same component across viewport changes so open editors retain their drafts.
@@ -111,7 +122,7 @@ export function SongLibraryWorkspace(props: Props) {
   return <><MemoSongLibraryPage {...props} {...(props.desktop ? actions : {})}/>{managing && props.state && <MemoDesktopSongDialog library={props.state} commit={managerActions.commit} youtubeEnabled={props.youtubeEnabled ?? true} onChange={actions.onChange} onClose={managerActions.onClose} onSearch={actions.onSearch} onPlay={actions.onPlay}/>}</>;
 }
 
-export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, onSearch, onPlay, onPlayAll, busy, onChange, loadError, onRetry, youtubeEnabled = true, disabledDisplay = 'dim', source = 'all', sourceControls, desktop = false, onManage, versionPlayback, onEnqueue, onCreator, hidden = false }: Props) {
+export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, onSearch, onPlay, onPlayAll, busy, onChange, loadError, onRetry, youtubeEnabled = true, disabledDisplay = 'dim', source = 'all', sourceControls, desktop = false, onManage, versionPlayback, onEnqueue, onEnqueueNext, onEnqueueAll, onNotice, onCreator, hidden = false }: Props) {
   const [filter, setFilter] = useState(''), [editing, setEditing] = useState<string>(), [name, setName] = useState(''), [creating, setCreating] = useState<'new' | 'rename'>(), [destination, setDestination] = useState(''), [remove, setRemove] = useState(false);
   const [maintenance, setMaintenance] = useState(false);
   const [desktopContext, setDesktopContext] = useState<SongDialogContext>(), [managing, setManaging] = useState(false), [adding, setAdding] = useState<Song>();
@@ -156,26 +167,34 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
   const openEditor = (row: typeof rows[number]) => desktop ? setDesktopContext({ songId: row.songId, ...(row.entry ? { playlistId: selected, entryId: row.id } : {}), versionId: chosenFor(row)?.id }) : setEditing(row.songId);
   const PlaylistHeading = 'h1';
   const playlistName = favorites ? '我的收藏' : playlist?.name;
-  const playAllButton=<button className="btn btn-primary play-all" disabled={!visible.some(row=>!blocked(row))} onClick={()=>onPlayAll(visible.map(({selection,song})=>({selection,song})))}><PlayIcon size={18}/>播放全部</button>;
+  const playAllButton=<PlayAllButton count={visible.length} disabled={!visible.some(row=>!blocked(row))} onClick={()=>onPlayAll(visible.map(({selection,song})=>({selection,song})))}/>;
   return <section className="catalog list-view song-library-page" hidden={hidden}>
     {loadError && <div className="feedback" role="status"><p>歌单更新暂时失败，当前内容保留。{loadError}</p><button className="btn btn-secondary" onClick={onRetry}>重试读取歌单</button></div>}
     {desktop&&<div className="segmented playlist-switcher" aria-label="选择歌单"><button className={favorites ? 'selected' : ''} onClick={() => onSelect(songFavoritesId)}>我的收藏<small>{state.snapshot.favorites.length} 首</small></button>{state.snapshot.playlists.map(playlist => <button key={playlist.id} className={selected === playlist.id ? 'selected' : ''} onClick={() => onSelect(playlist.id)}>{playlist.name}<small>{playlist.entries.length} 首</small></button>)}</div>}
-    <div className="playlist-intro">{desktop ? <button className="playlist-cover-button" aria-label="更换封面" title="更换封面" disabled={busy || !favorites && !playlist} onClick={() => setCoverTarget(selected)}><PlaylistCover image={coverImage} song={autoCoverSong} className="playlist-art"/><span className="playlist-cover-overlay"><CameraIcon size={28}/><span>更换封面</span></span></button> : <SongCover song={rows[0]?.song} className="playlist-art"/>}<div className="playlist-copy">{desktop?<PlaylistHeading title={playlistName}>{playlistName}</PlaylistHeading>:<div className="mobile-playlist-heading"><h1 aria-label={playlistName}><button aria-label="选择歌单" onClick={()=>setMobileSheet('playlists')}><span>{playlistName}</span><CaretDownIcon size={18}/></button></h1><button className="btn btn-icon" aria-label="歌单管理" onClick={()=>setMobileSheet('manage')}><DotsThreeIcon size={25}/></button></div>}<p>{members.length} 首歌曲</p><div className="toolbar">{desktop&&playAllButton}{desktop && <ControlPopover key={selected} className="playlist-manage-menu" buttonClassName="btn-secondary" label="歌单管理" icon={<><DotsThreeIcon size={20}/><span>管理</span></>} side="bottom">
-      {playlist && <><button disabled={busy} onClick={() => { setName(playlist.name); setCreating('rename'); }}><PencilSimpleIcon size={18}/>歌单改名</button><hr/></>}
-      <button onClick={() => { setName(''); setCreating('new'); }}><PlusIcon size={18}/>新建歌单</button>
-      <button onClick={() => onManage ? onManage() : setManaging(true)}><ListBulletsIcon size={18}/>歌曲管理</button>
-      <button onClick={onBackup}><ArrowsDownUpIcon size={18}/>导入 / 导出</button>
-      {playlist && <><hr/><button className="danger-text" disabled={busy} onClick={() => setRemove(true)}><TrashIcon size={18}/>删除歌单</button></>}
-    </ControlPopover>}</div></div></div>
+    <div className="playlist-intro">{desktop ? <button className="playlist-cover-button" aria-label="更换封面" title="更换封面" disabled={busy || !favorites && !playlist} onClick={() => setCoverTarget(selected)}><PlaylistCover image={coverImage} song={autoCoverSong} className="playlist-art"/><span className="playlist-cover-overlay"><CameraIcon size={28}/><span>更换封面</span></span></button> : <SongCover song={rows[0]?.song} className="playlist-art"/>}<div className="playlist-copy">{desktop?<PlaylistHeading title={playlistName}>{playlistName}</PlaylistHeading>:<div className="mobile-playlist-heading"><h1 aria-label={playlistName}><button aria-label="选择歌单" onClick={()=>setMobileSheet('playlists')}><span>{playlistName}</span><CaretDownIcon size={18}/></button></h1><button className="btn btn-icon" aria-label="歌单管理" onClick={()=>setMobileSheet('manage')}><DotsThreeIcon size={25}/></button></div>}<p>{members.length} 首歌曲</p><div className="toolbar">{desktop&&playAllButton}{desktop && <PlaylistActions key={selected} target=".playlist-intro" className="playlist-manage-menu" library={state} selections={visible.map(({selection,song})=>({selection,song}))} targetId={selected} busy={busy} commit={commit} youtubeEnabled={youtubeEnabled} trigger={<><DotsThreeIcon size={20}/><span>管理</span></>} onPlay={onPlayAll} onEnqueue={onEnqueueAll} onRename={()=>{if(playlist){setName(playlist.name);setCreating('rename');}}} onDelete={()=>setRemove(true)} onCover={()=>setCoverTarget(selected)} onCreate={()=>{setName('');setCreating('new');}} onManage={()=>onManage?onManage():setManaging(true)} onBackup={onBackup}/>}</div></div></div>
     {!desktop&&<div className="toolbar mobile-playlist-tools">{playAllButton}<button className="btn btn-secondary" onClick={()=>onSearch()}><PlusIcon size={20}/>添加歌曲</button><button className="btn btn-icon" aria-label="排序" title="排序" onClick={()=>{setQueueError('');setMobileSheet('sort');}}><ArrowsDownUpIcon size={20}/></button></div>}
     <div className="playlist-list-toolbar"><label className="search-field search-field-inline"><input aria-label="搜索歌单内音乐" placeholder="搜索歌单内音乐" value={filter} onChange={event => setFilter(event.target.value)}/></label>{sourceControls}{desktop&&<span className="muted">{visible.length === members.length ? `${visible.length} 首歌曲` : `${visible.length} / ${members.length} 首歌曲`}</span>}</div>
     <PagedList id={'songs:' + selected + ':' + filter} group="library" label="歌单歌曲" items={visible}>{items => items.length ? <div className="track-list">{items.map(row => {
       const versions = index.versionsBySong.get(row.songId) ?? [], chosen = chosenFor(row), favorite = index.favorites.get(row.songId);
+      const actions:MenuAction[]=[
+        {id:'play',label:'立即播放',icon:<PlayIcon size={18}/>,disabled:blocked(row),hint:blocked(row)?'YouTube 已关闭':undefined,onSelect:()=>onPlay(row.selection,row.song)},
+        ...(onEnqueueNext?[{id:'next',label:'下一首播放',icon:<QueueIcon size={18}/>,disabled:blocked(row),onSelect:()=>void onEnqueueNext(row.selection,row.song)}]:[]),
+        ...(onEnqueue?[{id:'last',label:'加入队尾',icon:<QueueIcon size={18}/>,disabled:blocked(row),onSelect:()=>void onEnqueue(row.selection,row.song)}]:[]),
+        {separator:true},
+        {id:'favorite',label:favorite?'取消收藏':'收藏',icon:<HeartIcon size={18} weight={favorite?'fill':'regular'}/>,disabled:busy,onSelect:()=>void commit([favorite?{type:'remove-favorite',favoriteId:favorite.favoriteId}:{type:'favorite',songId:row.songId}])},
+        {id:'playlist',label:'加入歌单',icon:<PlusIcon size={18}/>,onSelect:()=>{setDestination('');setAddError('');setAdding(row.song);}},
+        {id:'versions',label:'歌曲与版本',ariaLabel:'编辑歌曲 '+row.song.title,icon:<MusicNotesIcon size={18}/>,onSelect:()=>openEditor(row)},
+        ...(chosen?[{separator:true} as const,...(onCreator?[{id:'creator',label:'查看 UP / 博主',icon:<UsersIcon size={18}/>,disabled:blocked(row),onSelect:()=>onCreator(row.song,chosen)}]:[]),{id:'source',label:'打开原视频',icon:<LinkIcon size={18}/>,href:versionUrl(chosen)},{id:'copy',label:'复制来源链接',onSelect:()=>{void copySourceLink(versionUrl(chosen)).then(()=>onNotice?.('已复制来源链接')).catch(()=>onNotice?.('复制失败，请从原视频复制链接'));}}]:[]),
+        {separator:true},
+        {id:'up',label:'上移',ariaLabel:'上移 '+row.song.title,icon:<ArrowUpIcon size={18}/>,disabled:busy||row.position===0,onSelect:()=>move(row.id,-1)},
+        {id:'down',label:'下移',ariaLabel:'下移 '+row.song.title,icon:<ArrowDownIcon size={18}/>,disabled:busy||row.position===members.length-1,onSelect:()=>move(row.id,1)},
+        ...(row.entry?[{id:'remove',label:'从歌单移除',ariaLabel:'从歌单移除 '+row.song.title,icon:<TrashIcon size={18}/>,danger:true,disabled:busy,onSelect:()=>void commit([{type:'remove-entry',playlistId:selected,entryId:row.id}])}]:[]),
+      ];
       return <div className={'song-library-row' + (blocked(row) && disabledDisplay === 'dim' ? ' source-disabled' : '')} key={row.id}>
         <span className="row-number">{row.position + 1}</span>
         <button className="row-cover" aria-label={'播放 ' + row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}><SongCover song={row.song}/></button>
         <div className="row-info">
-          <button className="track-name" title={row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}>{row.song.title}</button>
+          {desktop ? <button className="track-name" title={row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}>{row.song.title}</button> : <MobileBrowseTitle className="track-name" title={row.song.title} disabled={blocked(row)} onPlay={() => onPlay(row.selection, row.song)}/>}
           <p className="row-sub">{row.song.artists?.join(' / ') || '歌手待整理'}</p>
           {!desktop && versions.length > 1 && <button className="song-version-link" aria-label={'选择播放版本 ' + row.song.title} title={chosen?.label || chosen?.facts.title} onClick={() => openEditor(row)}>{versions.length} 个版本</button>}
           {row.entry?.pinnedVersionId && chosen && <span className="row-status">固定 · {chosen.label || chosen.facts.title}</span>}
@@ -184,13 +203,7 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
         </div>
         {desktop && versions.length > 1 && <button className="song-version-link" aria-label={'选择播放版本 ' + row.song.title} title={chosen?.label || chosen?.facts.title} onClick={() => openEditor(row)}>{versions.length} 个版本</button>}
         <button className={'btn btn-icon ' + (favorite ? 'saved' : '')} aria-label={(favorite ? '取消收藏 ' : '收藏 ') + row.song.title} disabled={busy} onClick={() => void commit([favorite ? { type: 'remove-favorite', favoriteId: favorite.favoriteId } : { type: 'favorite', songId: row.songId }])}><HeartIcon size={20} weight={favorite ? 'fill' : 'regular'}/></button>
-        {desktop ? <ControlPopover className="song-row-menu" label={'更多操作 ' + row.song.title} icon={<DotsThreeIcon size={24}/>} side="bottom">
-          <button aria-label={'编辑歌曲 ' + row.song.title} onClick={() => openEditor(row)}>歌曲与版本</button>
-          <button onClick={() => { setDestination(''); setAddError(''); setAdding(row.song); }}><PlusIcon size={18}/>加入歌单</button>
-          <button aria-label={'上移 ' + row.song.title} disabled={busy || row.position === 0} onClick={() => move(row.id, -1)}><ArrowUpIcon size={18}/>上移</button>
-          <button aria-label={'下移 ' + row.song.title} disabled={busy || row.position === members.length - 1} onClick={() => move(row.id, 1)}><ArrowDownIcon size={18}/>下移</button>
-          {row.entry && <button className="danger-text" aria-label={'从歌单移除 ' + row.song.title} disabled={busy} onClick={() => void commit([{ type: 'remove-entry', playlistId: selected, entryId: row.id }])}><TrashIcon size={18}/>从歌单移除</button>}
-        </ControlPopover> : <button className="btn btn-icon" aria-label={'更多操作 ' + row.song.title} aria-expanded={mobileAction===row.id} onClick={()=>{setQueueError('');setMobileAction(row.id);}}><DotsThreeIcon size={24}/></button>}
+        {desktop ? <ActionMenu className="song-row-menu" label={'更多操作 '+row.song.title} title={row.song.title} subtitle={chosen?(row.entry?.pinnedVersionId?'歌单固定 · ':'默认 · ')+(chosen.label||chosen.facts.title):'播放时自动匹配'} target=".song-library-row" actions={actions}/> : <button className="btn btn-icon" aria-label={'更多操作 ' + row.song.title} aria-expanded={mobileAction===row.id} onClick={()=>{setQueueError('');setMobileAction(row.id);}}><DotsThreeIcon size={24}/></button>}
       </div>;
     })}</div> : <div className="empty"><MusicNotesIcon size={36}/><h3>这里还没有匹配的歌曲</h3><button className="btn btn-secondary" onClick={() => onSearch()}>去搜索音乐</button></div>}</PagedList>
     {!desktop&&actionRow&&<Modal title="歌曲操作" className="mobile-actions-sheet mobile-song-actions" onClose={()=>setMobileAction(undefined)}><div className="song-editor-heading"><SongCover song={actionRow.song}/><div><h3>{actionRow.song.title}</h3><p className="muted">{actionRow.song.artists?.join(' / ')||'歌手未填写'}</p></div></div><div className="mobile-action-list">

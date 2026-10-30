@@ -269,8 +269,9 @@ const protectSession:MiddlewareHandler=async(c,next)=>{
   const proceed=async(signal:AbortSignal)=>{
     const body=raw.body?.pipeThrough(new TransformStream(),{signal});
     c.req.raw=new Request(raw,{signal,...(body?{body}:{})});
-    if(desktopPlayback.current)c.header('X-SlowTune-Operation',desktopPlayback.current.id);
+    const operationId=desktopPlayback.current?.id;
     await next();
+    if(operationId)c.header('X-SlowTune-Operation',operationId);
     desktopPlayback.response(c.res.status);
   };
   if(c.req.header('X-SlowTune-Surface')==='desktop'&&desktopSourcePath(c.req.path)){
@@ -343,6 +344,7 @@ app.get('/api/follows',async c=>{
   return c.json(profiles==='1'?await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.readProfiles(signal,refresh==='1')):follows.store.read());
 });
 app.post('/api/creators/resolve',async c=>{const input=await json(c.req.raw,4096);return c.json(await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.resolve(input,signal)));});
+app.post('/api/creators/search',async c=>{const input=await json(c.req.raw,4096);return c.json(await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.search(input,signal)));});
 app.get('/api/creators/profile',async c=>{
   const refresh=c.req.query('refresh');if(refresh!==undefined&&!['0','1'].includes(refresh))throw new LibraryError('invalid-input');
   return c.json(await follows.run(getCookie(c,'music_session')!,c.req.raw.signal,signal=>follows.creator({provider:c.req.query('provider'),id:c.req.query('id')},signal,refresh==='1')));
@@ -435,11 +437,11 @@ const chartInputs=[{source:'netease',chart:'hot'},{source:'netease',chart:'new'}
 batches.start([()=>batches.warm('bilibili'),...chartInputs.map(input=>()=>charts.read(input,AbortSignal.any([batches.signal,AbortSignal.timeout(20000)])))]);
 let warmedYoutube=false;
 sourceListeners.add(()=>{if(!youtube.status().available){warmedYoutube=false;return;}if(warmedYoutube)return;warmedYoutube=true;for(const region of warmRegions)void batches.warm('youtube:'+region).catch(()=>{});});
-server.on('error',async e=>{console.error('服务监听失败', (e as NodeJS.ErrnoException).code);await expireSessions();await songSync.dispose();lyricProviders.dispose();songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();await batches.dispose();await charts.dispose();await comments.dispose();await follows.dispose();await youtubeCandidates.dispose();await youtubeDiscovery.dispose();await delivery.dispose();await api.dispose();browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();await songLibraryStore.close();process.exitCode=1;});
+server.on('error',async e=>{console.error('服务监听失败', (e as NodeJS.ErrnoException).code);await expireSessions();await songSync.dispose();await lyricProviders.dispose();await songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();await batches.dispose();await charts.dispose();await comments.dispose();await follows.dispose();await youtubeCandidates.dispose();await youtubeDiscovery.dispose();await delivery.dispose();await api.dispose();browseCache.close();recommendationStore.close();startupSettings.close();sourceSettingsStore.close();searchSettings.close();lyricsStore.close();await songLibraryStore.close();process.exitCode=1;});
 async function shutdown(reason = 'control') {
   if(stopping)return;stopping=true;
   if(desktopOwned)console.log(`${new Date().toISOString()} 正在停止桌面服务：${reason}`);
-  await expireSessions();await songSync.dispose();lyricProviders.dispose();songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();
+  await expireSessions();await songSync.dispose();await lyricProviders.dispose();await songCatalog.dispose();searchStop.abort();desktopPlayback.dispose();musicSearch.dispose();await searchCatalogue.dispose();
   closeSourceStreams();await youtube.dispose();
   const closing=new Promise<void>(resolve=>server.close(()=>resolve()));
   (server as import('node:http').Server).closeIdleConnections();

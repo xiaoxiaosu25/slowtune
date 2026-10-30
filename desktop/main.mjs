@@ -90,6 +90,16 @@ async function start() {
     window.webContents.on('will-navigate', (event, url) => { if (url !== allowed()) { event.preventDefault(); safeExternal(url); } });
     window.webContents.on('will-redirect', (event, url) => { if (url !== allowed()) event.preventDefault(); });
     window.webContents.on('will-attach-webview', event => event.preventDefault());
+    window.webContents.on('context-menu', (_event, params) => {
+      if (!params.isEditable) return;
+      const flags = params.editFlags;
+      Menu.buildFromTemplate([
+        { role: 'undo', label: '撤销', enabled: flags.canUndo }, { role: 'redo', label: '重做', enabled: flags.canRedo },
+        { type: 'separator' },
+        { role: 'cut', label: '剪切', enabled: flags.canCut }, { role: 'copy', label: '复制', enabled: flags.canCopy }, { role: 'paste', label: '粘贴', enabled: flags.canPaste },
+        { type: 'separator' }, { role: 'selectAll', label: '全选', enabled: flags.canSelectAll },
+      ]).popup({ window });
+    });
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     window.webContents.session.setPermissionCheckHandler(() => false);
   }
@@ -131,7 +141,8 @@ async function start() {
     // continues to record whether the user enabled desktop lyrics.
     if (visible) overlay.showInactive(); else overlay.hide();
   }
-  const lyricHeight = () => Math.max(170, Math.ceil(prefs.fontSize * (prefs.lines === 2 ? 2.6 : 1.6) + 66));
+  // Reserve both lanes so the current sentence stays anchored when the next line is toggled.
+  const lyricHeight = () => Math.max(170, Math.ceil(prefs.fontSize * 2.6 + 66));
   function compactOverlayBounds() {
     const bounds = overlay.getBounds(), height = lyricHeight();
     // Expanded windows can be clamped at a screen edge. Keep the compact anchor

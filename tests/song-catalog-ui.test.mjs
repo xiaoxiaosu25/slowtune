@@ -55,7 +55,7 @@ test('desktop catalogue matching updates library and live playback without repla
   const after = await page.locator('audio').evaluate(a => ({ same: a === window.catalogAudio, source: a.currentSrc, time: a.currentTime, paused: a.paused }));
   assert.equal(after.same, true); assert.equal(after.source, before.source); assert(after.time >= before.time); assert.equal(after.paused, false);
   await canonicalRow.getByRole('button', { name: /^更多操作 / }).click();
-  await page.locator('.song-row-menu [popover]:popover-open').getByRole('button', { name: /^编辑歌曲 / }).click();
+  await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem', { name: /^编辑歌曲 / }).click();
   const editor = page.getByRole('dialog', { name: '歌曲与版本', exact: true });
   assert.equal(await editor.locator('.song-editor-heading img').getAttribute('src'), directoryArtwork);
   assert.equal(await editor.locator('.song-version-original img').getAttribute('src'), sourceArtwork);

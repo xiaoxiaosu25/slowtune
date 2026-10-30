@@ -103,7 +103,7 @@ test('chart playback: direct first results, lazy whole charts, failures, cancell
   await t.test('play all queues all 300 songs, resets the mode and resolves only the selected song',async()=>{
     await load(Array.from({length:300},(_,i)=>({rank:i+1,title:i===1?'空结果':i===2?'取源失败':'完整榜 '+(i+1),artists:['榜单歌手']})));
     await page.locator('.playbar').getByRole('button',{name:'播放模式',exact:true}).click();const n=searches.length;await page.locator('.chart-play-all').click();await playing('完整榜 1');const saved=await storage();assert.equal(saved.items.length,300);assert.equal(saved.order,'sequential');assert.equal(saved.repeat,'off');assert.equal(saved.items.filter(x=>x.selection.kind==='chart').length,300);assert.equal(searches.length,n+1);
-    await page.getByRole('button',{name:'打开播放队列',exact:true}).click();await page.getByRole('button',{name:'队列操作 完整榜 5',exact:true}).click();assert.equal(await page.getByRole('button',{name:'查看 UP / 博主',exact:true}).isDisabled(),true);await page.keyboard.press('Escape');
+    await page.getByRole('button',{name:'打开播放队列',exact:true}).click();await page.getByRole('button',{name:'队列操作 完整榜 5',exact:true}).click();assert.equal(await page.getByRole('menuitem',{name:'查看 UP / 博主',exact:true}).count(),0);await page.keyboard.press('Escape');
     const queuedIds=(await storage()).items.map(x=>x.instanceId),beforeSearch=searches.length;await page.locator('.queue-play-all').click();await playing('完整榜 1');assert.deepEqual((await storage()).items.map(x=>x.instanceId),queuedIds);assert.equal(searches.length,beforeSearch);assert.equal((await storage()).items.filter(x=>x.selection.kind==='chart').length,300);
     await page.screenshot({path:join(artifacts,'full-chart-desktop.png')});
   });

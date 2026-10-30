@@ -1,0 +1,25 @@
+.search-type-tabs { margin:0 0 16px; }
+.search-sort-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; margin:12px 0 20px; }
+.search-sort-row>span,.creator-search-sort>span { font-size:13px; color:var(--muted); }
+.search-sort-tabs { flex-wrap:wrap; }
+.creator-search-sort { display:flex; align-items:center; gap:12px; margin:12px 0 20px; }
+.creator-search-sort .select { width:auto; }
+.creator-search-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:16px; margin:20px 0; }
+.creator-search-card { display:flex; flex-direction:column; gap:12px; min-width:0; padding:20px; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); }
+.creator-search-profile { display:flex; align-items:center; gap:12px; min-width:0; text-align:left; width:100%; color:var(--text); }
+.creator-search-profile .follow-avatar { width:56px; height:56px; flex:none; border-radius:50%; object-fit:cover; }
+.creator-search-profile>span { display:grid; gap:4px; min-width:0; }
+.creator-search-profile strong { font-size:16px; line-height:1.5; overflow-wrap:anywhere; }
+.creator-search-profile small { color:var(--muted); font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.creator-search-profile .creator-search-verification { color:var(--accent-text); }
+.creator-search-description { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; margin:0; color:var(--muted); font-size:13px; line-height:1.8; overflow-wrap:anywhere; }
+.creator-search-actions { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin-top:auto; }
+@media(max-width:760px) {
+  .mobile-search-content>.search-type-tabs { display:inline-flex; margin-bottom:12px; }
+  .mobile-search-content .search-sort-row { align-items:flex-start; flex-direction:column; margin:8px 0 16px; }
+  .mobile-search-content .search-sort-tabs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
+  .mobile-search-content .search-sort-tabs>button,.mobile-search-content .search-type-tabs>button { min-height:48px; }
+  .creator-search-grid { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .creator-search-card { padding:16px; }
+  .creator-search-actions>.btn,.creator-search-sort .select { min-height:48px; }
+}

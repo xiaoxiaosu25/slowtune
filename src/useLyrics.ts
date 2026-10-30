@@ -9,11 +9,13 @@ import { desktopSurface } from './song-search';
 import { desktopLyricSearch } from './desktop-lyric-search';
 
 export const lyricsDisplayStorageKey = 'slow-listening:lyrics-display:v1';
+export type LyricMotion = 'system' | 'full' | 'reduced';
 function readDisplay() {
   try {
     const value = JSON.parse(preferenceStorage().getItem(lyricsDisplayStorageKey) ?? '{}');
-    return { bottom: value?.bottom !== false, translations: value?.translations !== false };
-  } catch { return { bottom: true, translations: true }; }
+    const motion:LyricMotion=value?.motion==='full'||value?.motion==='reduced'?value.motion:'system';
+    return { bottom: value?.bottom !== false, translations: value?.translations !== false, motion };
+  } catch { return { bottom: true, translations: true, motion:'system' as LyricMotion }; }
 }
 
 /** One current-source session, shared by both lyric surfaces and the settings dialog. */
@@ -33,6 +35,14 @@ export function useLyrics(track: Track | null, duration: number | undefined, ver
   const [settings, setSettings] = useState(false), [selector, setSelector] = useState(false), [matched, setMatched] = useState(false);
   const [title, setTitle] = useState(''), [artist, setArtist] = useState(''), [text, setText] = useState(''), [offset, setOffset] = useState('0');
   const [results, setResults] = useState<LyricSearch>(), [preview, setPreview] = useState<LyricDocument>();
+  const [previewBusy,setPreviewBusy]=useState(false),[previewError,setPreviewError]=useState('');
+  const [previewTarget,setPreviewTarget]=useState<Pick<LyricCandidate,'provider'|'id'>>();
+  const previewWork=useRef<AbortController|null>(null);
+  const cancelPreview=()=>{previewWork.current?.abort();previewWork.current=null;setPreviewBusy(false);};
+  const [providerFilter, setProviderFilter] = useState<'all'|'netease'|'lrclib'>('all');
+  const querySeed = useRef({ sourceKey, title: seed.title.slice(0,300), artist: seed.artist.slice(0,300) });
+  const autoSearch = useRef(false);
+  const settingsSource = useRef('');
   const work = useRef<AbortController | null>(null);
   const setState = (value: LyricState) => setSelection({ key: sourceKey, value });
   const cancel = () => { work.current?.abort(); work.current = null; setBusy(''); };
@@ -75,32 +85,52 @@ export function useLyrics(track: Track | null, duration: number | undefined, ver
   });
   useEffect(() => {
     setSelection(undefined); setError(''); setStale(false); setMatched(false); setResults(undefined); setPreview(undefined);
-    setTitle(seed.title.slice(0, 300)); setArtist(seed.artist.slice(0, 300)); setText(''); setOffset('0'); setSettings(false); setSelector(false);
-    return () => work.current?.abort();
+    cancelPreview();setPreviewTarget(undefined);setPreviewError('');
+    setTitle(seed.title.slice(0, 300)); setArtist(seed.artist.slice(0, 300)); setText(''); setOffset('0'); setSettings(false); setSelector(false); setProviderFilter('all');
+    querySeed.current={sourceKey,title:seed.title.slice(0,300),artist:seed.artist.slice(0,300)};
+    return () => {work.current?.abort();previewWork.current?.abort();};
   }, [sourceKey]);
+  useEffect(()=>{
+    const previous=querySeed.current,next={sourceKey,title:seed.title.slice(0,300),artist:seed.artist.slice(0,300)};
+    if(previous.sourceKey===sourceKey){setTitle(value=>value===previous.title?next.title:value);setArtist(value=>value===previous.artist?next.artist:value);}
+    querySeed.current=next;
+  },[sourceKey,seed.title,seed.artist]);
   // A stable duration bucket avoids restarting work for fractional media-duration updates.
   const durationKey = Math.round(durationSeconds ?? 0);
   useEffect(() => {
-    if (enabled && sourceKey) { if (!state?.document) void resolve(); }
+    if (enabled && sourceKey) { if (!state?.document&&(!settings||settingsSource.current!==sourceKey)) void resolve(); }
     else cancel();
     const automatic = work.current;
     return () => automatic?.abort();
   }, [sourceKey, enabled, seed.title, seed.artist, durationKey, canAutoMatch]);
   const offsetMs = Number.isFinite(Number(offset)) ? Math.round(Number(offset) * 1000) : state?.offsetMs ?? 0;
   const search = () => run('搜索', async signal => {
+    cancelPreview();setPreview(undefined);setPreviewTarget(undefined);setPreviewError('');setResults(undefined);
+    // A manual lookup must recover the revision before offering a writable choice.
+    if(track&&(!state||stale)){
+      const value=await request<LyricState>('/api/lyrics/state',{ref:track.ref},signal);
+      if(signal.aborted)return;setState(value);setStale(false);if(!state)setOffset(String(value.offsetMs/1000));
+    }
     if(desktopSurface()){
-      setResults(undefined);setPreview(undefined);
       await desktopLyricSearch({title,artist,...(durationSeconds?{durationSeconds}:{})},signal,value=>{if(!signal.aborted)setResults(value);});return;
     }
     const value = await request<LyricSearch>('/api/lyrics/search', { title, artist, ...(durationSeconds ? { durationSeconds } : {}) }, signal);
     if (!signal.aborted) { setResults(value); setPreview(undefined); }
   });
-  const inspect = (candidate: LyricCandidate) => run('预览', async signal => {
-    const value = await request<LyricDocument>('/api/lyrics/document', { provider: candidate.provider, id: candidate.id }, signal);
-    if (!signal.aborted) setPreview(value);
-  });
+  useEffect(()=>{
+    if(!settings||!selector){autoSearch.current=false;return;}
+    if(autoSearch.current||busy||results?.candidates.length||!title.trim()||!track)return;
+    autoSearch.current=true;void search();
+  },[settings,selector,busy,results,sourceKey]);
+  const inspect = async(candidate: LyricCandidate) => {
+    previewWork.current?.abort();const controller=new AbortController();previewWork.current=controller;
+    setPreviewTarget({provider:candidate.provider,id:candidate.id});setPreviewBusy(true);setPreviewError('');setPreview(undefined);
+    try {const value=await request<LyricDocument>('/api/lyrics/document',{provider:candidate.provider,id:candidate.id},controller.signal);if(!controller.signal.aborted)setPreview(value);}
+    catch(issue){if(!controller.signal.aborted&&!cancelled(issue))setPreviewError((issue as {code?:string})?.code==='not-found'?'这份候选暂时没有可用歌词，请选择其他候选。':errorText(issue));}
+    finally{if(previewWork.current===controller){previewWork.current=null;setPreviewBusy(false);}}
+  };
   const accept = (keepOpen = false) => run('保存', async signal => {
-    if (!preview || !state || !track) return;
+    if (!preview || previewBusy || preview.provider!==previewTarget?.provider || preview.id!==previewTarget.id || !state || !track) return;
     const value = await request<LyricState>('/api/lyrics/select', { ref: track.ref, revision: state.revision, candidate: { provider: preview.provider, id: preview.id } }, signal);
     if (!signal.aborted) { setState(value); setOffset('0'); setMatched(false); setSelector(false); setSettings(open => keepOpen && open); }
   });
@@ -120,17 +150,20 @@ export function useLyrics(track: Track | null, duration: number | undefined, ver
     const value = await request<LyricState>('/api/lyrics/select', { ref: track.ref, revision: state.revision, candidate: null }, signal);
     if (!signal.aborted) { setState(value); setOffset('0'); setMatched(false); setPreview(undefined); setSelector(false); }
   });
-  const closeSettings = () => { if (busy !== '匹配' && busy !== '保存') cancel(); setSettings(false); setSelector(false); setOffset(String((state?.offsetMs ?? 0) / 1000)); };
+  const closeSettings = () => { if (busy !== '匹配' && busy !== '保存') cancel();cancelPreview(); setSettings(false); setSelector(false); setOffset(String((state?.offsetMs ?? 0) / 1000)); };
   const openSelector = () => {
+    settingsSource.current=sourceKey;
     setSelector(true); setSettings(true);
     // A failed initial read has no revision yet. Recover it before a manual save.
     if (!state || stale) void load(!!state);
   };
   return {
     sourceKey, track, state, document: state?.document, durationSeconds, offsetMs, busy, error, stale, matched,
-    settings, selector, setSelector, openSelector, openSettings: () => { setSelector(false); setSettings(true); }, closeSettings,
-    title, setTitle, artist, setArtist, text, setText, offset, setOffset, results, preview,
-    bottom: display.bottom, translations: display.translations, updateDisplay,
+    settings, selector, setSelector, openSelector, openSettings: () => { settingsSource.current=sourceKey;setSelector(false); setSettings(true); }, closeSettings,
+    title, setTitle, artist, setArtist, text, setText, offset, setOffset, results, preview, setPreview, previewTarget,previewBusy,previewError,cancelPreview,providerFilter, setProviderFilter,
+    resetQuery:()=>{setTitle(seed.title.slice(0,300));setArtist(seed.artist.slice(0,300));},
+    originalTitle: version?.facts.title ?? track?.sourceTitle ?? track?.title ?? '',
+    bottom: display.bottom, translations: display.translations, motion:display.motion, updateDisplay,
     run, cancel, load, resolve, search, inspect, accept, importText, saveOffset, clear,
   };
 }

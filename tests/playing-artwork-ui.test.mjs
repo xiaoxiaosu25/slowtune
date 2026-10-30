@@ -96,16 +96,9 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
   await page.waitForTimeout(140);
   assert.equal(await page.locator('.vinyl-rotor').evaluate(el => getComputedStyle(el).transform), stoppedVinyl);
   await page.screenshot({ path: join(artifacts, 'desktop-vinyl.png') });
-  await selectMode(page, 'original');
-  await page.locator('.playing-art-original img').waitFor();
-  await page.waitForFunction(() => document.querySelector('.playing-art-original img')?.naturalWidth > 0);
-  assert.equal(await mode(page).getAttribute('data-visual-mode'), 'original');
   const detail = await page.locator('.playing-detail').boundingBox();
   const gap = await page.locator('.listening-content').evaluate(el => getComputedStyle(el).columnGap);
   assert.equal(gap, '96px');
-  const original = await page.locator('.playing-art-original img').boundingBox();
-  assert(Math.abs(original.width / original.height - 1983 / 793) < .01, 'original preserves the real image aspect ratio without inner letterboxing');
-  await page.screenshot({ path: join(artifacts, 'desktop-original.png') });
   await mode(page).focus(); await page.keyboard.press('Enter');
   assert.equal(await mode(page).getAttribute('data-visual-mode'), 'square');
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.playing-art-square')).opacity === '1');
@@ -133,6 +126,8 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
   await page.screenshot({ path: join(artifacts, 'desktop-disc.png') });
   const source = await media(page).evaluate(el => ({ src: el.currentSrc, position: el.currentTime })), preparations = fixture.preparations.length;
   await selectMode(page, 'spectrum');
+  const spectrum = await page.locator('.playing-art-frequency .playing-spectrum').boundingBox();
+  assert(Math.abs(spectrum.width - disc.width) < 1, 'horizontal spectrum matches the round cover width');
   await page.waitForFunction(() => document.querySelector('.playing-art-switch').dataset.analysisState === 'ready');
   await media(page).evaluate(el => { el.currentTime = 1; });
   await page.waitForTimeout(450);
@@ -171,7 +166,7 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
   assert.equal(await page.locator('.listening-stage').evaluate(el => el.scrollTop), 0, 'the stage never scrolls when focused artwork changes shape');
 
   // Sampling stops outside the spectrum, while its audio output stays alive.
-  await selectMode(page, 'original'); await page.waitForTimeout(220);
+  await selectMode(page, 'square'); await page.waitForTimeout(220);
   const paints = await page.evaluate(() => window.__paints), position = await media(page).evaluate(el => el.currentTime);
   await page.waitForTimeout(180);
   assert.equal(await page.evaluate(() => window.__paints), paints);
@@ -229,7 +224,7 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
       await page.setViewportSize({ width, height });
       await page.waitForFunction(width=>document.querySelector('.app')?.dataset.layout===(width<=760?'mobile':'desktop'),width);
       const anchor = await page.locator('.playing-detail').boundingBox();
-      for (const visual of ['vinyl', 'original', 'square', 'disc', 'spectrum', 'halo']) {
+      for (const visual of ['vinyl', 'square', 'disc', 'spectrum', 'halo']) {
         await selectMode(page, visual);
         const measurement = await page.evaluate(() => {
           const stage = document.querySelector('.listening-stage,.mobile-player').getBoundingClientRect();
@@ -253,6 +248,11 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
           const crop = await page.locator('.playing-art-layer.is-active .playing-art-frame').boundingBox();
           assert(crop.width <= measurement.boxes[0].width * .81 && Math.abs(crop.width - crop.height) < 1, 'cropped covers keep breathing room at every size: ' + JSON.stringify({ theme, visual, crop, measurement }));
         }
+        if (visual === 'spectrum') {
+          const wave = await page.locator('.playing-art-frequency .playing-spectrum').boundingBox();
+          const round = await page.locator('.playing-art-disc .playing-art-frame').boundingBox();
+          assert(Math.abs(wave.width - round.width) < 1, 'horizontal spectrum keeps the same width as round covers at every size');
+        }
         measurements.push({ theme, visual, ...measurement });
         if (visual === 'vinyl' && (width === 390 || width === 320 || (theme === 'dark' && width === 1803))) await page.screenshot({ path: join(artifacts, `${theme}-vinyl-${width}x${height}.png`) });
         if ((width === 390 || width === 1803) && visual !== 'vinyl') await page.screenshot({ path: join(artifacts, `${theme}-${visual}-${width}x${height}.png`) });
@@ -273,13 +273,14 @@ test('artwork cycles, real spectrum, uninterrupted audio and responsive layout',
   writeFileSync(join(artifacts, 'checks.json'), JSON.stringify({ low, high, breathingHeights, haloLow, haloHigh, measurements, errors }, null, 2));
 });
 
-test('unavailable analysis preserves native playback and invalid preferences recover', { timeout: 30000 }, async t => {
+test('unavailable analysis preserves native playback and removed artwork preferences recover', { timeout: 30000 }, async t => {
   const fixture = await createPlayingArtworkFixture(), browser = await chromium.launch({ executablePath, headless: true });
   t.after(async () => { await browser.close(); await fixture.close(); });
   const page = await browser.newPage(); page.setDefaultTimeout(8000);
   await page.addInitScript(({ record, preference }) => {
     localStorage.setItem('slow-listening:playback:v3', JSON.stringify(record));
-    localStorage.setItem(preference, 'invalid-mode');
+    localStorage.setItem(preference, 'original');
+    localStorage.setItem('slow-listening:mobile-playing-visual:v1', 'original');
     window.AudioContext = class { constructor() { throw new Error('unavailable'); } };
   }, { record:queueRecord(fixture.tracks), preference });
   await openPlaying(page, fixture.base);
@@ -287,6 +288,8 @@ test('unavailable analysis preserves native playback and invalid preferences rec
   await selectMode(page, 'spectrum');
   await page.getByText('当前环境暂不支持实时音波', { exact: true }).waitFor();
   await page.setViewportSize({ width: 320, height: 480 });
+  await page.locator('.app[data-layout="mobile"]').waitFor();
+  assert.equal(await mode(page).getAttribute('data-visual-mode'), 'vinyl', 'removed mobile preference falls back to vinyl');
   await selectMode(page,'spectrum');
   const failureBounds = await page.locator('.playing-spectrum-status').boundingBox(), detail = await page.locator('.playing-detail').boundingBox();
   assert(failureBounds.x >= 0 && failureBounds.x + failureBounds.width <= 320 && failureBounds.y + failureBounds.height <= detail.y, 'fallback explanation stays clear of the controls on short phones');
@@ -428,7 +431,7 @@ test('mobile artwork uses named style choices without changing desktop preferenc
     assert.equal(await page.locator('.playing-art-hint').count(),0,'mobile artwork has no hidden cycling instruction');
     assert.equal(await mode(page).isDisabled(),true,'tapping the artwork does not change its style');
     const desktopPreference=await page.evaluate(key=>localStorage.getItem(key),preference);
-    await selectMode(page,'original');
+    await selectMode(page,'square');
     assert.equal(await page.evaluate(key=>localStorage.getItem(key),preference),desktopPreference,'mobile style changes leave desktop preferences intact');
     await selectMode(page, 'vinyl');
     await page.locator('.listening-transport .play-toggle').click();

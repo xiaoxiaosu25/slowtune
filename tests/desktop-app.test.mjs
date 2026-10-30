@@ -179,6 +179,8 @@ test('Windows integrated chrome, immersive and floating lyrics retain one player
   assert.equal(await overlay.locator('#secondary').textContent(), '仍然有真实文字');
   await publishLyricDocument(lyricSnapshot.document); await waitForOverlayVisibility(true);
   await assertOverlayTopmost('hidden and shown again');
+  // Match the real paused player: its periodic host snapshot remains authoritative.
+  await page.locator('audio').evaluate(audio => { audio.currentTime = 0; audio.dispatchEvent(new Event('timeupdate')); });
   await page.evaluate(sourceKey => window.slowTuneDesktop.publishClock({ sourceKey, position: 0, playing: false }), originalSource);
   await overlay.getByText('让晚风慢慢经过身旁', { exact: true }).waitFor();
   await waitForOverlayVisibility(true);
@@ -186,6 +188,7 @@ test('Windows integrated chrome, immersive and floating lyrics retain one player
   await publishLyricDocument({ ...lyricSnapshot.document, lines: [] });
   await publishLyricDocument(lyricSnapshot.document); await waitForOverlayVisibility(false);
   assert.equal(await page.evaluate(() => window.slowTuneDesktop.getState().then(state => state.preferences.visible)), false, 'new lyrics do not override a manual close');
+  await page.locator('audio').evaluate((audio, position) => { audio.currentTime = position; audio.dispatchEvent(new Event('timeupdate')); }, lyricSnapshot.clock.position);
   await page.evaluate(clock => { window.slowTuneDesktop.publishClock(clock); return window.slowTuneDesktop.setLyricsVisible(true); }, lyricSnapshot.clock);
   await waitForOverlayVisibility(true);
   await overlay.waitForFunction(() => document.querySelector('#current')?.dataset.line === '1');
@@ -227,8 +230,12 @@ test('Windows integrated chrome, immersive and floating lyrics retain one player
   await overlay.waitForFunction(() => window.slowTuneLyrics.getState().then(state => state.preferences.color === '#ddeeff'));
   await overlay.getByRole('button', { name: '减小字号', exact: true }).click();
   await overlay.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue('--lyric-size') === '28px');
+  const doubleLane=await overlay.locator('#current').boundingBox();
+  const doubleWindow=await application.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='慢听 · 桌面歌词').getBounds());
   await overlay.getByRole('checkbox', { name: '双行歌词', exact: true }).uncheck();
   await overlay.waitForFunction(() => document.body.dataset.lines === '1');
+  assert.deepEqual(await overlay.locator('#current').boundingBox(),doubleLane,'single-line mode keeps the singing line in place');
+  assert.deepEqual(await application.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='慢听 · 桌面歌词').getBounds()),doubleWindow,'line count does not move or resize the native window');
   await overlay.getByRole('checkbox', { name: '双行歌词', exact: true }).check();
   await overlay.waitForFunction(() => document.body.dataset.lines === '2');
   assert.equal((await overlay.locator('#current .word > span:first-child').allTextContents()).join(''), '听风', 'display toggles retain the current lyric');

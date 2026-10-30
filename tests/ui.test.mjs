@@ -735,7 +735,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
   });
 
   await t.test('acceptance helpers operate playlist menus, queue drawers and the independent player page', async () => {
-    await page.locator('.song-library-row').filter({hasText:part.title}).first().getByRole('button',{name:'更多操作 '+part.title,exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('button',{name:'编辑歌曲 '+part.title,exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与版本'});
+    await page.locator('.song-library-row').filter({hasText:part.title}).first().getByRole('button',{name:'更多操作 '+part.title,exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'编辑歌曲 '+part.title,exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与版本'});
     await menu.getByRole('tab', { name: '播放版本', exact: true }).waitFor();
     assert(await menu.getByRole('tab', { name: '播放版本', exact: true }).isVisible());
     await menu.getByRole('button', { name: '关闭', exact: true }).click();
@@ -744,11 +744,11 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(), '新验收歌单');
     await page.getByRole('button', { name: '打开播放队列', exact: true }).click();
     const firstActions = await queueTrackMenu(page, part.title);
-    await firstActions.getByRole('button', { name: '下移', exact: true }).click();
+    await firstActions.getByRole('menuitem', { name: '下移', exact: true }).click();
     const actions = await queueTrackMenu(page, second.title);
     assert.equal(await page.locator('.queue-actions [popover]:popover-open').count(), 1);
     assert.equal(await page.locator('.queue-track-main strong').first().getAttribute('title'), second.title);
-    await actions.getByRole('button', { name: '移除', exact: true }).click();
+    await actions.getByRole('menuitem', { name: '从播放队列移除', exact: true }).click();
     assert.equal(await page.locator('.queue-track').count(), 1);
     await page.getByRole('button', { name: '关闭播放队列', exact: true }).click();
     await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
@@ -1023,11 +1023,13 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert.equal(youtubeCalls.length,before+1);assert.equal(youtubeCalls.at(-1).refresh,'1');
     youtubeFailure=true;
     await youtube.getByRole('button',{name:'YouTube 音乐精选换一批',exact:true}).click();
-    await youtube.getByRole('alert').waitFor();
+    const status=youtube.getByRole('button',{name:'YouTube 音乐精选：暂未更新，查看详情',exact:true});
+    await status.waitFor();
     assert.equal(await youtube.locator('.music-card').count(),12,'a failed batch keeps the displayed songs');
     youtubeFailure=false;
-    await youtube.getByRole('button',{name:'重试音乐精选',exact:true}).click();
-    await page.waitForFunction(()=>!document.querySelector('[data-shelf-id="youtube-music-selection"] [role="alert"]'));
+    await status.click();
+    await youtube.locator('.discovery-status-popover [popover]:popover-open').getByRole('button',{name:'重试更新',exact:true}).click();
+    await status.waitFor({state:'detached'});
     assert.equal(youtubeCalls.at(-1).region,'JP','the shelf retry refetches the region chosen in the shelf');
     assert.equal(youtubeCalls.at(-1).refresh,'1');
     await setViewport({width:320,height:740});
@@ -1063,15 +1065,16 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await closeSettings();
     await navigate(page, '发现');
   });
-  await t.test('an endpoint answering with the page document names the build mismatch instead of a network error', async () => {
+  await t.test('an endpoint answering with the page document names the build mismatch instead of a network error', async t => {
     await page.route('**/api/discovery/bilibili*', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html lang="zh-CN"><body>慢听</body></html>' }));
+    t.after(() => page.unroute('**/api/discovery/bilibili*'));
     await page.reload();
-    const feedback = page.locator('.feedback').filter({ hasText: '服务端与当前页面不是同一次构建' });
+    const feedback = page.locator('.discovery-unavailable').filter({ hasText: '服务端与当前页面不是同一次构建' });
     await feedback.waitFor();
     assert.match(await feedback.textContent(), /stop\.cmd/, 'the message names the restart entry point');
     await page.unroute('**/api/discovery/bilibili*');
-    await feedback.getByRole('button', { name: '重试', exact: true }).click();
-    await page.waitForFunction(() => ![...document.querySelectorAll('.feedback')].some(e => e.textContent.includes('不是同一次构建')));
+    await feedback.getByRole('button', { name: '重新获取推荐', exact: true }).click();
+    await feedback.waitFor({state:'detached'});
     assert.deepEqual((await verifyDefaultDiscovery(page, 3)).map(shelf => shelf.shown), [12, 12, 0], 'the recorded retry returns to the running service');
   });
   await t.test('a running service that predates the dist blocks the page with the restart steps', async () => {

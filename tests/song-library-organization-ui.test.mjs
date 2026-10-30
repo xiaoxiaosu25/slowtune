@@ -53,7 +53,7 @@ test('organization is on demand, cancellable and local; adoption preserves playb
   const openEditor = async title => {
     const row = page.locator('.song-library-row').filter({ has: page.getByRole('button', { name: title, exact: true }) });
     await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
-    await page.locator('.song-row-menu [popover]:popover-open').getByRole('button', { name: '编辑歌曲 ' + title, exact: true }).click();
+    await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem', { name: '编辑歌曲 ' + title, exact: true }).click();
     await page.getByRole('tab',{name:'歌曲资料',exact:true}).click();
   };
   await page.goto(origin); await page.locator('.sidebar-nav').getByRole('button', { name: '歌单', exact: true }).click();

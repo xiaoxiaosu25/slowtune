@@ -64,7 +64,7 @@ test('desktop managers share one retryable module without unloaded static depend
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await page.getByRole('button', { name: '查看歌曲来源', exact: true }).click();
   await page.getByRole('button', { name: '选择播放版本', exact: true }).click();
-  await page.getByRole('dialog', { name: '版本与歌词', exact: true }).waitFor();
+  await page.getByRole('dialog', { name: '播放版本', exact: true }).waitFor();
   assert.equal(requests.length, 2, 'another manager reuses the successfully retried module');
   assert(await page.evaluate(() => document.querySelector('audio') === window.testAudio && !window.testAudio.paused));
 });
@@ -113,7 +113,7 @@ test('a desktop page render error stays below the player and navigation recovers
   assert(await page.evaluate(() => document.querySelector('audio') === window.testAudio));
 });
 
-test('a failed nonmodal management module retains its side panel and available transport', { timeout: 30000 }, async t => {
+test('a failed version dialog can be dismissed or retried without replacing the player', { timeout: 30000 }, async t => {
   const { page, fixture } = await setup(t);
   let fail = true;
   await page.route('**/assets/desktop-features-*.js*', route => fail ? route.fulfill({ status: 503, contentType: 'text/javascript', body: '' }) : route.continue());
@@ -121,11 +121,10 @@ test('a failed nonmodal management module retains its side panel and available t
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await page.getByRole('button', { name: '查看歌曲来源', exact: true }).click();
   await page.getByRole('button', { name: '选择播放版本', exact: true }).click();
-  await page.locator('.playback-management').getByRole('alert').waitFor();
-  await page.getByRole('button', { name: '暂停', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('audio').paused);
+  await page.getByRole('dialog',{name:'播放版本暂不可用',exact:true}).getByRole('alert').waitFor();
+  assert(await page.evaluate(()=>document.querySelector('audio')===window.testAudio&&!window.testAudio.paused));
   fail = false;
   await page.getByRole('button', { name: '重试显示', exact: true }).click();
-  await page.getByRole('dialog', { name: '版本与歌词', exact: true }).waitFor();
+  await page.getByRole('dialog', { name: '播放版本', exact: true }).waitFor();
   assert(await page.evaluate(() => document.querySelector('audio') === window.testAudio));
 });

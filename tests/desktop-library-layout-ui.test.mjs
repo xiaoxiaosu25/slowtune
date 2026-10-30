@@ -24,7 +24,7 @@ test('desktop library keeps songs above the player, menus reachable and desktop 
   await manage.click();
   await page.waitForFunction(() => document.querySelector('.playlist-manage-menu>button')?.getAttribute('aria-expanded') === 'true');
   const menu = library.locator('.playlist-manage-menu [popover]');
-  assert.equal(await menu.getByRole('button').first().innerText(), '歌单改名');
+  assert.equal(await menu.getByRole('menuitem').first().innerText(), '播放全部');
   const buttonStyle = await manage.evaluate(button => {
     const style = getComputedStyle(button), play = getComputedStyle(document.querySelector('.playlist-copy .play-all'));
     return { radius: style.borderRadius, height: style.height, playRadius: play.borderRadius, playHeight: play.height };
@@ -40,7 +40,7 @@ test('desktop library keeps songs above the player, menus reachable and desktop 
   assert.equal(await page.getByRole('button', { name: '歌单管理', exact: true }).evaluate(e => e === document.activeElement), true, 'dialog closes back to the visible menu trigger');
   assert.equal(fixture.library.read().snapshot.playlists.find(p => p.id === 'layout').name, '散步歌单');
   await selectPlaylist(page, '我的收藏'); await manage.click();
-  assert.equal(await menu.getByRole('button', { name: '歌单改名', exact: true }).count(), 0);
+  assert.equal(await menu.getByRole('menuitem', { name: '歌单改名', exact: true }).count(), 0);
   await page.keyboard.press('Escape');
   await selectPlaylist(page, '周杰伦精选'); await libraryAction(page, '歌单改名');
   assert.equal(await rename.getByLabel('歌单名称').inputValue(), '周杰伦精选');

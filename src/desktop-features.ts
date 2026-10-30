@@ -2,4 +2,4 @@
 // same retryable chunk. Dependencies shared with the app are already loaded.
 export { DesktopSongDialog } from './DesktopSongDialog';
 export { DesktopPlaylistCoverDialog } from './DesktopPlaylistCoverDialog';
-export { PlaybackManagement } from './PlaybackManagement';
+export { PlaybackVersionsDialog } from './PlaybackVersionsDialog';

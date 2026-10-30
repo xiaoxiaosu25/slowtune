@@ -83,8 +83,8 @@ test('desktop sleep timer: form, replacement, completion and host actions', { ti
     await page.locator('.sleep-current').click();
     assert.match(await page.getByRole('alert').textContent(), /请先播放/); assert.equal((await snapshot()).status, 'idle');
   });
-  await t.test('manual next and seeking to the end do not count; natural loop completion counts exactly once', async () => {
-    await open(); await play();
+  for (const query of ['', '?mobile']) await t.test(`${query ? 'mobile' : 'desktop'} manual next and seeking to the end do not count; natural loop completion counts exactly once`, async () => {
+    await open(query); await play();
     await invoke('mode'); await invoke('mode'); await invoke('mode'); // sequential -> shuffle -> all -> one
     await field('trigger').selectOption('items'); await field('count').fill('2'); await submit();
     await invoke('next'); assert.equal((await snapshot()).remainingItems, 2);

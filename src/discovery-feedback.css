@@ -1,0 +1,8 @@
+.discovery-status { display:inline-flex; flex-shrink:0; }
+.discovery-status-popover>.btn { gap:5px; height:28px; padding:0 6px; color:var(--muted); font-size:12px; white-space:nowrap; }
+.discovery-status[data-loading] .discovery-status-popover>.btn>svg { animation:catalog-refresh-spin 1s linear infinite; }
+.discovery-status-popover .control-popover-panel { width:300px; }
+.discovery-status-copy { padding:4px 12px 8px; font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+.discovery-unavailable { gap:12px; }
+.discovery-unavailable>.btn { margin-top:12px; }
+@media(prefers-reduced-motion:reduce) { .discovery-status[data-loading] .discovery-status-popover>.btn>svg { animation:none; } }

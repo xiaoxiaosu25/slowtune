@@ -108,6 +108,7 @@ export class SongLibraryService {
     return { modelVersion: 1 as const, revision: state.revision, snapshot: state.document.snapshot };
   }
   cancelOwner(owner: string) {
+    this.store.cancelDesktopOwner(owner);
     for (const [id, preview] of this.previews) if (preview.owner === owner) this.previews.delete(id);
     for (const [id, preview] of this.maintenance) if (preview.owner === owner) this.maintenance.delete(id);
     for (const [id, preview] of this.organization) if (preview.owner === owner) this.organization.delete(id);

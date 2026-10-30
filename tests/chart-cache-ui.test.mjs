@@ -63,5 +63,15 @@ test('chart browsing reuses daily/weekly caches across navigation, editions and 
   // Switching to a valid cache cancels an expired request; its late response must not win.
   delay=200;await page.getByLabel('网易云榜单').selectOption('new');await page.locator('.charts-page .loading').waitFor();
   await page.getByLabel('网易云榜单').selectOption('hot');await idle();const hot=await page.locator('.chart-song-title').textContent();await page.waitForTimeout(250);assert.equal(await page.locator('.chart-song-title').textContent(),hot);
+  // An uncached mobile chart must keep its selector while loading and after failure.
+  await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>document.querySelector('.app')?.dataset.layout==='mobile');
+  failure=true;delay=500;const kinds=page.getByRole('combobox',{name:'网易云榜单',exact:true});
+  await kinds.selectOption('rising');await page.locator('.charts-page .loading').waitFor();
+  assert.equal(await kinds.isVisible(),true);assert.equal(await kinds.count(),1);
+  await page.getByRole('alert').waitFor();assert.equal(await kinds.isVisible(),true);assert.equal(await kinds.inputValue(),'rising');
+  const failedCalls=calls.length;await kinds.selectOption('hot');await idle();
+  assert.equal(calls.length,failedCalls);assert.equal(await page.locator('.chart-song-title').textContent(),hot);assert.equal(await page.getByRole('alert').count(),0);
+  await page.setViewportSize({width:1280,height:800});await page.waitForFunction(()=>document.querySelector('.app')?.dataset.layout==='desktop');
+  assert.equal(await kinds.isVisible(),true);assert.equal(await kinds.count(),1);assert.equal(await kinds.inputValue(),'hot');
   assert.deepEqual(errors,[]);
 });

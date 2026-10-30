@@ -4,13 +4,14 @@ import { MusicSourceError, validateRef, type CallOptions, type MusicApi, type Pr
 import { prepareBestAudio, supportsAudioType, losslessAudio } from './audio-quality.js';
 import { sameVideoPart } from './search-policy.js';
 import { DesktopInflight, requestIdentity } from './desktop-inflight.js';
+import { BilibiliResponseReuse } from '@studio/music-sources/bilibili';
 
 export { desktopAudioCapability } from './audio-quality.js';
 export const desktopOperationTimeoutMs = 60000;
 export function desktopSourcePath(path:string){
   return /^\/v1\/(?:handshake|call\/[^/]+)$/.test(path)||[
     '/api/search','/api/search/resolve','/api/song-library/playback','/api/identify','/api/playback/prefetch',
-    '/api/discovery/bilibili','/api/youtube/music','/api/creators/resolve',
+    '/api/discovery/bilibili','/api/youtube/music','/api/creators/resolve','/api/creators/search',
     '/api/song-library/catalog/search','/api/song-library/catalog/backfill',
   ].includes(path);
 }
@@ -19,11 +20,11 @@ interface Work {
   id:string; owner:string; generation:string; signal:AbortSignal; priority:Priority;
   shared?:boolean;
   responseStatus?:number;
-  responses:Map<string,Promise<{status:number;headers:[string,string][];body:Uint8Array}>>;tickets:Set<string>;bytes:number;
+  responses:BilibiliResponseReuse;tickets:Set<string>;
 }
 interface Pending {provider:ProviderId;priority:Priority;signal:AbortSignal;start:()=>void;reject:(error:unknown)=>void;detach:()=>void}
 interface Ticket {owner:string;generation:string;until:number;playback:PreparedPlayback}
-type Event = {id:string;operation:string;code:string;at:number;elapsedMs?:number;provider?:ProviderId;status?:number;errorCode?:string};
+type Event = {id:string;operation:string;code:string;at:number;elapsedMs?:number;provider?:ProviderId;status?:number;errorCode?:string;sourceRequest?:string;attempt?:number};
 const cancelled = (signal:AbortSignal) => new MusicSourceError({code:signal.reason?.name==='TimeoutError'?'timeout':'cancelled',retryable:signal.reason?.name==='TimeoutError'});
 
 /** Product-owned desktop work only. Normal browser/mobile source calls bypass it. */
@@ -56,13 +57,15 @@ export class DesktopPlayback {
   private record(event:Event){this.events.push(event);if(this.events.length>160)this.events.shift();}
   async run<T>(owner:string,operation:string,signal:AbortSignal,task:(signal:AbortSignal)=>Promise<T>,priority:Priority=2,timeoutMs=desktopOperationTimeoutMs):Promise<T>{
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(new DOMException('Desktop operation timed out','TimeoutError')),timeoutMs);
-    const combined=AbortSignal.any([signal,this.stop.signal,controller.signal]),work:Work={id:'desktop-'+ ++this.sequence,owner,generation:this.generation(),signal:combined,priority,responses:new Map(),tickets:new Set(),bytes:0};
+    const combined=AbortSignal.any([signal,this.stop.signal,controller.signal]),id='desktop-'+ ++this.sequence;
+    const responses=new BilibiliResponseReuse((...args)=>this.fetcher(...args),combined,()=>this.record({id,operation:'upstream',code:'reuse',at:this.now(),provider:'bilibili'}));
+    const work:Work={id,owner,generation:this.generation(),signal:combined,priority,responses,tickets:new Set()};
     const start=this.now();
     return this.context.run(work,async()=>{
       this.record({id:work.id,operation,code:'start',at:start});
       try{combined.throwIfAborted();const result=await task(combined);this.check(work);this.record({id:work.id,operation,code:(work.responseStatus??200)>=400?'failure':'complete',at:this.now(),elapsedMs:this.now()-start,...(work.responseStatus?{status:work.responseStatus}:{})});return result;}
       catch(error){for(const token of work.tickets)this.tickets.delete(token);const failure=combined.aborted?cancelled(combined):error;this.record({id:work.id,operation,code:'failure',at:this.now(),elapsedMs:this.now()-start,errorCode:failure instanceof MusicSourceError?failure.code:'upstream'});throw failure;}
-      finally{clearTimeout(timer);work.responses.clear();}
+      finally{clearTimeout(timer);await work.responses.dispose();}
     });
   }
   response(status:number){const work=this.current;if(!work)return;work.responseStatus=status;if(status>=400)for(const token of work.tickets)this.tickets.delete(token);}
@@ -101,31 +104,10 @@ export class DesktopPlayback {
   }
   /** Reuse only bounded public API bodies within this one desktop operation. */
   fetch:typeof fetch=async(input,init)=>{
-    const work=this.current,url=new URL(typeof input==='string'||input instanceof URL?input:input.url);
-    if(!work||url.origin!=='https://api.bilibili.com'||!['/x/web-interface/view','/x/player/wbi/playurl'].includes(url.pathname)||(init?.method??'GET')!=='GET')return this.fetcher(input,init);
+    const work=this.current;
+    if(!work)return this.fetcher(input,init);
     this.check(work);
-    // Signature timestamps vary between formats and prepare. Everything else,
-    // including request credentials, must identify the exact same upstream read.
-    const identity=new URL(url);identity.searchParams.delete('wts');identity.searchParams.delete('w_rid');identity.searchParams.sort();
-    const key=JSON.stringify([identity.href,[...new Headers(init?.headers).entries()].sort()]);
-    let pending=work.responses.get(key);
-    if(!pending){
-      pending=(async()=>{
-        const response=await this.fetcher(input,init);
-        const reader=response.body?.getReader(),chunks:Uint8Array[]=[];let length=0;
-        const abort=()=>{void reader?.cancel().catch(()=>{});};work.signal.addEventListener('abort',abort,{once:true});
-        try{if(reader)for(;;){work.signal.throwIfAborted();const chunk=await reader.read();if(chunk.done)break;length+=chunk.value.length;if(length>4*1024*1024)throw new MusicSourceError({code:'upstream',provider:'bilibili',retryable:true});chunks.push(chunk.value);}}
-        finally{work.signal.removeEventListener('abort',abort);await reader?.cancel().catch(()=>{});reader?.releaseLock();}
-        this.check(work);
-        if(work.bytes+length<=8*1024*1024)work.bytes+=length;
-        else if(work.responses.get(key)===pending)work.responses.delete(key);
-        return {status:response.status,headers:[...response.headers.entries()],body:new Uint8Array(Buffer.concat(chunks))};
-      })();
-      if(work.responses.size<32)work.responses.set(key,pending);
-      void pending.catch(()=>{if(work.responses.get(key)===pending)work.responses.delete(key);});
-    }else this.record({id:work.id,operation:'upstream',code:'reuse',at:this.now(),provider:'bilibili'});
-    const result=await pending;this.check(work);
-    return new Response(result.body.slice(),{status:result.status,headers:result.headers});
+    const response=await work.responses.fetch(input,init);this.check(work);return response;
   };
   private fetcher:typeof fetch=fetch;
   setFetch(fetcher:typeof fetch){this.fetcher=fetcher;}
@@ -147,7 +129,7 @@ export class DesktopPlayback {
     }
     return this.share(['best-audio',request,support,{...options,signal:undefined}],options.signal??work.signal,signal=>prepareBestAudio(api,request,{...options,signal},format=>supportsAudioType(support,format)));
   }
-  observe(event:SourceDiagnostic){const work=this.current;if(work||event.operation==='media')this.record({id:work?.id??event.requestId,operation:event.operation,code:event.code,at:event.timestamp,...(event.elapsedMs!==undefined?{elapsedMs:event.elapsedMs}:{}),...(event.provider?{provider:event.provider}:{}),...(event.status?{status:event.status}:{}),...(event.errorCode?{errorCode:event.errorCode}:{})});}
+  observe(event:SourceDiagnostic){const work=this.current;if(work||event.operation==='media')this.record({id:work?.id??event.requestId,sourceRequest:event.requestId,operation:event.operation,code:event.code,at:event.timestamp,...(event.attempt!==undefined?{attempt:event.attempt}:{}),...(event.elapsedMs!==undefined?{elapsedMs:event.elapsedMs}:{}),...(event.provider?{provider:event.provider}:{}),...(event.status?{status:event.status}:{}),...(event.errorCode?{errorCode:event.errorCode}:{})});}
   private prune(){for(const [token,ticket]of this.tickets)if(ticket.until<=this.now()||ticket.generation!==this.generation())this.tickets.delete(token);}
   cancelOwner(owner:string){this.inflight.cancelOwner(owner);for(const [token,ticket]of this.tickets)if(ticket.owner===owner)this.tickets.delete(token);}
   diagnostics(){

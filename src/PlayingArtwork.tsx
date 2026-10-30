@@ -1,13 +1,13 @@
 import { preferenceStorage } from './preference-storage';
-import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ArrowClockwiseIcon, MusicNotesIcon } from '@phosphor-icons/react';
 import type { PlaybackAudioAnalysis } from './audio-analysis';
 import { PlayingSpectrum } from './PlayingSpectrum';
 
-export type PlayingVisualMode = 'vinyl' | 'original' | 'square' | 'disc' | 'spectrum' | 'halo' | 'lyrics';
+export type PlayingVisualMode = 'vinyl' | 'square' | 'disc' | 'spectrum' | 'halo' | 'lyrics';
 export const playingVisualStorageKey = 'slow-listening:playing-visual:v1';
-const modes: PlayingVisualMode[] = ['vinyl', 'original', 'square', 'disc', 'spectrum', 'halo', 'lyrics'];
-const names: Record<PlayingVisualMode, string> = { vinyl: '唱片', original: '原图', square: '方形', disc: '圆形', spectrum: '音波', halo: '音环', lyrics: '歌词' };
+const modes: PlayingVisualMode[] = ['vinyl', 'square', 'disc', 'spectrum', 'halo', 'lyrics'];
+const names: Record<PlayingVisualMode, string> = { vinyl: '唱片', square: '方形', disc: '圆形', spectrum: '音波', halo: '音环', lyrics: '歌词' };
 function readMode(): PlayingVisualMode {
   try { const saved = preferenceStorage().getItem(playingVisualStorageKey); return modes.find(mode => mode === saved) ?? 'vinyl'; }
   catch { return 'vinyl'; }
@@ -34,7 +34,6 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
   const selectedMode = visualMode ?? storedMode;
   const mode = !allowLyrics && selectedMode === 'lyrics' ? 'vinyl' : selectedMode;
   const [failed, setFailed] = useState('');
-  const [dimensions, setDimensions] = useState({ url: '', ratio: 16 / 9 });
   const [visible, setVisible] = useState(() => !document.hidden);
   const state = useSyncExternalStore(analysis?.subscribe ?? noSubscription, analysis?.getSnapshot ?? idleAnalysis);
   // The desktop lyric view shares this preference; refresh the retained normal view on return.
@@ -61,9 +60,7 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
   };
   const hasArtwork = !!artwork && failed !== artwork;
   const image = () => hasArtwork ? <img className="playing-art" src={artwork} alt="" referrerPolicy="no-referrer" draggable={false}
-    onLoad={event => { const { naturalWidth, naturalHeight } = event.currentTarget; if (naturalWidth && naturalHeight) setDimensions({ url: artwork, ratio: naturalWidth / naturalHeight }); }}
     onError={() => setFailed(artwork)}/> : <span className="playing-art unknown-cover"><MusicNotesIcon size={60}/></span>;
-  const ratio = hasArtwork && dimensions.url === artwork ? dimensions.ratio : 16 / 9;
   const message = state === 'unavailable' ? '当前环境暂不支持实时音波' : state !== 'ready' ? '点击播放后显示实时音波' : '';
   if (mode === 'lyrics') return <div className="playing-art-slot playing-lyrics-slot">
     <div className="playing-art-lyrics">{lyrics ?? <p className="muted">播放音乐后自动显示歌词</p>}</div>
@@ -71,15 +68,13 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
   </div>;
   return <div className="playing-art-slot">
     <button type="button" className="playing-art-switch" data-visual-mode={mode} data-analysis-state={state}
-      disabled={!interactive} aria-label={interactive?`封面样式：${names[mode]}，点击切换为${names[next]}`:`封面样式：${names[mode]}`} onClick={interactive?cycle:undefined}
-      style={{ '--artwork-ratio': ratio } as CSSProperties}>
+      disabled={!interactive} aria-label={interactive?`封面样式：${names[mode]}，点击切换为${names[next]}`:`封面样式：${names[mode]}`} onClick={interactive?cycle:undefined}>
       <span className={'playing-art-layer playing-art-vinyl' + (mode === 'vinyl' ? ' is-active' : '') + (mode === 'vinyl' && playing && visible ? ' is-playing' : '')} aria-hidden="true">
         <span className="vinyl-record"><span className="vinyl-rotor">
           <img className="vinyl-material" src="/assets/vinyl-black-red.webp" alt="" draggable={false}/>
           <VinylLabel/>
         </span><span className="vinyl-sheen"/></span>
       </span>
-      <span className={'playing-art-layer playing-art-original' + (mode === 'original' ? ' is-active' : '')} aria-hidden="true"><span className="playing-art-frame">{image()}</span></span>
       <span className={'playing-art-layer playing-art-square' + (mode === 'square' ? ' is-active' : '')} aria-hidden="true"><span className="playing-art-frame">{image()}</span></span>
       <span className={'playing-art-layer playing-art-disc' + (mode === 'disc' ? ' is-active' : '') + (mode === 'disc' && playing && visible ? ' is-playing' : '')} aria-hidden="true"><span className="playing-art-frame">{image()}</span></span>
       <span className={'playing-art-layer playing-art-frequency' + (mode === 'spectrum' ? ' is-active' : '')} aria-hidden="true">

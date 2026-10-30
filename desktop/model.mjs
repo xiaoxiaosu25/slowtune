@@ -46,7 +46,7 @@ export function lyricDocument(input) {
     lines.push({ text: line.text, startMs: line.startMs, ...(line.translation ? { translation: text(line.translation, 16000) } : {}), ...(words ? { words } : {}) });
   }
   if (!finite(input.offsetMs) || Math.abs(input.offsetMs) > 86400000) return null;
-  return { sourceKey: input.sourceKey, title: text(input.title, 500), status: text(input.status, 200), synced: input.synced === true, instrumental: input.instrumental === true, offsetMs: input.offsetMs, lines };
+  return { sourceKey: input.sourceKey, title: text(input.title, 500), status: text(input.status, 200), synced: input.synced === true, instrumental: input.instrumental === true, offsetMs: input.offsetMs,...(finite(input.durationMs)&&input.durationMs>0&&input.durationMs<=1e12?{durationMs:input.durationMs}:{}), lines };
 }
 
 export function lyricClock(input) {

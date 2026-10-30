@@ -1,4 +1,4 @@
-import { MusicSourceError, type MusicApi, type EntryRef, type MusicEntry, type ProviderId } from '@studio/music-sources';
+import { MusicSourceError, type MusicApi, type EntryRef, type MusicEntry, type ProviderId, type SearchOrder } from '@studio/music-sources';
 import { SongLibraryError as LibraryError } from './song-library-errors.js';
 import { SearchSettingsStore, validateSong, validateSongSearch } from './search-settings.js';
 import { bilibiliSearchPartition, preferredSong, searchPreferredVersions, songKey, songMatchReasons, desktopSongMatchReasons, songSearchText, SearchCandidateMismatch, type SearchEntry, type SearchPage, type SongQuery } from './search-policy.js';
@@ -36,10 +36,10 @@ export class MusicSearch {
     return this.share?this.share(['search',input,this.store.read().revision,this.context(),this.youtubeAvailable()],signal,s=>this.searchOnce(input,s)):this.searchOnce(input,signal);
   }
   private async searchOnce(input:unknown,signal:AbortSignal):Promise<SearchPage>{
-    const value=input as {provider:ProviderId;query:string;cursor?:string;song?:SongQuery};
-    if(!value||!['bilibili','youtube'].includes(value.provider)||typeof value.query!=='string'||!value.query.trim()||value.query.length>512||value.cursor!==undefined&&(typeof value.cursor!=='string'||value.cursor.length>256))throw new LibraryError('invalid-input');
+    const value=input as {provider:ProviderId;query:string;cursor?:string;song?:SongQuery;order?:SearchOrder};
+    if(!value||!['bilibili','youtube'].includes(value.provider)||typeof value.query!=='string'||!value.query.trim()||value.query.length>512||value.cursor!==undefined&&(typeof value.cursor!=='string'||value.cursor.length>256)||value.order!==undefined&&!['relevance','plays','favorites','newest'].includes(value.order))throw new LibraryError('invalid-input');
     const song=validateSong(value.song??{title:value.query});
-    const result=await this.api.search(value.provider,{query:value.query,mode:'video',limit:20,...(value.cursor?{cursor:value.cursor}:{})},{signal});
+    const result=await this.api.search(value.provider,{query:value.query,mode:'video',limit:20,...(value.order?{order:value.order}:{}),...(value.cursor?{cursor:value.cursor}:{})},{signal});
     const entries:SearchEntry[]=[];let classificationIssue:SearchPage['classificationIssue'];
     // Enrich in bounded groups while retaining every upstream position and cursor.
     for(let start=0;start<result.items.length;start+=3){

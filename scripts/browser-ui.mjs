@@ -63,7 +63,8 @@ export async function libraryAction(page, name) {
     await page.getByRole('dialog',{name:'音乐库管理',exact:true}).getByRole('button',{name,exact:true}).click();return;
   }
   const library = page.locator('.song-library-page');
-  const action = (await page.locator('.app').getAttribute('data-layout')==='mobile'?page:library).getByRole('button', { name, exact: true });
+  const mobile = await page.locator('.app').getAttribute('data-layout')==='mobile';
+  const action = (mobile?page:library).getByRole(mobile?'button':'menuitem', { name, exact: true });
   if (!await action.isVisible()) await library.getByRole('button', { name: '歌单管理', exact: true }).click();
   await action.click();
 }
@@ -82,9 +83,16 @@ export async function selectPlaylist(page, name) {
 export async function openTrackMenu(page, title) {
   const row = page.locator('.track-row').filter({ has: page.getByTitle(title, { exact: true }) }).first();
   await row.getByRole('button', { name: '更多操作 ' + title, exact: true }).click();
+  if(await row.locator('.context-menu:popover-open').count()) await row.getByRole('menuitem', { name:'歌曲详情与分 P…', exact:true }).click();
   const dialog=page.locator('.music-action-modal');
   await dialog.locator('.music-more .action-list').first().waitFor({state:'visible'});
   return dialog;
+}
+
+export async function openSourceDetails(page, title) {
+  await page.getByRole('button', { name: '更多操作 ' + title, exact: true }).first().click();
+  const menu = page.locator('.context-menu:popover-open');
+  if (await menu.count()) await menu.getByRole('menuitem', { name: '歌曲详情与分 P…', exact: true }).click();
 }
 
 export async function queueTrackMenu(page, title) {

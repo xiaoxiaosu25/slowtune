@@ -53,18 +53,19 @@ test('fixed cover slots, container columns, artwork fit and shared follow views 
     await page.setViewportSize({width,height:900});await navigate(page,'发现');
     const measurement=await bili.locator('.cover-grid').evaluate(el=>({width:el.clientWidth,columns:getComputedStyle(el).gridTemplateColumns.split(' ').length,card:el.querySelector('.music-card').getBoundingClientRect().width}));
     if(width>760)assert.equal(measurement.columns,measurement.width>=800?4:measurement.width>=600?3:2,'desktop cover columns retain their container layout');
-    else {assert.equal(measurement.columns,2,'mobile recommendations use two cover columns');assert.equal(await bili.locator('.music-card').count(),4);assert(await bili.locator('.mobile-shelf-covers').evaluate(el=>el.scrollWidth<=el.clientWidth),'mobile recommendations fit the shelf width');}
-    await bili.locator('img').first().waitFor();const image=await bili.locator('.cover-button img').first().evaluate(el=>({ratio:el.getBoundingClientRect().width/el.getBoundingClientRect().height,fit:getComputedStyle(el).objectFit}));assert(Math.abs(image.ratio-1)<.02);assert.equal(image.fit,'cover');
+    else {assert.equal(measurement.columns,1,'mobile recommendations use one featured column');assert.equal(await bili.locator('.music-card').count(),6);assert(await bili.locator('.mobile-shelf-covers').evaluate(el=>el.scrollWidth<=el.clientWidth),'mobile recommendations fit the shelf width');}
+    await bili.locator('img').first().waitFor();const image=await bili.locator('.cover-button img').first().evaluate(el=>({ratio:el.getBoundingClientRect().width/el.getBoundingClientRect().height,fit:getComputedStyle(el).objectFit}));if(width>760)assert(Math.abs(image.ratio-1)<.02);else assert(image.ratio>1,'featured mobile artwork retains its wide cover');assert.equal(image.fit,'cover');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.screenshot({path:join(directory,`discover-${width}.png`)});layouts.push({width,...measurement});
   }
-  await updates.getByRole('button',{name:'关注的最近更新栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'关注的最近更新栏目操作',exact:true}).getByRole('button',{name:'封面浏览',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),4);await updates.getByRole('button',{name:'查看全部 12 首',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),12);assert.equal(await updates.locator('time').count(),12);
-  await navigate(page,'关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.locator('.follows-page .track-row').last().waitFor();await page.getByRole('button',{name:'关注的最近更新封面视图',exact:true}).click();await page.locator('.follows-page .music-card').last().waitFor();assert.equal(await page.locator('.follows-page .music-card').count(),30,'follow page is not capped to 12');
-  assert.equal(await page.getByRole('button',{name:'关注的最近更新封面视图',exact:true}).getAttribute('aria-pressed'),'true');
+  await updates.getByRole('button',{name:'关注的最近更新栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'关注的最近更新栏目操作',exact:true}).getByRole('button',{name:'封面浏览',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),4);await updates.getByRole('button',{name:'展开更多 · 还有 8 首',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),12);assert.equal(await updates.locator('time').count(),12);
+  await navigate(page,'关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.locator('.follows-page .music-card').last().waitFor();assert.equal(await page.locator('.follows-page .music-card').count(),30,'follow page is not capped to 12');
+  await page.getByRole('button',{name:'关注页面操作',exact:true}).click();const followMenu=page.getByRole('dialog',{name:'关注页面操作',exact:true});assert.equal(await followMenu.getByRole('button',{name:'封面浏览',exact:true}).getAttribute('aria-pressed'),'true');await page.keyboard.press('Escape');
   assert.equal(await page.locator('.follows-page time').count(),30);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await page.screenshot({path:join(directory,'follow-covers-320.png')});
-  await page.getByRole('button',{name:'关注的最近更新列表视图',exact:true}).click();await page.locator('.follows-page .track-row').last().waitFor();assert.equal(await page.locator('.follows-page .track-row').count(),30);
-  await navigate(page,'发现');await updates.locator('.music-card').last().waitFor();assert.equal(await updates.locator('.music-card').count(),4,'the mobile shelf restores its cover preference as a compact preview, separate from the full follow page');
+  await page.getByRole('button',{name:'关注页面操作',exact:true}).click();await followMenu.getByRole('button',{name:'歌曲列表',exact:true}).click();await page.locator('.follows-page .track-row').last().waitFor();assert.equal(await page.locator('.follows-page .track-row').count(),30);
+  await navigate(page,'发现');await updates.locator('.track-row').last().waitFor();assert.equal(await updates.locator('.track-row').count(),4,'the mobile shelf shares the list preference while retaining its compact preview');
+  await updates.getByRole('button',{name:'关注的最近更新栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'关注的最近更新栏目操作',exact:true}).getByRole('button',{name:'封面浏览',exact:true}).click();assert.equal(await updates.locator('.music-card').count(),4);
   await updates.getByRole('button',{name:'关注的最近更新栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'关注的最近更新栏目操作',exact:true}).getByRole('button',{name:'歌曲列表',exact:true}).click();
   await page.reload();await updates.locator('.track-row').last().waitFor();assert.equal(await updates.locator('.track-row').count(),4,'mobile list preference restores with a compact preview');
   assert.equal(surfaces.at(-1),null,'mobile keeps its existing recommendation request');
@@ -77,7 +78,7 @@ test('fixed cover slots, container columns, artwork fit and shared follow views 
   await page.emulateMedia({colorScheme:'dark'});await page.screenshot({path:join(directory,'discover-dark-1440-no-queue.png')});
   layouts.push({width:1440,queue:false,theme:'dark',...withoutQueue});
   // Polling the startup fallback must never abort a user's slow explicit next batch.
-  startupUpdating=true;manualDelay=3500;await page.reload();await youtube.getByText('启动时正在准备新推荐，先展示上次内容。',{exact:true}).waitFor();
+  startupUpdating=true;manualDelay=3500;await page.reload();await youtube.getByRole('button',{name:'YouTube 推荐：正在更新，查看详情',exact:true}).waitFor();
   assert.equal(surfaces.at(-1),'desktop');
   const bBefore=requests.length,yBefore=youtubeRequests.length;
   await bili.getByRole('button',{name:'B站推荐换一批',exact:true}).click();await youtube.getByRole('button',{name:'YouTube 推荐换一批',exact:true}).click();
