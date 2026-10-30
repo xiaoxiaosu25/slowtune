@@ -43,7 +43,7 @@
     "@studio/music-sources": "file:vendor/studio-music-sources-0.2.14.tgz",
     "@studio/player": "file:vendor/studio-player-0.12.15.tgz",
     "@studio/recommendation": "file:vendor/studio-recommendation-0.3.5.tgz",
-    "hono": "4.13.12",
+    "hono": "4.13.14",
     "qrcode": "1.5.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
