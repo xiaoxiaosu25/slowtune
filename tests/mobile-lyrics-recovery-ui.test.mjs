@@ -73,6 +73,7 @@ test('mobile empty lyrics open existing search and selection directly without re
   await page.goForward();
   assert.equal(await dialog.count(), 0, 'Forward does not reopen a closed recovery dialog');
   await recover.click(); await dialog.waitFor();
+  await dialog.getByRole('button',{name:'修改搜索',exact:true}).click();
   await dialog.getByLabel('歌词歌名', { exact:true }).fill('恢复演示');
   await dialog.getByRole('button', { name:'查找歌词', exact:true }).click();
   await dialog.getByRole('button', { name:'预览 LRCLIB 恢复演示 42', exact:true }).click();
@@ -103,7 +104,7 @@ test('mobile failed lyric reads recover the revision for manual import and offer
   const dialog = page.getByRole('dialog', { name:'选择歌词', exact:true });
   await dialog.getByRole('alert').waitFor();
   assert(calls.filter(call => call.path.endsWith('/state')).length > reads, 'the recovery entry rereads a missing revision');
-  await dialog.getByText('导入或粘贴歌词', { exact:true }).click();
+  await dialog.getByText('导入歌词', { exact:true }).click();
   await dialog.getByLabel('粘贴歌词正文').fill('[00:00]导入后第一行');
   assert.equal(await dialog.getByRole('button', { name:'使用导入歌词', exact:true }).isDisabled(), true, 'a missing revision cannot be saved');
   await dialog.getByRole('button', { name:'返回上一级', exact:true }).click();
@@ -111,9 +112,9 @@ test('mobile failed lyric reads recover the revision for manual import and offer
   control.stateError = false;
   await panel.getByRole('button', { name:'查找或导入歌词', exact:true }).click();
   await dialog.waitFor();
-  await dialog.getByText('导入或粘贴歌词', { exact:true }).click();
+  await dialog.getByText('导入歌词', { exact:true }).click();
   assert.equal(await dialog.getByLabel('粘贴歌词正文').inputValue(), '[00:00]导入后第一行', 'the cancelled recovery keeps its draft');
-  await page.waitForFunction(() => !document.querySelector('.lyrics-import button').disabled);
+  await page.waitForFunction(() => !document.querySelector('.lyric-picker-footer .btn-primary').disabled);
   await dialog.getByLabel('导入歌词文件').setInputFiles({ name:'recovered.lrc', mimeType:'text/plain', buffer:Buffer.from('[00:00]导入后第一行') });
   await dialog.getByRole('button', { name:'使用导入歌词', exact:true }).click(); await dialog.waitFor({ state:'detached' });
   await panel.getByRole('button', { name:'导入后第一行', exact:true }).waitFor();
@@ -152,7 +153,7 @@ test('mobile recovery of a failed first read restores the saved lyric timing wit
   control.stateError = false;
   await panel.getByRole('button', { name:'查找或导入歌词', exact:true }).click();
   const dialog = page.getByRole('dialog', { name:'选择歌词', exact:true });
-  await dialog.getByRole('button', { name:'清除当前歌词选择', exact:true }).waitFor();
+  await dialog.getByRole('button', { name:'预览 LRCLIB 恢复演示 42', exact:true }).waitFor();
   await dialog.getByRole('button', { name:'返回上一级', exact:true }).click();
   await panel.getByRole('button', { name:'恢复后继续听', exact:true }).click();
   await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 1.25) < .05);

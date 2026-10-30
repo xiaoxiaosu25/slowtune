@@ -15,6 +15,8 @@ async function openVersions(page, surface = page) {
   await source.getByRole('button', { name: '选择播放版本', exact: true }).click();
   await source.waitFor({ state: 'hidden' });
 }
+async function openLyricsSettings(page){await page.getByRole('button',{name:'更多播放选项',exact:true}).click();await page.getByRole('button',{name:'歌词管理',exact:true}).click();return page.getByRole('dialog',{name:'歌词设置',exact:true});}
+async function openOffset(settings){const details=settings.locator('.lyrics-offset');if(await details.getAttribute('open')===null)await details.locator('summary').click();}
 
 test('desktop versions, source facts, in-place audition and per-source lyric management', { timeout: 120000 }, async t => {
   const fixture = await startSongManagementFixture(); t.after(fixture.close);
@@ -50,7 +52,7 @@ test('desktop versions, source facts, in-place audition and per-source lyric man
   const record = () => page.evaluate(() => JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
   const before = await record();
   await openVersions(page);
-  const panel = page.getByRole('dialog', { name: '版本与歌词', exact: true }); await panel.waitFor();
+  const panel = page.getByRole('dialog', { name: '播放版本', exact: true }); await panel.waitFor();
   const live = panel.locator('.playback-version-card').filter({ hasText: '演唱会现场' });
   fail = true; const oldSource = await page.locator('audio').getAttribute('src');
   await live.getByRole('button', { name: '播放此版本', exact: true }).click();
@@ -76,59 +78,55 @@ test('desktop versions, source facts, in-place audition and per-source lyric man
   await panel.getByRole('button', { name: '试听', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000006'));
   assert.equal((await record()).current, before.current); assert.equal(fixture.library.read().snapshot.versions.some(version => version.ref.id === 'BV0000000006'), false);
-  await panel.getByRole('tab', { name: '歌词管理', exact: true }).click();
-  await panel.getByRole('button', { name: '延后 0.5 秒', exact: true }).click();
-  assert.equal(await panel.getByLabel('歌词延后秒数', { exact: true }).inputValue(), '0.5');
-  await panel.getByRole('button', { name: '关闭版本与歌词', exact: true }).click();
-  await openVersions(page);
-  await panel.getByRole('button', { name: '搜索其他版本', exact: true }).click(); await panel.getByRole('button', { name: '搜索', exact: true }).click(); await panel.getByRole('button', { name: '保存版本', exact: true }).waitFor();
-  await panel.getByRole('tab', { name: '歌词管理', exact: true }).click();
-  assert.equal(await panel.getByLabel('歌词延后秒数', { exact: true }).inputValue(), '0');
-  await panel.getByRole('button', { name: '延后 0.5 秒', exact: true }).click(); await panel.getByRole('button', { name: '保存偏移', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('.lyric-offset-value')?.textContent.includes('已保存'));
-  await panel.getByRole('button', { name: '更换或导入歌词', exact: true }).click(); await panel.getByRole('button', { name: '查找歌词', exact: true }).click();
-  await panel.getByRole('button', { name: /^预览 LRCLIB/ }).click(); await panel.getByText('候选歌词全文第二句', { exact: true }).waitFor();
-  assert.equal(stateFor({ id: 'BV0000000006', part: '10' }).document.title, '晴天原歌词');
-  await panel.getByRole('button', { name: '使用这份歌词', exact: true }).click();
-  await panel.getByText('晴天其他歌词 · LRCLIB', { exact: false }).waitFor();
-  await panel.getByRole('button', { name: '延后 0.5 秒', exact: true }).click(); await panel.getByRole('button', { name: '保存偏移', exact: true }).click();
-  await panel.getByRole('tab', { name: '播放版本', exact: true }).click();
-  assert.equal(await panel.getByLabel('版本搜索关键词', { exact: true }).inputValue(), '晴天 周杰伦');
   await panel.getByRole('button', { name: '保存版本', exact: true }).click();
   await panel.getByRole('button', { name: '已保存版本', exact: true }).waitFor();
   assert.equal(fixture.library.read().snapshot.songs.find(song => song.id === 'sun').defaultVersionId, 'studio');
-  await panel.getByRole('button', { name: '返回已保存版本', exact: true }).click();
+  await panel.getByRole('button',{name:'完成',exact:true}).click();
+  let settings=await openLyricsSettings(page);await openOffset(settings);
+  await settings.getByRole('button',{name:'延后 0.5 秒',exact:true}).click();
+  assert.equal(await settings.getByLabel('歌词延后秒数',{exact:true}).inputValue(),'0.5');
+  await settings.getByRole('button',{name:'关闭',exact:true}).click();
+  settings=await openLyricsSettings(page);await openOffset(settings);
+  assert.equal(await settings.getByLabel('歌词延后秒数',{exact:true}).inputValue(),'0');
+  await settings.getByRole('button',{name:'延后 0.5 秒',exact:true}).click();await settings.getByRole('button',{name:'保存偏移',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.lyric-offset-value')?.textContent.includes('已保存'));
+  await settings.getByRole('button',{name:'更换或导入歌词',exact:true}).click();
+  const picker=page.getByRole('dialog',{name:'选择歌词',exact:true});await picker.getByText('候选歌词全文第二句',{exact:true}).waitFor();
+  assert.equal(stateFor({id:'BV0000000006',part:'10'}).document.title,'晴天原歌词');
+  await picker.getByRole('button',{name:'使用这份歌词',exact:true}).click();await picker.waitFor({state:'detached'});
+  settings=await openLyricsSettings(page);await openOffset(settings);
+  await settings.locator('.lyrics-source').filter({hasText:'晴天其他歌词'}).waitFor();
+  await settings.getByRole('button',{name:'延后 0.5 秒',exact:true}).click();await settings.getByRole('button',{name:'保存偏移',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.lyric-offset-value')?.textContent.includes('已保存'));
+  await settings.getByRole('button',{name:'关闭',exact:true}).click();await openVersions(page);
   await panel.locator('.playback-version-card').filter({ hasText: '原唱 · 录音室' }).getByRole('button', { name: '播放此版本', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000001'));
-  await panel.getByRole('tab', { name: '歌词管理', exact: true }).click();
-  assert.equal(await panel.getByLabel('歌词延后秒数', { exact: true }).inputValue(), '0');
+  await panel.getByRole('button',{name:'完成',exact:true}).click();settings=await openLyricsSettings(page);await openOffset(settings);
+  assert.equal(await settings.getByLabel('歌词延后秒数',{exact:true}).inputValue(),'0');await settings.getByRole('button',{name:'关闭',exact:true}).click();
   const artifacts = join(developmentPaths().testRuntime, 'playback-management'); await mkdir(artifacts, { recursive: true });
-  await panel.getByRole('tab', { name: '播放版本', exact: true }).click();
+  await openVersions(page);
   await panel.locator('.playback-version-card').filter({ hasText: '晴天 · 2026音乐会' }).getByRole('button', { name: '播放此版本', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000006'));
-  await panel.getByRole('tab', { name: '歌词管理', exact: true }).click();
+  await panel.getByRole('button',{name:'完成',exact:true}).click();settings=await openLyricsSettings(page);await openOffset(settings);
   await page.waitForFunction(() => document.querySelector('[aria-label="歌词延后秒数"]')?.value === '0.5');
-  await panel.getByRole('tab', { name: '播放版本', exact: true }).click();
-  await panel.locator('.playback-version-card').filter({ hasText: '原唱 · 录音室' }).getByRole('button', { name: '播放此版本', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000001'));
-  await panel.getByRole('tab', { name: '歌词管理', exact: true }).click();
+  await settings.getByRole('button',{name:'关闭',exact:true}).click();await openVersions(page);
   await page.screenshot({ path: join(artifacts, 'lyrics-management.png'), animations: 'disabled' });
   for (const viewport of [{ width: 1280, height: 720 }, { width: 1000, height: 640 }, { width: 761, height: 600 }]) {
     await page.setViewportSize(viewport);
-    const play = await page.locator('.listening-transport .play-toggle').boundingBox();
-    assert(play.x >= 0 && play.y >= 0 && play.y + play.height <= viewport.height && play.x + play.width < viewport.width - Math.min(420, viewport.width * .44), 'the real transport stays accessible beside the management panel');
+    const box=await panel.boundingBox(),done=await panel.getByRole('button',{name:'完成',exact:true}).boundingBox();
+    assert(box.x>=0&&box.y>=0&&box.x+box.width<=viewport.width&&box.y+box.height<=viewport.height&&done.y+done.height<=box.y+box.height,'the independent version dialog and footer fit the viewport');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await page.screenshot({ path: join(artifacts, `management-${viewport.width}.png`), animations: 'disabled' });
   }
   await page.setViewportSize({ width: 1440, height: 960 });
-  await panel.getByRole('button', { name: '关闭版本与歌词', exact: true }).click();
+  await panel.getByRole('button', { name: '完成', exact: true }).click();
   await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).click();
   await openVersions(page, page.locator('.desktop-lyrics-view'));
-  assert.equal(await panel.getByRole('tab', { name: '播放版本', exact: true }).getAttribute('aria-selected'), 'true');
+  assert.equal(await panel.getByRole('tab').count(),0);
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '校准时间', exact: true }).click(); await page.locator('.lyric-offset-popover [popover]:popover-open').getByLabel('歌词延后秒数', { exact: true }).waitFor();
   await page.keyboard.press('Escape'); assert.equal(await page.locator('.lyric-offset-popover [popover]:popover-open').count(), 0); assert.equal(await panel.count(), 0); assert.equal(await page.locator('.desktop-lyrics-view').isVisible(), true);
-  await page.getByRole('button', { name: '更换歌词', exact: true }).click(); await panel.getByRole('button', { name: '查找歌词', exact: true }).waitFor();
+  await page.getByRole('button', { name: '更换歌词', exact: true }).click(); await picker.getByRole('button', { name: '查找歌词', exact: true }).waitFor();
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await page.screenshot({ path: join(artifacts, 'playing-desktop.png'), animations: 'disabled' });
   assert.deepEqual(errors, []);
@@ -147,14 +145,12 @@ test('unowned source auditions replace the current occurrence and never create l
   await page.goto(fixture.origin); await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await page.locator('.listening-transport .play-toggle').click(); await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .1);
   const before = fixture.library.read();
-  await openVersions(page); const panel = page.getByRole('dialog', { name: '版本与歌词', exact: true });
+  await openVersions(page); const panel = page.getByRole('dialog', { name: '播放版本', exact: true });
   await panel.getByRole('button', { name: '搜索其他版本', exact: true }).click(); await panel.getByRole('button', { name: '搜索', exact: true }).click(); await panel.getByRole('button', { name: '试听', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000007'));
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
   assert.equal(after.current, 'unowned'); assert.equal(after.items.length, 1); assert.equal(after.items[0].selection.ref.id, other.ref.id); assert.deepEqual(fixture.library.read(), before);
-  await panel.getByRole('tab', { name: '歌词管理', exact: true }).click(); await panel.getByText('这份歌词没有时间轴，可更换或导入带时间轴的歌词后校准。', { exact: true }).waitFor();
-  assert.equal(await panel.getByRole('button', { name: '提前 0.5 秒', exact: true }).count(), 0);
-  await panel.getByRole('tab', { name: '播放版本', exact: true }).click(); await panel.getByRole('button', { name: '保存版本', exact: true }).click();
+  await panel.getByRole('button', { name: '保存版本', exact: true }).click();
   await page.getByRole('dialog', { name: '归入歌曲', exact: true }).waitFor(); assert.deepEqual(fixture.library.read(), before);
 });
 
@@ -184,19 +180,18 @@ for (const action of ['select', 'import']) test(`closing lyric management during
   const source = await page.locator('audio').getAttribute('src');
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('button', { name: '歌词管理', exact: true }).click();
-  const panel = page.getByRole('dialog', { name: '版本与歌词', exact: true });
-  await panel.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
+  const settings=page.getByRole('dialog',{name:'歌词设置',exact:true});
+  await settings.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
+  const panel=page.getByRole('dialog',{name:'选择歌词',exact:true});
   if (action === 'select') {
-    await panel.getByRole('button', { name: '查找歌词', exact: true }).click();
-    await panel.getByRole('button', { name: /^预览 LRCLIB/ }).click();
     await panel.getByRole('button', { name: '使用这份歌词', exact: true }).click();
   } else {
-    await panel.getByText('导入或粘贴歌词', { exact: true }).click();
+    await panel.getByText('导入歌词', { exact: true }).click();
     await panel.getByLabel('粘贴歌词正文', { exact: true }).fill('[00:00]保存后的歌词');
     await panel.getByRole('button', { name: '使用导入歌词', exact: true }).click();
   }
   await submitted;
-  await panel.getByRole('button', { name: '关闭版本与歌词', exact: true }).click();
+  await panel.getByRole('button', { name: '关闭', exact: true }).click();
   assert.equal(await page.getByRole('dialog').count(), 0);
   release();
   await page.getByRole('region', { name: '底部歌词', exact: true }).getByText('保存后的歌词', { exact: true }).waitFor();
@@ -205,5 +200,5 @@ for (const action of ['select', 'import']) test(`closing lyric management during
   assert.equal(await page.locator('audio').evaluate(audio => audio.paused), false);
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   await page.getByRole('button', { name: '歌词管理', exact: true }).click();
-  await panel.locator('.lyrics-source').filter({ hasText: '保存后的歌词' }).waitFor();
+  await settings.locator('.lyrics-source').filter({ hasText: '保存后的歌词' }).waitFor();
 });

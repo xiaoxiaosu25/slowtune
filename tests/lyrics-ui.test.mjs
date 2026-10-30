@@ -123,7 +123,7 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '选择歌词', exact: true });
   assert.equal(await dialog.getByLabel('歌词歌名').inputValue(), '测试歌曲');
-  await dialog.getByRole('button', { name: '查找歌词', exact: true }).click(); await dialog.getByRole('button', { name: '预览 LRCLIB 测试歌曲 123', exact: true }).click();
+  await dialog.getByRole('button', { name: '预览 LRCLIB 测试歌曲 123', exact: true }).click();
   await dialog.getByRole('region', { name: '歌词预览', exact: true }).waitFor(); assert.equal(lyrics.read(ref).document.id, '123');
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
@@ -227,19 +227,20 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   assert.equal(await panel.locator('.lyric-text.is-current .lyric-ink').first().evaluate(element => getComputedStyle(element).backgroundImage), 'none');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.getByRole('button', { name: '播放', exact: true }).click();
+  await page.route('**/api/lyrics/document', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"code":"upstream"}}' }));
   await page.setViewportSize({ width: 740, height: 1000 }); await openSettings(page); await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   dialog = page.getByRole('dialog', { name: '选择歌词', exact: true });
-  await page.route('**/api/lyrics/document', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"code":"upstream"}}' }));
+  await dialog.getByRole('button',{name:'修改搜索',exact:true}).click();await dialog.getByRole('button',{name:'查找歌词',exact:true}).click();
   await dialog.getByRole('button', { name: '预览 LRCLIB 测试歌曲 123', exact: true }).click(); await dialog.getByRole('alert').waitFor(); assert.equal(lyrics.read(ref).document.id, '123');
   assert.equal(await page.locator('audio').evaluate(a => a.paused), false); await page.unroute('**/api/lyrics/document');
   const gate = new Promise(resolve => release = resolve); await page.route('**/api/lyrics/document', async route => { await gate; await route.continue().catch(() => {}); });
-  await dialog.getByRole('button', { name: '预览 LRCLIB 测试歌曲 123', exact: true }).click(); await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await dialog.getByRole('button', { name: '返回候选', exact: true }).click();await dialog.getByRole('button', { name: '预览 LRCLIB 测试歌曲 123', exact: true }).click(); await dialog.getByRole('button', { name: '取消预览', exact: true }).click();
   await page.keyboard.press('Escape'); release(); await page.unroute('**/api/lyrics/document');
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
   await page.getByRole('button', { name: '选择播放版本 测试歌曲', exact: true }).click(); await page.getByRole('button', { name: '播放此版本', exact: true }).nth(1).click(); await page.keyboard.press('Escape');
   await page.waitForFunction(() => /part=901/.test(document.querySelector('audio').currentSrc));
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click(); await openSettings(page); await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
-  dialog = page.getByRole('dialog', { name: '选择歌词', exact: true }); await dialog.getByText('导入或粘贴歌词', { exact: true }).click();
+  dialog = page.getByRole('dialog', { name: '选择歌词', exact: true }); await dialog.getByText('导入歌词', { exact: true }).click();
   // Model a first observer notification delivered only after the reading area's size changes.
   await page.evaluate(() => {
     window.__originalLyricResizeObserver = window.ResizeObserver;
@@ -268,7 +269,7 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
   await page.getByRole('button',{name:'搜索歌曲或视频',exact:true}).click(); await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('未收藏来源'); await page.getByRole('button', { name: '搜索', exact: true }).click(); await page.getByRole('button', { name: '播放 未收藏来源', exact: true }).click();
   await page.waitForFunction(() => /part=902/.test(document.querySelector('audio').currentSrc)); assert.equal(await page.getByRole('button', { name: '保持本 P', exact: true }).count(),0); await page.getByRole('button', { name: '关闭搜索', exact: true }).click(); await page.getByRole('button', { name: '打开正在播放', exact: true }).click(); await openSettings(page); await page.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
-  dialog = page.getByRole('dialog', { name: '选择歌词', exact: true }); await dialog.getByText('导入或粘贴歌词', { exact: true }).click();
+  dialog = page.getByRole('dialog', { name: '选择歌词', exact: true }); await dialog.getByText('导入歌词', { exact: true }).click();
   await dialog.getByLabel('导入歌词文件').setInputFiles({ name: 'lyrics.lrc', mimeType: 'text/plain', buffer: Buffer.from('纯文本歌词\n第二行文本') });
   await dialog.getByRole('button', { name: '使用导入歌词', exact: true }).click(); await dialog.waitFor({ state: 'detached' });
   await panel.getByLabel('歌词正文').getByText('纯文本歌词', { exact: true }).waitFor(); assert.equal(await panel.locator('.lyrics-offset').count(), 0);

@@ -74,8 +74,16 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   assert(Math.abs(vinyl.width - disc.width) < 1, 'immersive vinyl matches the round cover diameter');
   assert.equal(await page.locator('.desktop-lyrics-song').evaluate(el => getComputedStyle(el).textAlign), 'center');
   assert.equal(await page.locator('.desktop-lyrics-host').evaluate(el => getComputedStyle(el).fontSize), '28px');
-  for (let i = 0; i < 6; i++) { lyricModes.push(await lyricArtwork.getAttribute('data-visual-mode')); await lyricArtwork.click(); }
-  assert.deepEqual(lyricModes, ['vinyl', 'original', 'square', 'disc', 'spectrum', 'halo']);
+  for (let i = 0; i < 5; i++) {
+    const visual = await lyricArtwork.getAttribute('data-visual-mode');
+    lyricModes.push(visual);
+    if (visual === 'spectrum') {
+      const wave = await region(page).locator('.playing-art-frequency .playing-spectrum').boundingBox();
+      assert(Math.abs(wave.width - disc.width) < 1, 'immersive horizontal spectrum matches the round cover width');
+    }
+    await lyricArtwork.click();
+  }
+  assert.deepEqual(lyricModes, ['vinyl', 'square', 'disc', 'spectrum', 'halo']);
   assert.equal(await lyricArtwork.getAttribute('data-visual-mode'), 'vinyl');
   await region(page).getByRole('button', { name: '查看完整标题：' + fixture.tracks[0].title, exact: true }).click();
   await page.getByRole('dialog', { name: '完整标题', exact: true }).waitFor();
@@ -100,7 +108,7 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   await page.getByRole('dialog', { name: '播放队列', exact: true }).waitFor();
   await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true);
   await region(page).getByRole('button', { name: '更多播放选项', exact: true }).click(); await page.getByRole('button', { name: '歌词管理', exact: true }).click();
-  await page.getByRole('dialog', { name: '版本与歌词', exact: true }).waitFor(); await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true);
+  await page.getByRole('dialog', { name: '歌词设置', exact: true }).waitFor(); await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true);
   await page.getByLabel('沉浸歌词正文', { exact: true }).dispatchEvent('wheel', { deltaY: 220 });
   await page.getByRole('button', { name: '回到当前行', exact: true }).waitFor();
   await page.waitForTimeout(900); assert.equal(await page.getByRole('button', { name: '回到当前行', exact: true }).isVisible(), true);
@@ -134,26 +142,28 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
     await page.screenshot({ path: join(artifactDir, `immersive-${palette}-${theme}.png`), animations: 'disabled' });
   }
   await page.evaluate(() => { document.documentElement.dataset.palette = 'paper'; document.documentElement.dataset.theme = 'dark'; });
-  await lyricArtwork.click(); assert.equal(await lyricArtwork.getAttribute('data-visual-mode'), 'original');
+  await lyricArtwork.click(); assert.equal(await lyricArtwork.getAttribute('data-visual-mode'), 'square');
   await region(page).getByRole('button', { name: '返回普通播放', exact: true }).click();
   await page.waitForFunction(() => !document.querySelector('.desktop-lyrics-view'));
   await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '打开沉浸歌词');
   assert.equal(await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).evaluate(e => e === document.activeElement), true);
-  assert.equal(await page.locator('.playing-art-switch').getAttribute('data-visual-mode'), 'original', 'returning retains the artwork style selected in lyric mode');
-  for (let i = 0; i < 5; i++) await page.locator('.playing-art-switch').click();
+  assert.equal(await page.locator('.playing-art-switch').getAttribute('data-visual-mode'), 'square', 'returning retains the artwork style selected in lyric mode');
+  for (let i = 0; i < 4; i++) await page.locator('.playing-art-switch').click();
   assert.deepEqual(await geometry(page), normal, 'normal layout survives the full-screen mode unchanged');
   assert.equal(await page.locator('audio').getAttribute('src'), source); assert.equal(fixture.preparations.length, prepares); assert.equal(requests.length, lyricReads);
-  // Both layouts retain six artwork modes; mobile lyrics have a separate direct control.
+  // Both layouts retain five artwork modes; mobile lyrics have a separate direct control.
   const mode = page.locator('.playing-art-switch'), modes = [];
-  for (let i = 0; i < 6; i++) { modes.push(await mode.getAttribute('data-visual-mode')); await mode.click(); }
-  assert.deepEqual(modes, ['vinyl', 'original', 'square', 'disc', 'spectrum', 'halo']); assert.equal(await mode.getAttribute('data-visual-mode'), 'vinyl');
+  for (let i = 0; i < 5; i++) { modes.push(await mode.getAttribute('data-visual-mode')); await mode.click(); }
+  assert.deepEqual(modes, ['vinyl', 'square', 'disc', 'spectrum', 'halo']); assert.equal(await mode.getAttribute('data-visual-mode'), 'vinyl');
   await open(page); await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => !document.querySelector('.desktop-lyrics-view'));
   assert.equal(await page.locator(selector).count(), 0); assert.equal(await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).count(), 0);
   assert.equal(await mode.isDisabled(),true,'mobile artwork styles use the named selector');
   await page.getByRole('button',{name:'更多播放选项',exact:true}).click();
   const mobileOptions=page.getByRole('dialog',{name:'更多播放选项',exact:true});
-  for(const visual of ['original','square','disc','spectrum','halo','vinyl'])await mobileOptions.getByRole('combobox',{name:'封面样式',exact:true}).selectOption(visual);
+  const styleOptions = mobileOptions.getByRole('combobox',{name:'封面样式',exact:true});
+  assert.deepEqual(await styleOptions.locator('option').evaluateAll(options=>options.map(option=>option.value)), ['vinyl','square','disc','spectrum','halo']);
+  for(const visual of ['square','disc','spectrum','halo','vinyl'])await styleOptions.selectOption(visual);
   await mobileOptions.getByRole('button',{name:'关闭',exact:true}).click();assert.equal(await mode.getAttribute('data-visual-mode'),'vinyl');
   await page.getByRole('button',{name:'查看歌词',exact:true}).click(); await page.locator('.mobile-player.is-lyrics').waitFor();
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -306,7 +316,7 @@ test('split lyric artwork shares the live audio graph and handles long titles an
     await artwork.click();
   }
   assert.equal(await artwork.getAttribute('data-visual-mode'), 'vinyl');
-  await artwork.click(); await artwork.click();
+  await artwork.click();
   assert.equal(await artwork.getAttribute('data-visual-mode'), 'square');
   await region(page).locator('.playing-art-square .unknown-cover').waitFor();
   await region(page).getByRole('button', { name: '查看完整标题：' + fixture.tracks[0].title, exact: true }).click();

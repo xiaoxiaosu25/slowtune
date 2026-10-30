@@ -75,17 +75,17 @@ import { useLyrics } from './useLyrics';
 import { PreferSongAction } from './SearchPreferences';
 import { DesktopLyricsView, LyricsToggle } from './DesktopLyricsView';
 import { DesktopLyricFont } from './DesktopLyricFont';
+import { DesktopLyricMotion } from './DesktopLyricMotion';
 import { PlaybackSource } from './PlaybackSource';
-import type { PlaybackManagementTab } from './PlaybackManagement';
 import type { ComponentProps } from 'react';
 import { DesktopRegion, desktopFeature } from './DesktopRegion';
-import { PlaybackManagement as managementUrl } from 'virtual:desktop-feature-urls';
+import { PlaybackVersionsDialog as managementUrl } from 'virtual:desktop-feature-urls';
 import { PagedList } from './Pagination';
 import { useDesktopHost } from './desktop-host';
 import { useDesktopWindowMode } from './desktop-chrome';
 import { preferredSong, searchPreferredVersions, searchFilterReasons, songSearchText, type SearchConfig, type SearchSettings, type SearchPage, type PreferredSong, type SongQuery } from '../server/search-policy';
 
-const PlaybackManagement = desktopFeature<ComponentProps<typeof import('./PlaybackManagement').PlaybackManagement>>(managementUrl, 'PlaybackManagement', '版本与歌词', false);
+const PlaybackVersionsDialog = desktopFeature<ComponentProps<typeof import('./PlaybackVersionsDialog').PlaybackVersionsDialog>>(managementUrl, 'PlaybackVersionsDialog', '播放版本');
 const names={all:'全部',bilibili:'B站',youtube:'YouTube 视频'};
 const nav=[{id:'discover',label:'发现',icon:CompassIcon},{id:'charts',label:'音乐榜单',icon:MusicNotesIcon},{id:'follows',label:'关注',icon:UsersIcon},{id:'library',label:'歌单',icon:ListBulletsIcon}];
 const favoritesId='system:favorites';
@@ -108,7 +108,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const [statusCheckedAt,setStatusCheckedAt]=useState<number>();
   const [desktop,setDesktop]=useState(()=>window.matchMedia('(min-width:761px)').matches);
   const mobilePageOpen=useMobilePageOpen(),pagesSuspended=useMobilePagesSuspended();
-  const mobileVisuals={vinyl:'唱片',original:'原图',square:'方形',disc:'圆形',spectrum:'音波',halo:'音环'} as const;
+  const mobileVisuals={vinyl:'唱片',square:'方形',disc:'圆形',spectrum:'音波',halo:'音环'} as const;
   type MobileVisual=keyof typeof mobileVisuals;
   const [mobileVisual,setMobileVisual]=useState<MobileVisual>(()=>{try{const mode=preferenceStorage().getItem('slow-listening:mobile-playing-visual:v1')??preferenceStorage().getItem('slow-listening:playing-visual:v1');return mode&&mode in mobileVisuals?mode as MobileVisual:'vinyl';}catch{return 'vinyl';}});
   useEffect(()=>{const sync=(event:StorageEvent)=>{if(event.key!=='slow-listening:mobile-playing-visual:v1'&&event.key!==null)return;try{if(event.storageArea!==preferenceStorage())return;const mode=preferenceStorage().getItem('slow-listening:mobile-playing-visual:v1');setMobileVisual(mode&&mode in mobileVisuals?mode as MobileVisual:'vinyl');}catch{}};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);},[]);
@@ -179,9 +179,8 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const cancelPlayback=()=>{++playRequestSerial.current;preparationRetry.current=undefined;if(desktop&&playAction?.loading){playAction.controller.abort();setActionBusy(false);}setPlayAction(undefined);playback.cancel();};
   const preparingPlayback=playback.preparing||snapshot.loading||!!(desktop&&playAction?.loading);
   const [desktopLyrics,setDesktopLyrics]=useState(false);
-  const [management,setManagement]=useState<PlaybackManagementTab>();
-  const managementSection=useRef<'select'|'offset'|undefined>(undefined);
-  const managementVisible=desktop&&page==='playing'&&!!management;
+  const [versionsOpen,setVersionsOpen]=useState(false);
+  const versionsVisible=desktop&&page==='playing'&&versionsOpen;
   const desktopLyricsOpen=desktop&&page==='playing'&&desktopLyrics;
   useDesktopWindowMode(desktopLyricsOpen?'immersive':'standard');
   const lyricToggleOrigin=useRef<HTMLElement|null>(null);
@@ -287,7 +286,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   };
   // 设置页会卸载发现栏目；保存规则后准备新批次，返回时读取该批次。
   const refreshYoutubeCandidates=async()=>{if(!status?.providers.youtube.available)return;try{await request(youtubeMusicPath(readYoutubeRegion(),{refresh:true}));}catch{/* 候选池补取失败时，随后的预览／保存会把原因报给用户。 */}};
-  const toggleListeningPanel=(panel:'queue'|'comments')=>{if(management)closeManagement();const switching=listeningPanel!==panel;setListeningPanel(panel);setQueueOpen(value=>switching||!value);};
+  const toggleListeningPanel=(panel:'queue'|'comments')=>{setVersionsOpen(false);const switching=listeningPanel!==panel;setListeningPanel(panel);setQueueOpen(value=>switching||!value);};
   const toggleQueue=()=>{if(page==='playing'){toggleListeningPanel('queue');return;}setQueueOpen(value=>!value);};
   const open=(p:Popup|{type:'queue'}|{type:'playing'})=>{if(p.type==='queue'){toggleQueue();return;}if(p.type==='playing'){if(page!=='playing'){setListeningReturnPage(desktop?(page==='library'?mobilePlaylistRoute(selected):page):mobileRoute);listeningReturnScroll.current=window.scrollY;}if(!desktop)setSearchOpen(false);setListeningPanel('queue');setPage('playing');if(desktop)window.scrollTo(0,0);return;}actionWork.current?.abort();setActionBusy(false);setError('');setField(p.type==='rename'?lib?.snapshot.playlists.find(x=>x.id===p.id)?.name??'':'');const cached=p.track?partsStore.peek(p.track.ref.id):undefined;setPopup({...p,session:++modalSession.current,...(p.track?{parts:p.parts??cached?.parts,entryContext:p.entryContext??(p.track.songId?'part':'video')}:{})});};
   useEffect(()=>()=>partsStore.dispose(),[partsStore]);
@@ -566,11 +565,12 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const lyrics=useLyrics(lyricTrack,snapshot.duration,lib?.snapshot.versions.find(version=>version.id===current?.versionId),snapshot.state!=='idle'&&snapshot.state!=='stopped');
   const currentVersion=lib?.snapshot.versions.find(version=>current&&key(version.ref)===key(current.ref));
   const currentSong=lib?.snapshot.songs.find(song=>song.id===(current?.songId??currentVersion?.songId));
-  const closeManagement=()=>{setManagement(undefined);lyrics.closeSettings();};
-  const openManagement=(tab:PlaybackManagementTab,section?:'select'|'offset')=>{managementSection.current=section;setQueueOpen(false);setManagement(tab);lyrics.openSettings();if(section==='select')lyrics.setSelector(true);};
-  const openLyricsManagement=()=>{if(desktop&&page==='playing')openManagement('lyrics');else lyrics.openSettings();};
-  useEffect(()=>{if(!managementVisible){if(management){setManagement(undefined);lyrics.closeSettings();}return;}lyrics.openSettings();if(managementSection.current==='select')lyrics.setSelector(true);managementSection.current=undefined;},[managementVisible,lyrics.sourceKey]);
-  const desktopSongMeta=()=>current?<><div className="playing-artist"><span>{current.artists?.join(' / ')||'歌手未提供'}</span></div><PlaybackSource key={key(current.ref)} track={current} version={currentVersion} store={partsStore} onVersions={()=>openManagement('versions')} versionsOpen={managementVisible&&management==='versions'}/></>:<p className="muted">从发现、搜索或歌单添加音乐</p>;
+  const openVersions=()=>{setQueueOpen(false);lyrics.closeSettings();setVersionsOpen(true);};
+  const openLyricsManagement=()=>{setVersionsOpen(false);setQueueOpen(false);lyrics.openSettings();};
+  const chooseLyrics=()=>{setVersionsOpen(false);setQueueOpen(false);lyrics.openSelector();};
+  useEffect(()=>{if(!desktop||page!=='playing')setVersionsOpen(false);},[desktop,page]);
+  const desktopSongMeta=()=>current?<><div className="playing-artist"><span>{current.artists?.join(' / ')||'歌手未提供'}</span></div><PlaybackSource key={key(current.ref)} track={current} version={currentVersion} store={partsStore} onVersions={openVersions} versionsOpen={versionsVisible}/></>:<p className="muted">从发现、搜索或歌单添加音乐</p>;
+  const dialogPlaybackControl=<button className="btn btn-icon" aria-label={preparingPlayback?'取消播放准备':snapshot.playing?'暂停当前播放':'继续当前播放'} title={snapshot.playing?'暂停当前播放':'继续当前播放'} disabled={!snapshot.items.length&&!preparingPlayback} onClick={()=>preparingPlayback?cancelPlayback():void startPlayback(()=>playback.toggle(),false)}>{preparingPlayback?<SpinnerGapIcon size={20}/>:snapshot.playing?<PauseIcon size={20} weight="fill"/>:<PlayIcon size={20} weight="fill"/>}</button>;
   const lyricPlayback:LyricPlayback={position:snapshot.position,duration:snapshot.duration,playing:snapshot.playing&&!snapshot.loading,readPosition:playback.readPosition,...(desktop?{subscribePosition:playback.clock.subscribe}:{})};
   const desktopHost=useDesktopHost(lyrics,lyricPlayback,snapshot.state!=='idle'&&snapshot.state!=='stopped',{toggle:()=>preparingPlayback?cancelPlayback():startPlayback(()=>playback.toggle(),false),previous:()=>startPlayback(()=>playback.previous(),false),next:()=>startPlayback(()=>playback.next(),false),release:playback.release},issue=>setError(errorText(issue)));
   const bottomLyricsVisible=desktop&&!desktopHost.available&&!!lyricTrack&&lyrics.bottom&&snapshot.state!=='idle'&&snapshot.state!=='stopped';
@@ -644,7 +644,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     {desktop&&!desktopHost.available&&<label className="choice popover-lyrics-choice"><input type="checkbox" checked={lyrics.bottom} onChange={event=>lyrics.updateDisplay({bottom:event.target.checked})}/>底部歌词</label>}
     {desktopHost.available&&<label className="choice popover-lyrics-choice"><input type="checkbox" checked={desktopHost.visible} onChange={desktopHost.toggle}/>桌面悬浮歌词</label>}
     <button onClick={event=>{event.currentTarget.closest('.control-popover')?.querySelector<HTMLButtonElement>('button[popovertarget]')?.focus();openLyricsManagement();}}><MusicNotesIcon size={19}/>{desktop&&page==='playing'?'歌词管理':'歌词设置'}</button>
-    {desktop&&page==='playing'&&<DesktopLyricFont/>}
+    {desktop&&page==='playing'&&<><DesktopLyricFont/><DesktopLyricMotion lyrics={lyrics}/></>}
     {desktopLyricsOpen&&<><label className="choice popover-lyrics-choice"><input type="checkbox" checked={lyrics.translations} onChange={event=>lyrics.updateDisplay({translations:event.target.checked})}/>显示翻译</label><a href="/legal/desktop-lyrics-source.tar.gz" download="slowtune-desktop-lyrics-source.tar.gz">下载当前构建对应源码</a><a href="/legal/THIRD-PARTY-NOTICES.txt" download>下载第三方许可全文</a></>}
     {!dock&&page==='playing'&&<div className="popover-listening-extras"><div className="popover-seek">{seekButtons()}</div><div className="popover-volume">{volume}</div></div>}
     {!dock&&page==='playing'&&<div className="popover-short-settings">{rateControl(true)}{sleepButton(true)}<button className="btn btn-ghost" aria-label="播放队列" aria-expanded={queueVisible} onClick={toggleQueue}><QueueIcon size={19}/>播放队列</button></div>}
@@ -778,7 +778,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const mobileSecondary=!desktop&&(mobilePageOpen||page==='settings'||page==='search'||page==='playlist'||page==='follows'&&!!followView.selected);
   const mobilePlayerEmpty=!current&&!snapshot.items.length&&!playback.preparing&&!snapshot.loading&&!playback.error;
   const mobilePlaylistTitle=selected===favoritesId?'我的收藏':lib?.snapshot.playlists.find(playlist=>playlist.id===selected)?.name;
-  return <YoutubeEnabledContext.Provider value={youtubeEnabled}><ArtworkContext.Provider value={knownArtworks}><div className={'app '+(page==='playing'?'immersive ':'')+(mobilePlayerEmpty?'mobile-player-empty ':'')+(mobileSecondary?'mobile-secondary-open ':'')+(!desktop&&mobilePageOpen?'mobile-page-open ':'')+(page==='settings'&&!desktop?'mobile-settings-open ':'')+(page==='search'&&!desktop?'mobile-search-open ':'')+(queueVisible?'has-queue ':'')+(managementVisible?'has-playback-management ':'')+(desktopLyricsOpen?'desktop-lyrics-open ':'')+(bottomLyricsVisible?'has-bottom-lyrics ':'')} data-layout={desktop?'desktop':'mobile'} data-player-style={playerStyle}>
+  return <YoutubeEnabledContext.Provider value={youtubeEnabled}><ArtworkContext.Provider value={knownArtworks}><div className={'app '+(page==='playing'?'immersive ':'')+(mobilePlayerEmpty?'mobile-player-empty ':'')+(mobileSecondary?'mobile-secondary-open ':'')+(!desktop&&mobilePageOpen?'mobile-page-open ':'')+(page==='settings'&&!desktop?'mobile-settings-open ':'')+(page==='search'&&!desktop?'mobile-search-open ':'')+(queueVisible?'has-queue ':'')+(desktopLyricsOpen?'desktop-lyrics-open ':'')+(bottomLyricsVisible?'has-bottom-lyrics ':'')} data-layout={desktop?'desktop':'mobile'} data-player-style={playerStyle}>
 		    {page!=='playing'&&<aside className="sidebar"><button className="brand" aria-label="慢听" onClick={()=>navigate('discover')}><span className="brand-mark"><HeadphonesIcon size={22} weight="bold"/></span><span className="brand-wordmark">{brand.name}<small>{brand.english.toUpperCase()}</small></span></button><nav className="sidebar-nav" aria-label="主导航">{nav.map(n=><button key={n.id} className={'nav-item '+(page===n.id?'active':'')} aria-current={page===n.id?'page':undefined} onClick={()=>navigate(n.id)}><n.icon size={22} weight={page===n.id?'fill':'regular'}/><span>{n.label}</span></button>)}</nav><div className="sidebar-library"><div className="sidebar-heading"><span>我的歌单</span><button className="btn btn-icon" aria-label="新建歌单" title="新建歌单" disabled={!lib} onClick={()=>open({type:'new'})}><PlusIcon size={19}/></button></div><div className="sidebar-playlist-item"><button className={'sidebar-playlist '+(page==='library'&&selected===favoritesId?'active':'')} onClick={()=>{setSelected(favoritesId);navigate('library');}}>{desktopFavoriteCover??<span className="sidebar-favorite-art" aria-hidden="true"><HeartIcon size={23} weight="fill"/></span>}<span><strong>我的收藏</strong><small>{lib?lib.snapshot.favorites.length+' 首':libraryError?'暂不可用':'读取中…'}</small></span></button>{desktop&&lib&&sidebarPlaylistMenu(favoritesId)}</div>{desktop?desktopSidebarPlaylists:lib?.snapshot.playlists.map(p=><button className={'sidebar-playlist '+(page==='library'&&selected===p.id?'active':'')} key={p.id} onClick={()=>{setSelected(p.id);navigate('library');}}><SongCover song={lib.snapshot.songs.find(song=>song.id===p.entries[0]?.songId)}/><span><strong className="playlist-label">{p.name}</strong><small>{p.entries.length} 首</small></span></button>)}{lib&&!lib.snapshot.playlists.length&&<p className="sidebar-empty">把喜欢的音乐整理成歌单</p>}</div>
 	{desktop&&globalTools('desktop-tools')}</aside>}
 {desktop?<header className={'topbar'+(page==='playing'?' listening-header':'')} inert={desktopLyricsOpen}>
@@ -857,11 +857,11 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     {mobileSettingsOpened&&<MobileSettings {...settingsProps} active={!desktop&&page==='settings'} section={mobileSection} onSection={openMobileSettings}/>}
     </DesktopRegion></main>
 {desktop&&page!=='playing'&&bottomLyricsVisible&&<BottomLyrics lyrics={lyrics} playback={lyricPlayback} compact desktop/>}
-{desktopLyricsOpen&&<DesktopLyricsView onManage={section=>openManagement('lyrics',section)} lyrics={lyrics} playback={lyricPlayback} artwork={currentArtwork} onClose={closeDesktopLyrics} onSeek={seconds=>void playback.seek(seconds)} visual={<PlayingArtwork artwork={currentArtwork} playing={snapshot.playing&&!snapshot.loading&&!lyrics.focus} muted={snapshot.muted||snapshot.volume===0} analysis={playback.audioAnalysis} allowLyrics={false} desktop suspended={lyrics.focus}/>} songInfo={<><PlayingTitle key={current?.resourceId} title={current?displayTitle(current):undefined} fullTitle={current?.title}/><div className="playing-song-copy">{desktopSongMeta()}</div></>} controls={<>
+{desktopLyricsOpen&&<DesktopLyricsView onChooseLyrics={chooseLyrics} lyrics={lyrics} playback={lyricPlayback} artwork={currentArtwork} onClose={closeDesktopLyrics} onSeek={seconds=>void playback.seek(seconds)} visual={<PlayingArtwork artwork={currentArtwork} playing={snapshot.playing&&!snapshot.loading} muted={snapshot.muted||snapshot.volume===0} analysis={playback.audioAnalysis} allowLyrics={false} desktop/>} songInfo={<><PlayingTitle key={current?.resourceId} title={current?displayTitle(current):undefined} fullTitle={current?.title}/><div className="playing-song-copy">{desktopSongMeta()}</div></>} controls={<>
 {progress()}{playbackSlot}<div className="desktop-lyrics-tools">{modeButton()}{volume}</div>{transport(true)}<div className="desktop-lyrics-tools"><button className="btn btn-icon" aria-label="播放队列" title="播放队列" aria-expanded={queueVisible} onClick={toggleQueue}><QueueIcon size={24}/></button>{current&&<button className={'btn btn-icon '+(isFavorite(current)?'saved':'')} title={isFavorite(current)?'取消收藏当前歌曲':'收藏当前歌曲'} aria-label="收藏当前歌曲" aria-pressed={isFavorite(current)} aria-busy={favoritePending(current)||undefined} disabled={saving||!lib||favoritePending(current)} onClick={()=>favorite(current,true,'part')}>{favoritePending(current)?<SpinnerGapIcon size={22} className="favorite-spinner"/>:<HeartIcon size={24} weight={isFavorite(current)?'fill':'regular'}/>}</button>}<LyricsToggle active onClick={toggleDesktopLyrics}/>{playerOptions(true)}</div>
 </>}/>}
-{!managementVisible&&<LyricsSettings lyrics={lyrics} desktopImmersive={desktop} nativeDesktop={desktopHost.available}/>}
-{managementVisible&&<PlaybackManagement tab={management!} onTab={setManagement} onClose={closeManagement} current={current} song={currentSong} library={lib} youtubeEnabled={youtubeEnabled} nativeDesktop={desktopHost.available} lyrics={lyrics} preparing={preparingPlayback} saving={saving} playbackError={playback.error} onPlay={(selection,song)=>startPlayback(()=>playback.playSelection(selection,song,true))} onSave={(track,song)=>song?mutate({save:{refs:[track.ref],target:'version',songId:song.id}},false):groupSource(track)} onDefault={(song,version)=>mutate({edits:[{type:'set-default',songId:song.id,versionId:version.id}]},false)}/>}
+<LyricsSettings lyrics={lyrics} desktopImmersive={desktop} nativeDesktop={desktopHost.available} playbackControl={desktop?dialogPlaybackControl:undefined}/>
+{versionsVisible&&<PlaybackVersionsDialog onClose={()=>setVersionsOpen(false)} current={current} song={currentSong} library={lib} youtubeEnabled={youtubeEnabled} preparing={preparingPlayback} saving={saving} playbackError={playback.error} playbackControl={dialogPlaybackControl} onPlay={(selection,song)=>startPlayback(()=>playback.playSelection(selection,song,true))} onSave={(track,song)=>song?mutate({save:{refs:[track.ref],target:'version',songId:song.id}},false):groupSource(track)} onDefault={(song,version)=>mutate({edits:[{type:'set-default',songId:song.id,versionId:version.id}]},false)}/>}
 {queueVisible&&(compactQueue||desktopLyricsOpen?<Modal title={page==='playing'&&listeningPanel==='comments'?'视频评论':'播放队列'} className="queue-drawer" showHeader={false} onClose={closeQueue}>{page==='playing'?listeningSidePanel():queuePanel()}</Modal>:page==='playing'?listeningSidePanel():queuePanel())}
 {desktop&&page!=='playing'&&<footer className="playbar" aria-label="播放器">
 <div className="playbar-inner">
