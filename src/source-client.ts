@@ -14,7 +14,7 @@ export async function connectSourceClient(origin:string,lifetime:AbortSignal) {
       // envelope is removed before the protocol request leaves the browser.
       if(path==='/v1/call/prepare'&&typeof options?.body==='string'){
         const body=JSON.parse(options.body),audio=body.request?.slowTuneDesktopAudio;
-        if(audio){delete body.request.slowTuneDesktopAudio;headers.set('X-SlowTune-Audio-Support',JSON.stringify(audio.support));if(audio.preparationToken)headers.set('X-SlowTune-Preparation',audio.preparationToken);options={...options,body:JSON.stringify(body)};}
+        if(audio){delete body.request.slowTuneDesktopAudio;headers.set('X-SlowTune-Audio-Support',JSON.stringify(audio.support));if(audio.preparationToken)headers.set('X-SlowTune-Preparation',audio.preparationToken);if(audio.selection)headers.set('X-SlowTune-Audio-Selection',JSON.stringify(audio.selection));options={...options,body:JSON.stringify(body)};}
       }
       const signal=AbortSignal.any([lifetime,...(options?.signal?[options.signal]:[])]);
       recordPlaybackDiagnostic({operation:sourceDiagnosticPath(path),code:'start',at:Date.now(),...context});
@@ -27,6 +27,15 @@ export async function connectSourceClient(origin:string,lifetime:AbortSignal) {
     },
   });
   const desktop:DesktopAudioApi=client;
-  desktop.prepareDesktopAudio=(request,options,support,preparationToken)=>client.prepare({...request,...{slowTuneDesktopAudio:{support,preparationToken}}},options);
+  desktop.prepareDesktopAudio=(request,options,support,preparationToken,selection)=>client.prepare({...request,...{slowTuneDesktopAudio:{support,preparationToken,selection}}},options);
+  desktop.playbackFailure=async(leaseId,options)=>{
+    try{
+      const signal=AbortSignal.any([lifetime,AbortSignal.timeout(2000),...(options?.signal?[options.signal]:[])]);
+      const response=await fetch(new URL('/api/playback/failure',origin),{method:'POST',headers:{'Content-Type':'application/json','X-Music-App':'1'},body:JSON.stringify({leaseId}),signal});
+      if(!response.ok)return null;const data=await response.json(),value=data.failure;
+      if(!value||!Number.isSafeInteger(value.attempt)||value.attempt<1||!['pending','ready','complete','failed'].includes(value.state))return null;
+      return {attempt:value.attempt,state:value.state,provider:'bilibili',...(['authentication','restricted','rate-limited','network','protocol','timeout','cancelled','expired'].includes(value.code)?{code:value.code}:{}),...(Number.isInteger(value.status)&&value.status>=100&&value.status<=599?{status:value.status}:{}),...(Number.isFinite(value.retryAfterMs)&&value.retryAfterMs>=0?{retryAfterMs:value.retryAfterMs}:{})};
+    }catch{options?.signal?.throwIfAborted();return null;}
+  };
   return client;
 }

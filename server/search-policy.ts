@@ -3,6 +3,7 @@ import type { VerifiedMusicEntry } from './audio-quality.js';
 import { songIdentityReasons } from '@studio/music-sources/song-match';
 export { normalizeSongText } from '@studio/music-sources/song-match';
 import { normalizeSongText } from '@studio/music-sources/song-match';
+import type {AudioSelection} from './audio-selection.js';
 
 export type SearchRule = 'allow' | 'requested' | 'manual';
 export const partitionLabels = {
@@ -35,7 +36,7 @@ export function defaultSearchConfig():SearchConfig {
 }
 export interface SongQuery {title:string;artists?:string[];durationSeconds?:number}
 export type SongSearchMode = 'title' | 'title-artists';
-export interface SongSearchQuery extends SongQuery {searchMode?:SongSearchMode;audioSupport?:string[]}
+export interface SongSearchQuery extends SongQuery {searchMode?:SongSearchMode;audioSupport?:string[];audioSelection?:AudioSelection}
 export interface SearchEntry extends VerifiedMusicEntry {searchPartition?:SearchPartition}
 export interface PreferredSong {key:string;song:SongQuery;entry:MusicEntry;updatedAt:number}
 export interface SearchSettings {revision:string;defaultsVersion:string;config:SearchConfig;preferred:PreferredSong[];defaults:{version:string;config:SearchConfig}}

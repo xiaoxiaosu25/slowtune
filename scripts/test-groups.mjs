@@ -5,14 +5,14 @@ import { fileURLToPath } from 'node:url';
 export const testGroups = {
   core: [
     'documentation', 'desktop-lyric-source', 'browser-config', 'workspace-paths', 'vendor',
-    'lyric-timing', 'audio-quality', 'song-library', 'song-library-sync', 'recommendation',
-    'desktop-continuity', 'desktop-playback-performance', 'playback-diagnostics', 'desktop-library-copy',
+    'lyric-timing', 'audio-quality', 'audio-selection', 'audio-bridge', 'song-library', 'song-library-sync', 'recommendation',
+    'desktop-continuity', 'desktop-playback-performance', 'playback-diagnostics', 'playback-delivery-policy', 'desktop-library-copy',
     'song-library-worker', 'desktop-storage', 'desktop-state', 'desktop-profile',
     'search-playback', 'desktop-lyric-match', 'desktop-media-policy', 'desktop-youtube-reuse',
     'lyrics', 'desktop-lyrics-progress', 'playlist-cover',
   ],
   browser: [
-    'song-targets-desktop-ui', 'desktop-runtime-ui', 'desktop-feedback-ui', 'desktop-context-menu-ui', 'chart-cache-ui', 'playback-performance-ui',
+    'source-playback-baseline', 'source-playback-app', 'audio-selection-ui', 'song-targets-desktop-ui', 'desktop-runtime-ui', 'desktop-feedback-ui', 'desktop-context-menu-ui', 'chart-cache-ui', 'playback-performance-ui',
     'playback', 'playing-artwork-ui', 'sleep-timer-ui', 'playback-retry', 'song-version-switch', 'playback-management-ui',
     'desktop-lyrics-ui', 'desktop-lyrics-motion-ui', 'desktop-lyrics-progress-ui', 'lyrics-ui', 'lyrics-experience-ui', 'comments-ui', 'search-discovery-ui', 'mobile-layout-ui', 'mobile-lyrics-recovery-ui', 'mobile-settings-ui', 'mobile-browse-ui',
     'playlist-cover-ui', 'song-management-desktop-ui', 'desktop-library-layout-ui', 'mobile-secondary-ui', 'mobile-design-ui',

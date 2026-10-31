@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { SongLibraryError as LibraryError } from './song-library-errors.js';
 import { validateRef, type MusicEntry } from '@studio/music-sources';
 import { defaultSearchConfig, searchDefaultsVersion, partitionLabels, versionTerms, songKey, type SearchConfig, type SearchSettings, type SongQuery, type SongSearchMode } from './search-policy.js';
+import {audioSelection,type AudioSelection} from './audio-selection.js';
 
 const object=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 export function validateSongSearchMode(value:unknown):SongSearchMode {
@@ -15,10 +16,10 @@ export function validateAudioSupport(value:unknown):string[]|undefined {
   if(!Array.isArray(value)||value.length>32||value.some(type=>typeof type!=='string'||type.length>128||!/^audio\/[a-z0-9.+-]+; codecs="[a-z0-9.+-]+"$/i.test(type)))throw new LibraryError('invalid-input');
   return [...new Set(value as string[])].sort();
 }
-export function validateSongSearch(value:unknown):{song:SongQuery;searchMode:SongSearchMode;audioSupport?:string[]} {
+export function validateSongSearch(value:unknown):{song:SongQuery;searchMode:SongSearchMode;audioSupport?:string[];audioSelection:AudioSelection} {
   if(!object(value))throw new LibraryError('invalid-input');
-  const {searchMode,audioSupport,...song}=value;
-  return {song:validateSong(song),searchMode:validateSongSearchMode(searchMode),audioSupport:validateAudioSupport(audioSupport)};
+  const {searchMode,audioSupport,audioSelection:selection,...song}=value;
+  return {song:validateSong(song),searchMode:validateSongSearchMode(searchMode),audioSupport:validateAudioSupport(audioSupport),audioSelection:audioSelection(selection)};
 }
 export function validateSong(value:unknown):SongQuery {
   if(!object(value)||Object.keys(value).some(key=>!['title','artists','durationSeconds'].includes(key))||typeof value.title!=='string'||!value.title.trim()||value.title.length>512)throw new LibraryError('invalid-input');

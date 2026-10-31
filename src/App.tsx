@@ -28,6 +28,7 @@ import { catalogSongKey, songSourceKey } from '../server/song-library-policy';
 import { usePlayback } from './playback';
 import { DesktopPlaybackProgress } from './DesktopPlaybackProgress';
 import { audioQualityLabel } from './audio-quality';
+import {AudioPreferenceSelect,AudioQualityDialog} from './AudioQualityOptions';
 import { readYoutubeRegion, youtubeMusicPath } from './youtube-candidates';
 import { PartsPanel, type PartBatchAction } from './PartsPanel';
 import { SleepPanel } from './SleepPanel';
@@ -147,7 +148,8 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     }else{if(!value.youtube.available)capabilityReady.current=false;apply();}
   };
   const playback=usePlayback(client,youtubeAvailable,partsStore,youtubeEnabled),{snapshot}=playback;
-  useEffect(()=>{if(desktop)playback.sourceChanged();},[desktop,sources?.revision,sources?.sequence,youtubeAvailable]);
+  const [audioQualityOpen,setAudioQualityOpen]=useState(false);
+  useEffect(()=>{playback.sourceChanged();},[sources?.revision,sources?.sequence,youtubeAvailable]);
   useEffect(()=>{if(lib)playback.updateSongs(lib.snapshot.songs,lib.snapshot.versions,lib.snapshot.catalogLinks,lib.snapshot.redirects);},[lib?.revision,desktop]);
   const [restoredQueue]=useState(()=>readSavedPlayback(preferenceStorage()).tracks.length>0),restorationNotified=useRef(false);
   const [queueOpen,setQueueOpen]=useState(false),[listFilter,setListFilter]=useState(''),[previousPage,setPreviousPage]=useState('discover');
@@ -223,7 +225,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
   const [artworks,setArtworks]=useState<Record<string,string>>({});
   const [scrub,setScrub]=useState<number|null>(null),scrubValue=useRef<number|null>(null);
   const [bilibiliAccount,setBilibiliAccount]=useState<BilibiliAccountState>();
-  useEffect(()=>{if(desktop)playback.sourceChanged();},[desktop,bilibiliAccount?.state,bilibiliAccount?.account?.id]);
+  useEffect(()=>{playback.sourceChanged();},[bilibiliAccount?.state,bilibiliAccount?.account?.id]);
   const [followState,setFollowState]=useState<FollowState|null>(null),[trackAuthors,setTrackAuthors]=useState<Record<string,CreatorRef>>({});
   const [activeCreator,setActiveCreator]=useState<CreatorProfile>(),[authorBusy,setAuthorBusy]=useState(false),authorWork=useRef<AbortController|null>(null),[authorTarget,setAuthorTarget]=useState('');
   const [discoveryMessage,setDiscoveryMessage]=useState(''),[discoveryUpdatedAt,setDiscoveryUpdatedAt]=useState<number>();
@@ -619,11 +621,13 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
     <div className="mobile-playback-adjustments">
       <div className="mobile-option-volume"><span>音量</span>{volume}</div>
       {rateControl(true)}
+      <AudioPreferenceSelect playback={playback}/>
       <div className="popover-seek">{seekButtons()}</div>
       <label className="field"><span className="field-label">封面样式</span><select className="select" aria-label="封面样式" value={mobileVisual} onChange={event=>{const mode=event.target.value as MobileVisual;if(mode==='spectrum'||mode==='halo')playback.audioAnalysis?.request(true,true);setMobileVisual(mode);try{preferenceStorage().setItem('slow-listening:mobile-playing-visual:v1',mode);}catch{}}}>{Object.entries(mobileVisuals).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
     </div>
     {desktopHost.available&&<label className="choice"><input type="checkbox" checked={desktopHost.visible} onChange={desktopHost.toggle}/>桌面悬浮歌词</label>}
     <div className="mobile-action-list">
+      <button disabled={!current} onClick={()=>{close();setAudioQualityOpen(true);}}><MusicNotesIcon size={22}/><span>音质与音轨</span></button>
       {preparingPlayback&&<button onClick={()=>{close();cancelPlayback();}}><XIcon size={22}/><span>取消播放准备</span></button>}
       <button onClick={()=>{close();openLyricsManagement();}}><MusicNotesIcon size={22}/><span>歌词设置</span></button>
       {current&&<button onClick={()=>{close();open({type:'track',track:current,entryContext:'part',intent:'playlist'});}}><ListBulletsIcon size={22}/><span>加入歌单</span></button>}
@@ -641,6 +645,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
       <label className="player-style-option"><input type="radio" name="player-style" value="bar" checked={playerStyle==='bar'} onChange={()=>selectPlayerStyle('bar')}/><span>底部长条</span></label>
     </div>}
     <p className="popover-heading">播放选项</p>{preparingPlayback&&<button onClick={cancelPlayback}><XIcon size={19}/>取消播放准备</button>}{dock&&<><div className="popover-settings">{rateControl(true)}{sleepButton(true)}</div><div className="popover-seek">{seekButtons()}</div></>}
+    <AudioPreferenceSelect playback={playback}/><button disabled={!current} onClick={event=>{const popover=event.currentTarget.closest<HTMLElement>('[popover]');popover?.hidePopover();popover?.closest('.control-popover')?.querySelector<HTMLButtonElement>('button[popovertarget]')?.focus();setAudioQualityOpen(true);}}><MusicNotesIcon size={19}/>音质与音轨</button>
     {desktop&&!desktopHost.available&&<label className="choice popover-lyrics-choice"><input type="checkbox" checked={lyrics.bottom} onChange={event=>lyrics.updateDisplay({bottom:event.target.checked})}/>底部歌词</label>}
     {desktopHost.available&&<label className="choice popover-lyrics-choice"><input type="checkbox" checked={desktopHost.visible} onChange={desktopHost.toggle}/>桌面悬浮歌词</label>}
     <button onClick={event=>{event.currentTarget.closest('.control-popover')?.querySelector<HTMLButtonElement>('button[popovertarget]')?.focus();openLyricsManagement();}}><MusicNotesIcon size={19}/>{desktop&&page==='playing'?'歌词管理':'歌词设置'}</button>
@@ -832,6 +837,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
       lyrics={<LyricsView lyrics={lyrics} playback={lyricPlayback} onSeek={seconds=>void playback.seek(seconds)} recovery/>}
       title={<PlayingTitle key={current?.resourceId} title={current?(currentSong?.title??displayTitle(current)):undefined} fullTitle={current?.title} details={current&&<dl className="mobile-track-details">{currentSong&&<><dt>歌曲</dt><dd>{currentSong.title}</dd></>}{mobileArtist&&<><dt>歌手</dt><dd>{mobileArtist}</dd></>}<dt>当前来源</dt><dd>{current.ref.provider==='bilibili'?'B站':'YouTube'}{currentVersion?.label?' · '+currentVersion.label:''}</dd></dl>}/>}
       artist={current?(mobileArtist||creatorContent(current)):'从发现、搜索或歌单添加音乐'}
+      quality={snapshot.format&&<button type="button" className="btn btn-ghost mobile-audio-quality" aria-label="当前音质" onClick={()=>setAudioQualityOpen(true)}>{audioQualityLabel(snapshot.format)}</button>}
       source={current&&<><button className="btn btn-ghost mobile-player-version" aria-label={currentSong?'选择播放版本 '+currentSong.title:'查看当前来源'} title={currentVersion?.label||'查看当前来源与版本'} onClick={()=>currentSong?setMobileSongId(currentSong.id):open({type:'track',track:current,entryContext:'part'})}><span className="mobile-source-platform">{current.ref.provider==='bilibili'?<TelevisionSimpleIcon size={16}/>:<YoutubeLogoIcon size={16}/>}<span>{current.ref.provider==='bilibili'?'B站':'YouTube'}</span></span>{currentVersion?.label&&<span className="mobile-version-copy">{currentVersion.label}</span>}<span className="mobile-version-count">{mobileVersionCount?'版本 · '+mobileVersionCount:'来源详情'}<ArrowRightIcon size={14}/></span></button><PartBadge track={current} store={partsStore} active={!popup} current viewKey={page+':'+searchOpen} onOpen={()=>void showParts(current)}/></>}
       progress={progress()} transport={transport(true)} mode={modeButton(23)} favorite={currentFavoriteButton()} timer={sleepButton()}
       queueOpen={queueVisible&&listeningPanel==='queue'} queueCount={snapshot.items.length} onQueue={toggleQueue}
@@ -844,7 +850,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
 <PlayingArtwork artwork={currentArtwork} playing={snapshot.playing&&!snapshot.loading&&!desktopLyricsOpen} muted={snapshot.muted||snapshot.volume===0} analysis={playback.audioAnalysis} allowLyrics={false} desktop suspended={desktopLyricsOpen}/>
 <div className="playing-detail">
 <div className="playing-title">
-<div className="playing-status"><span className={'playback-status '+(snapshot.playing?'is-playing':'')} role="status">{playbackLabel}</span>{!playback.preparing&&!snapshot.loading&&snapshot.format&&<span className="audio-quality" aria-label="当前音质" title="自动选择此来源当前可用、浏览器支持的最佳音轨">{audioQualityLabel(snapshot.format)}</span>}</div>
+<div className="playing-status"><span className={'playback-status '+(snapshot.playing?'is-playing':'')} role="status">{playbackLabel}</span>{!playback.preparing&&!snapshot.loading&&snapshot.format&&<button type="button" className="audio-quality" aria-label="当前音质" title="查看来源规格与选择音轨" onClick={()=>setAudioQualityOpen(true)}>{audioQualityLabel(snapshot.format)}</button>}</div>
 <PlayingTitle key={current?.resourceId} title={current?displayTitle(current):undefined} fullTitle={current?.title}/>{current&&<PartBadge track={current} store={partsStore} active={!popup} current viewKey={page+':'+searchOpen} onOpen={()=>void showParts(current)}/>}
 <div className="playing-meta desktop-playing-meta"><div className="playing-song-copy">{desktopSongMeta()}</div><div className="playing-song-actions"><LyricsToggle active={false} onClick={toggleDesktopLyrics}/>{playerOptions()}</div></div>
 </div>
@@ -963,6 +969,7 @@ function Workspace({client,preload,onLogout}:{client:MusicClient;preload:Startup
 <p>{error}</p>
 <button className="btn btn-ghost" onClick={()=>void reload()}>重读资料 / 检查服务</button>{pending&&<button className="btn btn-ghost" disabled={saving} onClick={retryWrite}>重试保留编辑</button>}</div>}
     </Modal>}{notice&&!popup&&(!desktop||!error&&!searchOpen)&&<div className="toast" role="status">{notice}{noticeAction&&<button className="btn btn-ghost btn-sm" onClick={noticeAction.run}>{noticeAction.label}</button>}</div>}
+  {audioQualityOpen&&<AudioQualityDialog playback={playback} generation={JSON.stringify([bilibiliAccount?.state,bilibiliAccount?.account?.id,sources?.sequence])} onClose={()=>setAudioQualityOpen(false)}/>}
   {playbackFeedback()}
   {desktop&&<DesktopOperationFeedback error={!popup&&!searchOpen?error:''} offline={!online} onDismiss={()=>setError('')}><button className="btn btn-ghost" onClick={()=>void reload()}>重读资料 / 检查服务</button>{pending&&<button className="btn btn-ghost" disabled={saving} onClick={retryWrite}>重试保留编辑</button>}{error.includes('会话')&&<button className="btn btn-ghost" onClick={async()=>{await playback.release();onLogout();}}>重新连接</button>}</DesktopOperationFeedback>}
   {listImport&&lib&&<SongListImportPanel client={client} input={listImport} library={lib} onChange={updateLibrary} onClose={()=>setListImport(undefined)} onSaved={text=>flash(text)}/>}

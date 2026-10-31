@@ -12,6 +12,7 @@ import { validateSongSearchMode, validateAudioSupport } from './search-settings.
 import { sameVideoPart, songKey } from './search-policy.js';
 import type { VerifiedMusicEntry } from './audio-quality.js';
 import { desktopCatalogLibrary } from './song-catalog-display.js';
+import {audioSelection} from './audio-selection.js';
 
 export interface SongSourceAccess {
   metadata(ref: EntryRef, signal: AbortSignal): Promise<MusicEntry>;
@@ -138,8 +139,8 @@ export class SongLibrarySources {
     }, signal);
     return { modelVersion: result.modelVersion, revision: result.revision, snapshot: result.document.snapshot };
   }
-  async playback(selection: SongPlaybackSelection, signal: AbortSignal, searchMode?:unknown, audioSupport?:unknown) {
-    const mode=validateSongSearchMode(searchMode),support=validateAudioSupport(audioSupport);
+  async playback(selection: SongPlaybackSelection, signal: AbortSignal, searchMode?:unknown, audioSupport?:unknown,requestedAudio?:unknown) {
+    const mode=validateSongSearchMode(searchMode),support=validateAudioSupport(audioSupport),audio=audioSelection(requestedAudio);
     if (!selection || typeof selection !== 'object') fail();
     if (selection.kind === 'song') object(selection, ['kind', 'songId', 'pinnedVersionId', 'explicitVersionId']);
     else if (selection.kind === 'source') object(selection, ['kind', 'ref', 'songId', 'context']);
@@ -150,7 +151,7 @@ export class SongLibrarySources {
     const catalog=mode==='title-artists'&&chosen.kind!=='source'&&chosen.songId?state.songs.find(song=>song.id===chosen.songId)?.desktopCatalog:undefined;
     const record=catalog?.state==='matched'?catalog.record:undefined;
     const durationSeconds=record&&chosen.kind!=='source'&&songKey(chosen.query)===songKey(record)?record.durationSeconds:undefined;
-    const resolved = chosen.kind === 'source' ? undefined : await this.access.resolve({...chosen.query,...(mode==='title-artists'?{searchMode:mode,...(durationSeconds!==undefined?{durationSeconds}:{}),...(support?{audioSupport:support}:{})}:{})}, signal);
+    const resolved = chosen.kind === 'source' ? undefined : await this.access.resolve({...chosen.query,audioSelection:audio,...(mode==='title-artists'?{searchMode:mode,...(durationSeconds!==undefined?{durationSeconds}:{}),...(support?{audioSupport:support}:{})}:{})}, signal);
     let entry:VerifiedMusicEntry = await this.metadata(chosen.kind === 'source' ? chosen.ref : resolved!.ref, signal, generation);
     if(mode==='title-artists'&&resolved?.verifiedAudio&&sameVideoPart(entry.ref,resolved.verifiedAudio.ref))entry={...entry,verifiedAudio:resolved.verifiedAudio};
     this.check(signal, generation, entry.ref.provider);

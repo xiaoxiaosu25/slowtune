@@ -22,12 +22,12 @@
       "documentation": "README.md"
     },
     {
-      "file": "studio-music-sources-0.2.14.tgz",
+      "file": "studio-music-sources-0.2.16.tgz",
       "name": "@studio/music-sources",
-      "version": "0.2.14",
+      "version": "0.2.16",
       "license": "AGPL-3.0-only",
-      "origin": "Studio platform: packages/audio-video/music-sources; 2026-10-30 Bilibili platform search order and read-only user search",
-      "source": "sources/studio-music-sources-0.2.14.tar.gz",
+      "origin": "Studio platform: packages/audio-video/music-sources; 2026-10-31 explicit host audio selection and supplied audio specifications, retaining bounded candidate reads",
+      "source": "sources/studio-music-sources-0.2.16.tar.gz",
       "sourceBasis": "Current platform src and tests; standalone package build inputs and existing AGPL license material supplied with this distribution",
       "documentation": "README.md"
     },
