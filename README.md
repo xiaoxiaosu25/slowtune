@@ -2,7 +2,9 @@
 
 <p align="center"><strong>发现喜欢的音乐，留下想听的版本。</strong></p>
 
-<p align="center">面向 Windows 的个人音乐播放器：从 B站发现音乐，用歌单和多版本整理喜欢的歌，搭配沉浸歌词与桌面悬浮歌词。</p>
+<p align="center">面向 Windows 的个人音乐播放器：搜索和收听 B站（哔哩哔哩 / Bilibili）与 YouTube 的音乐，用歌单整理喜欢的歌曲和版本，搭配沉浸歌词与桌面悬浮歌词。</p>
+
+<p align="center">YouTube 默认关闭，启用需配置网络和取源工具。</p>
 
 <p align="center">
   <a href="https://github.com/xiaoxiaosu25/slowtune/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/xiaoxiaosu25/slowtune?label=version&amp;color=a92e32"></a>
