@@ -10,11 +10,13 @@ export { audioPrefixRecognized } from '@studio/music-sources/audio-probe';
 /** Product matching and preparation tickets wrap the shared bounded media check. */
 export async function verifySearchPlayback(api: Pick<MusicApi, 'prepare'> & Partial<Pick<MusicApi, 'formats' | 'capabilities'>>, host: MusicHost, ref: EntryRef, options: CallOptions & { signal: AbortSignal }, audioSupport?: string[], verified?: (playback: PreparedPlayback) => string | undefined, accept?: (facts: MusicEntry) => boolean,deliveryPolicy?:DeliveryReadPolicy,selection:AudioSelection=audioSelection()): Promise<VerifiedAudio> {
   let preparationToken: string | undefined;
+  const selectFormat = audioSelector(selection);
   const checked = await verifyAudioPlayback(api, host, ref, {
     ...options,
     ...(deliveryPolicy?{deliveryPolicy,stopOnRestricted:true}:{}),
-    ...(audioSelector(selection)?{selectFormat:audioSelector(selection)}:{}),
-    ...(audioSupport ? { playable: (format: Parameters<typeof supportsAudioType>[1]) => supportsAudioType(audioSupport, format) } : {}),
+    selectFormat,
+    // The probe reads the rendition list only when given a playable predicate.
+    playable: audioSupport ? format => supportsAudioType(audioSupport, format) : selectFormat && (() => true),
     validateEntry(entry) { if (accept && !accept(entry)) throw new SearchCandidateMismatch(); },
     onPrepared(playback) { preparationToken = verified?.(playback); },
   });

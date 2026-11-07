@@ -78,24 +78,39 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     // Songs start fresh when selected; pause/resume and source recovery retain the live position.
     let recovery:PlaybackRecovery;
     let blockedMedia:{queueId:string|undefined;operation:string;lease:string;fact:PlaybackFailureFact}|undefined;
-    const permitAutomatic=async(id:string,plan:PlaybackPlan,signal:AbortSignal,manual=false)=>{
+    const automaticFailure=async(id:string,plan:PlaybackPlan,signal?:AbortSignal,reason:'fallback'|'expired'='fallback')=>{
       const ref=committed.get(id),lease=plan.processing?.sessionEndpoint;
-      if(!desktopSurface()||ref?.provider!=='bilibili'||manual)return true;
-      if(blockedMedia&&blockedMedia.queueId===queue.snapshot.current?.id&&blockedMedia.operation===recovery.diagnosticId&&(!lease||lease===blockedMedia.lease))return false;
-      if(!lease)return true;
-      const fact=await (client as DesktopAudioApi).playbackFailure?.(lease,{signal});signal.throwIfAborted();
-      if(fact?.state!=='failed'||!['restricted','authentication','rate-limited'].includes(fact.code??''))return true;
+      if(!desktopSurface()||ref?.provider!=='bilibili')return;
+      if(blockedMedia&&blockedMedia.queueId===queue.snapshot.current?.id&&blockedMedia.operation===recovery.diagnosticId&&(!lease||lease===blockedMedia.lease))return blockedMedia.fact;
+      if(!lease)return;
+      const fact=await (client as DesktopAudioApi).playbackFailure?.(lease,{signal});signal?.throwIfAborted();
+      if(fact?.state!=='failed'||!['restricted','authentication','rate-limited'].includes(fact.code??''))return;
       blockedMedia={queueId:queue.snapshot.current?.id,operation:recovery.diagnosticId,lease,fact};
-      recordPlaybackDiagnostic({operation:'recovery',code:'blocked',at:Date.now(),operationId:recovery.diagnosticId,reason:'fallback',errorCode:fact.code});
-      return false;
+      recordPlaybackDiagnostic({operation:'recovery',code:'blocked',at:Date.now(),operationId:recovery.diagnosticId,reason,errorCode:fact.code});
+      return fact;
     };
     const sourceForPlan=(ref:EntryRef,plan:PlaybackPlan,options:{signal?:AbortSignal})=>bridge.sourceForPlan(ref,plan,options);
     const retainSelection=(plan:PlaybackPlan,next:PlaybackPlan)=>plan.metadata?.verifiedAudio?retainVerifiedAudio(plan,next):next;
-    const refresh=(id:string,plan:PlaybackPlan,signal:AbortSignal)=>recovery.trackSource(async()=>{const staged=engine.current?.audioChange;if(staged?.id===id&&!staged.signal.aborted){signal.throwIfAborted();staged.used=true;return {...staged.plan,resourceId:id};}if(!await permitAutomatic(id,plan,signal,!!explicitRetry.current&&!explicitRetry.current.aborted))throw blockedMedia!.fact;const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal}):undefined;const refreshed=await bridge.resolver.resolveUrl!(source?.resourceId??aliases.get(id)??id,plan,'retry',{signal});return typeof refreshed==='string'?{...plan,playUrl:refreshed,resourceId:id}:{...retainSelection(plan,refreshed),resourceId:id};});
+    const refresh=(id:string,plan:PlaybackPlan,signal:AbortSignal)=>recovery.trackSource(async()=>{
+      const staged=engine.current?.audioChange;
+      if(staged?.id===id&&!staged.signal.aborted){signal.throwIfAborted();staged.used=true;return {...staged.plan,resourceId:id};}
+      if(!explicitRetry.current||explicitRetry.current.aborted){const failure=await automaticFailure(id,plan,signal);if(failure)throw failure;}
+      const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal}):undefined;
+      const refreshed=await bridge.resolver.resolveUrl!(source?.resourceId??aliases.get(id)??id,plan,'retry',{signal});
+      return typeof refreshed==='string'?{...plan,playUrl:refreshed,resourceId:id}:{...retainSelection(plan,refreshed),resourceId:id};
+    });
     const player=new StudioPlayer({nativeElementTag:'audio',sourceResolver:{...bridge.resolver,
       prepareSource:(id,plan,context)=>refresh(id,plan,context.signal),
-      resolveUrl:(id,plan,reason,context)=>recovery.trackSource(async()=>{const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context?.signal}):undefined;const refreshed=await bridge.resolver.resolveUrl!(source?.resourceId??aliases.get(id)??id,plan,reason,context);return typeof refreshed==='string'?refreshed:{...retainSelection(plan,refreshed),resourceId:id};},reason),
-      recoverSource:(id,plan,context)=>recovery.trackSource(async()=>{recovery.capture(context.positionSeconds,context.paused);if(!await permitAutomatic(id,plan,context.signal))return null;const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context.signal}):undefined;const recovered=await bridge.resolver.recoverSource?.(source?.resourceId??aliases.get(id)??id,plan,context);return recovered?{...retainSelection(plan,recovered),resourceId:id}:null;},'fallback')
+      resolveUrl:(id,plan,reason,context)=>recovery.trackSource(async()=>{
+        if(reason==='expired'){
+          const failure=await automaticFailure(id,plan,context?.signal,reason);
+          if(failure)throw failure;
+        }
+        const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context?.signal}):undefined;
+        const refreshed=await bridge.resolver.resolveUrl!(source?.resourceId??aliases.get(id)??id,plan,reason,context);
+        return typeof refreshed==='string'?refreshed:{...retainSelection(plan,refreshed),resourceId:id};
+      },reason),
+      recoverSource:(id,plan,context)=>recovery.trackSource(async()=>{recovery.capture(context.positionSeconds,context.paused);if(await automaticFailure(id,plan,context.signal))return null;const ref=committed.get(id),source=ref?await sourceForPlan(ref,plan,{signal:context.signal}):undefined;const recovered=await bridge.resolver.recoverSource?.(source?.resourceId??aliases.get(id)??id,plan,context);return recovered?{...retainSelection(plan,recovered),resourceId:id}:null;},'fallback')
     },autoResume:false});
     recovery=new PlaybackRecovery(player,audio,desktopSurface()?desktopSurface:false,recordPlaybackDiagnostic);
     audio.dataset.productMedia='true';audio.preload='none';audio.hidden=true;document.body.append(audio);player.attach(audio);player.setVolume(initial.volume);
@@ -276,15 +291,17 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     if(q.loaded||q.loading){e.sourceStopping=true;void e.player.stop().then(()=>{if(resume&&e.intent===intent&&!enabled.current)return advancePlayable(e,1);}).catch(()=>{}).finally(()=>{e.sourceStopping=false;});}
     e.sync?.();
   },[youtubeEnabled]);
-  const run=async(fn:(e:NonNullable<typeof engine.current>,signal:AbortSignal)=>Promise<unknown>|unknown,preparesSource=true,deadline?:number)=>{
-    if(!engine.current)return;operation.current?.abort();const c=new AbortController();operation.current=c;engine.current.intent++;setError('');setChartSearchTitle('');
+  const run=async(fn:(e:NonNullable<typeof engine.current>,signal:AbortSignal)=>Promise<unknown>|unknown,preparesSource=true,{deadline,controller}:{deadline?:number;controller?:AbortController}={})=>{
+    const c=controller??new AbortController();
+    if(!engine.current||c.signal.aborted)return;operation.current?.abort();operation.current=c;engine.current.intent++;setError('');setChartSearchTitle('');
     engine.current.prefetch?.foreground();
     engine.current.recovery.cancelEnvironment();
     const target=engine.current,start=performance.now(),abort=()=>target.player.sourceController.cancelSourcePreparation();
     target.audioIntent={signal:c.signal,selection:audioDefault()};
     let succeeded=false;
     const desktop=desktopSurface(),timer=desktop&&preparesSource?setTimeout(()=>c.abort(new DOMException('Playback operation timed out','TimeoutError')),Math.max(1,(deadline??Date.now()+60000)-Date.now())):undefined;
-    if(desktop)c.signal.addEventListener('abort',abort,{once:true});
+    // Audio switches bind cancellation to their own native preparation below.
+    if(desktop&&!controller)c.signal.addEventListener('abort',abort,{once:true});
     // Seeking and transport commands must not turn a focused Play button into Cancel.
     setPreparing(preparesSource);
     try {const result=await fn(engine.current,c.signal);if(operation.current===c&&c.signal.aborted&&c.signal.reason?.name==='TimeoutError')setError(errorText({code:'timeout'}));succeeded=!c.signal.aborted&&result!==false;return succeeded;}
@@ -492,22 +509,33 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     finally{if(e.chartSelection===selection)e.chartSelection=undefined;}
   };
   const readPosition=useCallback(()=>engine.current?.player.currentTime??0,[]);
-  const changeAudio=async(selection:AudioSelection)=>run(async(e,signal)=>{
+  const changeAudio=async(selection:AudioSelection,controller=new AbortController())=>run(async(e,signal)=>{
     audioPreparing.current=signal;
     try{
-    selection=audioSelection(selection);const original=e.player.currentPlan,id=e.queue.snapshot.current?.id;
-    const track=id?e.tracks.get(id):undefined,ref=original?(e.committed.get(original.resourceId)??(track&&isTrack(track)?track.ref:undefined)):undefined;
-    if(!original||!ref||!e.player.canPrepareSource)throw {code:'unsupported'};
-    const entry=await readMetadata(ref,{signal});if(!prefetchedRef(ref,entry.ref))throw {code:'protocol'};const source=await e.bridge.sourceFrom(entry,{signal},selection),prepared=await source.prepare({signal,restart:false});
-    const staged={id:original.resourceId,plan:prepared,signal,used:false};
-    try{
-      signal.throwIfAborted();if(e.player.currentPlan!==original||e.queue.snapshot.current?.id!==id||e.sleep.snapshot.status==='expired')return false;
-      e.audioChange=staged;
-      await e.player.prepareSource({reason:'seek'});signal.throwIfAborted();
-      e.aliases.set(original.resourceId,source.resourceId);e.committed.set(original.resourceId,entry.ref);e.sync?.();return true;
-    }finally{if(e.audioChange===staged)e.audioChange=undefined;if(!staged.used)e.player.sourceController.releaseUnusedPlan(prepared);}
+      selection=audioSelection(selection);
+      const original=e.player.currentPlan,id=e.queue.snapshot.current?.id;
+      const track=id?e.tracks.get(id):undefined,ref=original?(e.committed.get(original.resourceId)??(track&&isTrack(track)?track.ref:undefined)):undefined;
+      if(!original||!ref||!e.player.canPrepareSource)throw {code:'unsupported'};
+      const entry=await readMetadata(ref,{signal});
+      if(!prefetchedRef(ref,entry.ref))throw {code:'protocol'};
+      const source=await e.bridge.sourceFrom(entry,{signal},selection),prepared=await source.prepare({signal,restart:false});
+      const staged={id:original.resourceId,plan:prepared,signal,used:false};
+      const cancelPreparation=()=>e.player.sourceController.cancelSourcePreparation();
+      try{
+        signal.throwIfAborted();
+        if(e.player.currentPlan!==original||e.queue.snapshot.current?.id!==id||e.sleep.snapshot.status==='expired')return false;
+        e.audioChange=staged;
+        signal.addEventListener('abort',cancelPreparation,{once:true});
+        await e.player.prepareSource({reason:'seek'});
+        signal.throwIfAborted();
+        e.aliases.set(original.resourceId,source.resourceId);e.committed.set(original.resourceId,entry.ref);e.sync?.();return true;
+      }finally{
+        signal.removeEventListener('abort',cancelPreparation);
+        if(e.audioChange===staged)e.audioChange=undefined;
+        if(!staged.used)e.player.sourceController.releaseUnusedPlan(prepared);
+      }
     }finally{if(audioPreparing.current===signal)audioPreparing.current=undefined;}
-  });
+  },true,{controller});
   const availableAudio=async(signal:AbortSignal)=>{
     const e=engine.current,track=e?.tracks.get(e.queue.snapshot.current?.id??''),plan=e?.player.currentPlan;
     const ref=plan?(e?.committed.get(plan.resourceId)??(track&&isTrack(track)?track.ref:undefined)):undefined;
@@ -596,7 +624,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       if(!await e.queue.replaceItems(items))return;s.throwIfAborted();e.queue.setOrder('sequential');e.queue.setRepeat('off');
       e.chartSession={failed:new Set(),handled:new Set(),allowed:true};await e.queue.select(0,{restart:true});
     }),
-    play:(t:Track,_context?:{tracks:Track[];index:number},ready=false,deadline?:number)=>run((e,s)=>playSingle(e,t,s,ready),true,deadline),
+    play:(t:Track,_context?:{tracks:Track[];index:number},ready=false,deadline?:number)=>run((e,s)=>playSingle(e,t,s,ready),true,{deadline}),
     add:(t:Track,ready=false,next=false)=>editQueue(async(e,s)=>{if(blocked(t))throw {code:'source-disabled'};if(e.queue.snapshot.items.length>=500)throw {code:'queue-limit'};const added=await item(e,t,s,queueId(),ready);s.throwIfAborted();if(blocked(t))throw {code:'source-disabled'};if(e.queue.snapshot.items.length>=500)throw {code:'queue-limit'};enqueueItems(e,[added],next);}),
     playAll:(list:Track[])=>run(async(e,s)=>{if(list.length>500)throw {code:'queue-limit'};if(!list.some(t=>!blocked(t)))throw {code:'source-disabled'};await cancelLoading(e,s);const desktop=desktopSurface(),items=desktop?list.map(track=>deferredItem(e,track)):await batchItems(e,list,s);s.throwIfAborted();normalQueue(e);if(!await e.queue.replaceItems(items))return false;s.throwIfAborted();if(desktop)e.batchSession={failed:new Set(),handled:new Set(),allowed:true};return e.queue.select(list.findIndex(t=>!blocked(t)),{restart:true});}),
     addAll:(list:Track[])=>editQueue(async(e,s)=>{if(e.queue.snapshot.items.length+list.length>500)throw {code:'queue-limit'};const items=await batchItems(e,list,s);s.throwIfAborted();if(e.queue.snapshot.items.length+items.length>500)throw {code:'queue-limit'};e.queue.add(items);}),

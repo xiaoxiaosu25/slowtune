@@ -65,6 +65,19 @@ test('desktop verification filters unsupported lossless formats before preparing
   assert.equal((await verifySearchPlayback(api,host,ref,options(),[audioMime(aac)])).format.id,aac.id);
   await assert.rejects(verifySearchPlayback(api,host,ref,options(),[]),{code:'unsupported'});assert.deepEqual(prepared,[aac.id]);
 });
+test('requested audio selection still uses formats when decoder support is omitted',async()=>{
+  const economical={...aac,id:'30216',bitrate:64000};
+  const formats=[flac,{...aac,bitrate:192000},economical];
+  const api={capabilities:()=>({operations:['formats','prepare']}),formats:async()=>formats,prepare:async request=>{
+    const format=formats.find(candidate=>candidate.id===request.formatId);assert(format);
+    return {...playback,format};
+  }};
+  const host={now:Date.now,fetch:async()=>new Response(mp4Prefix(),{status:206,headers:{'Content-Range':'bytes 0-1023/2048'}})};
+  for(const [selection,id] of [[{preference:'compatible'},aac.id],[{preference:'economy'},economical.id],[{preference:'auto',formatId:flac.id},flac.id]]){
+    const verified=await verifySearchPlayback(api,host,ref,options(),undefined,undefined,undefined,undefined,selection);
+    assert.equal(verified.format.id,id);assert.deepEqual(verified.selection,selection);
+  }
+});
 test('desktop rendition fallback stops on global failures and cancellation',async()=>{
   for(const code of ['network','authentication','rate-limited','upstream','cancelled']){
     const controller=new AbortController(),prepared=[];
