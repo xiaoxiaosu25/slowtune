@@ -51,7 +51,7 @@ export async function createPlaylist(page, name) {
   await libraryAction(page, '新建歌单');
   await page.getByLabel('歌单名称').fill(name);
   await page.getByRole('button', { name: '保存歌单', exact: true }).click();
-  await page.locator('dialog').waitFor({ state: 'detached' });
+  await page.getByRole('dialog', { name: '新建歌单', exact: true }).waitFor({ state: 'detached' });
 }
 
 export async function libraryAction(page, name) {

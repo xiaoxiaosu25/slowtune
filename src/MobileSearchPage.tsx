@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ArrowLeftIcon, LinkIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react';
+import { OPEN_LAYER } from './ui/layers';
 
 export function MobileSearchPage({ query, onQuery, onSearch, onBack, onLink, autoFocus, children }: {
   query: string; onQuery: (query: string) => void; onSearch: () => void; onBack: () => void; onLink: () => void; autoFocus: boolean; children: ReactNode;
@@ -7,7 +8,7 @@ export function MobileSearchPage({ query, onQuery, onSearch, onBack, onLink, aut
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (autoFocus) input.current?.focus({ preventScroll: true }); }, []);
   useEffect(() => {
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('dialog[open],:popover-open')) { event.preventDefault(); onBack(); } };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector(OPEN_LAYER)) { event.preventDefault(); onBack(); } };
     window.addEventListener('keydown', escape); return () => window.removeEventListener('keydown', escape);
   }, [onBack]);
   return <main className="mobile-search-page" aria-label="搜索音乐">

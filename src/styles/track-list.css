@@ -1,0 +1,35 @@
+/* ==========================================================================
+   9. 歌曲列表：桌面表格列与手机堆叠共用同一组行结构
+   ========================================================================== */
+.track-list { --track-cover-width:var(--track-cover-size); --track-columns:28px var(--track-cover-width) minmax(120px,1fr) minmax(90px,.4fr) 84px 60px var(--ctl-icon) var(--ctl-icon); display:flex; flex-direction:column; margin-top:var(--sp-3); container:tracks / inline-size; }
+.track-table-heading,.track-row.normal,.track-row.playlist { display:grid; grid-template-columns:var(--track-columns); align-items:center; column-gap:var(--sp-3); }
+.track-table-heading { min-height:36px; padding:0 var(--sp-2) var(--sp-2); color:var(--muted); font-size:var(--fs-meta); border-bottom:1px solid var(--border); }
+:is(.track-row,.chart-song,.queue-track) { min-width:0; border-bottom:1px solid var(--border-subtle); border-radius:var(--r-control); transition:background var(--motion-fast); }
+:is(.track-row,.chart-song,.queue-track):hover { background:var(--hover); }
+:is(.track-row,.chart-song,.queue-track).current { background:var(--selected); }
+.track-row { min-height:68px; padding:var(--sp-2); }
+.track-row.current .track-name,.track-row.current .row-number { color:var(--accent-text); }
+.row-number,.queue-number { color:var(--muted); font-size:var(--fs-meta); font-weight:400; line-height:1.5; text-align:center; font-variant-numeric:tabular-nums; }
+.row-cover { width:var(--track-cover-size); height:var(--track-cover-size); padding:0; border-radius:var(--r-control); overflow:hidden; flex-shrink:0; transition:box-shadow var(--motion-base),background var(--motion-base); }
+.row-cover:hover,.row-cover:focus-visible { background:var(--hover); box-shadow:0 2px 8px color-mix(in srgb,var(--text) 12%,transparent); }
+.row-cover img,.row-cover>.unknown-cover { width:100%; height:100%; object-fit:cover; background:var(--raised); }
+.row-info { min-width:0; }
+.track-name { display:block; width:100%; padding:0; overflow:hidden; text-align:left; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-body); line-height:1.5; }
+.track-name:hover { color:var(--accent-text); }
+.row-sub { display:flex; align-items:center; gap:var(--sp-3); min-width:0; margin-top:2px; color:var(--muted); font-size:var(--fs-meta); }
+.normal .row-sub,.playlist .row-sub { display:none; }
+.row-sub>span:first-child,.row-creator { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.row-creator,.row-duration { color:var(--muted); font-size:var(--fs-meta); }
+.row-duration { text-align:right; font-variant-numeric:tabular-nums; }
+.row-status { display:block; margin-top:var(--sp-1); font-size:var(--fs-meta); line-height:1.6; overflow-wrap:anywhere; }
+.track-row.part,.track-row.queue { display:flex; gap:var(--sp-3); }
+.part .row-info,.queue .row-info { flex:1; }
+/* 按列表实际可用宽度收起次要列，包含展开队列和弹窗的情况。 */
+@container tracks (max-width:800px) {
+  .track-table-heading,.track-row.normal,.track-row.playlist { --track-columns:24px var(--track-cover-width) minmax(90px,1fr) 84px 60px var(--ctl-icon) var(--ctl-icon); column-gap:var(--sp-2); }
+  .row-creator,.track-table-heading>:nth-child(4) { display:none; }
+}
+@container tracks (max-width:540px) {
+  .track-table-heading,.track-row.normal,.track-row.playlist { --track-columns:24px var(--track-cover-width) minmax(90px,1fr) 60px var(--ctl-icon) var(--ctl-icon); }
+  .row-source,.track-table-heading>:nth-child(5) { display:none; }
+}

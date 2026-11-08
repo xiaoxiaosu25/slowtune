@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { request } from './api';
+import { OPEN_DIALOG } from './ui/layers';
 
 /** Authenticated desktop visits progressively enrich retained songs, one bounded request at a time. */
 export function useDesktopSongCatalog(enabled: boolean, refresh: () => Promise<unknown>,deferred=false) {
@@ -9,7 +10,7 @@ export function useDesktopSongCatalog(enabled: boolean, refresh: () => Promise<u
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const run = async () => {
       let delay = 60000;
-      const editing = !!document.querySelector('dialog[open]');
+      const editing = !!document.querySelector(OPEN_DIALOG);
       if (editing) delay = 5000;
       if (!editing && document.visibilityState === 'visible' && navigator.onLine) {
         try {

@@ -1,0 +1,46 @@
+/* ==========================================================================
+   7. 应用骨架：侧栏、顶栏、主内容、手机导航
+   ========================================================================== */
+.app { --sidebar-width:216px; --queue-width:340px; --header-height:72px; --player-height:104px; color:var(--text); background:var(--bg); min-height:100dvh; padding-left:var(--sidebar-width); padding-top:var(--header-height); padding-bottom:var(--player-height); }
+.app.immersive { --queue-width:360px; position:fixed; inset:0; height:100dvh; min-height:0; overflow:hidden; padding-left:0; padding-bottom:env(safe-area-inset-bottom); }
+.sidebar { position:fixed; inset:0 auto 0 0; width:var(--sidebar-width); padding:var(--sp-5) var(--sp-3) calc(var(--sidebar-player-clearance,0px) + var(--sp-3)); border-right:1px solid var(--border); display:flex; flex-direction:column; background:var(--sidebar); z-index:var(--z-sticky); }
+.brand { font-size:var(--brand-size); line-height:1.2; font-weight:750; letter-spacing:1px; text-align:left; }
+.sidebar>.brand { display:flex; align-items:center; gap:10px; padding:0 var(--sp-3); margin-bottom:var(--sp-6); }
+.brand-mark { display:grid; place-items:center; flex:0 0 32px; width:32px; height:32px; border-radius:var(--r-card); background:var(--primary); color:var(--on-primary); }
+.brand-wordmark { display:grid; gap:3px; }
+.brand-wordmark>small { font-size:var(--brand-tagline-size); letter-spacing:.17em; line-height:1; font-weight:500; color:var(--muted); }
+.sidebar-nav { display:flex; flex-direction:column; gap:var(--sp-1); }
+.sidebar-library { min-height:0; margin-top:var(--sp-5); padding-top:var(--sp-4); border-top:1px solid var(--border); overflow:auto; flex:1; }
+.sidebar-heading { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-2); padding-left:var(--sp-3); margin-bottom:var(--sp-2); color:var(--muted); font-size:var(--fs-meta); }
+.sidebar-playlist { display:flex; align-items:center; gap:var(--sp-3); width:100%; min-height:62px; padding:var(--sp-2); text-align:left; border-radius:var(--r-control); transition:background var(--motion-fast); }
+.sidebar-favorite-art { display:grid; place-items:center; width:var(--track-cover-size); height:var(--track-cover-size); flex:0 0 var(--track-cover-size); border-radius:var(--r-control); color:var(--accent-text); background:var(--selected); }
+.sidebar-playlist:hover { background:var(--hover); }
+.sidebar-playlist>img,.sidebar-playlist>.unknown-cover { width:var(--track-cover-size); height:var(--track-cover-size); object-fit:cover; background:var(--raised); border-radius:var(--r-control); flex-shrink:0; }
+.sidebar-playlist>span:not(.unknown-cover):not(.sidebar-favorite-art) { min-width:0; flex:1; }
+.sidebar-playlist strong { display:block; font-size:var(--fs-secondary); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sidebar-playlist small { display:block; color:var(--muted); margin-top:2px; font-size:var(--fs-meta); }
+.sidebar-playlist.active { background:var(--selected); }
+.sidebar-empty { padding:var(--sp-3); color:var(--muted); font-size:var(--fs-meta); line-height:1.8; }
+.topbar-actions { --ctl-icon:var(--ctl-h); display:flex; flex-shrink:0; align-items:center; gap:var(--sp-2); margin-left:auto; }
+.topbar-actions>.btn.active { color:var(--accent-text); background:var(--selected); }
+.topbar { position:fixed; top:0; left:var(--sidebar-width); right:0; height:var(--header-height); padding:0 var(--sp-6); display:flex; align-items:center; gap:var(--sp-3); border-bottom:1px solid var(--border-subtle); background:color-mix(in srgb,var(--bg) 92%,transparent); backdrop-filter:blur(18px); z-index:var(--z-sticky); }
+.topbar>.brand,.desktop-nav { display:none; }
+.topbar>.search-field { flex:1; min-width:0; }
+.search-field { display:flex; align-items:center; gap:var(--sp-3); width:100%; max-width:520px; height:var(--ctl-h); padding:0 var(--sp-3); margin-right:auto; border:1px solid var(--border); border-radius:var(--r-control); background:var(--surface); color:var(--muted); transition:border-color var(--motion-fast),box-shadow var(--motion-fast); }
+.search-field input { width:100%; min-width:0; border:0; background:transparent; color:var(--text); font-size:var(--fs-body); }
+.search-field input::placeholder { color:var(--muted); }
+.search-field:focus-within { border-color:var(--accent); box-shadow:var(--focus-ring); }
+.search-field input:focus-visible { outline:0; }
+.search-field button { display:flex; align-items:center; justify-content:center; flex:0 0 32px; width:32px; height:32px; padding:0; border-radius:50%; }
+.search-field button:hover { color:var(--text); background:var(--hover); }
+.search-field-inline { width:250px; margin:0; }
+.main-content { width:100%; max-width:var(--content-max); min-width:0; margin:0 auto; padding:28px var(--sp-6) var(--sp-6); }
+.app.has-queue:not(.immersive) { padding-right:var(--queue-width); }
+.mobile-nav { display:none; }
+
+/* ==========================================================================
+   8. 导航项：侧栏导航与设置分组共用
+   ========================================================================== */
+.nav-item { display:flex; align-items:center; gap:var(--sp-4); width:100%; min-height:44px; padding:0 var(--sp-4); border-radius:var(--r-control); color:var(--muted); font-size:var(--fs-body); text-align:left; transition:background var(--motion-fast),color var(--motion-fast); }
+.nav-item:hover { background:var(--hover); color:var(--text); }
+.nav-item.active { background:var(--selected); color:var(--accent-text); font-weight:600; }

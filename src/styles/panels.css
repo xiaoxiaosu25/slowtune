@@ -1,0 +1,53 @@
+/* ==========================================================================
+   18. 分 P 面板与睡眠面板
+   ========================================================================== */
+.parts-panel>.muted { font-size:var(--fs-secondary); line-height:1.8; }
+/* 分 P 工具条吸附在弹窗标题之下：偏移＝标题实际可见高度（关闭按钮图标高 + 下内边距 + 边框），
+   长分 P 列表滚动时「全选分 P／清空选择」保持可达，且与吸附标题不重叠。 */
+.parts-toolbar { margin:var(--sp-3) 0; position:sticky; top:calc(var(--ctl-icon) + var(--sp-3) + 1px); z-index:var(--z-sticky); padding-top:var(--sp-2); background:var(--surface); border-bottom:1px solid var(--border); }
+.parts-toolbar strong { color:var(--accent-text); font-size:var(--fs-secondary); font-weight:600; }
+.parts-actions { margin-bottom:var(--sp-4); }
+.parts-playlist { align-items:flex-end; gap:var(--sp-4); padding:var(--sp-4); }
+.parts-playlist .field { flex:1 1 180px; }
+.parts-list { display:flex; flex-direction:column; }
+.part-entry { display:flex; align-items:flex-start; gap:var(--sp-3); border-bottom:1px solid var(--border); }
+.part-select { display:flex; flex-direction:column; align-items:center; gap:var(--sp-2); flex:0 0 36px; padding-top:var(--sp-4); color:var(--muted); font-size:var(--fs-meta); }
+.part-select input { width:18px; height:18px; accent-color:var(--accent); }
+.part-content { flex:1; min-width:0; }
+.part-content .track-row { border:0; }
+.part-content .track-name { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; white-space:normal; }
+.part-from { margin:0 0 var(--sp-2) 70px; }
+.sleep-modal { width:min(540px,calc(100% - var(--sp-6))); }
+.sleep-panel { display:grid; gap:var(--sp-5); }
+.sleep-summary { display:flex; align-items:center; gap:var(--sp-4); padding:var(--sp-5); border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border)); border-radius:var(--r-card); background:linear-gradient(120deg,var(--selected),color-mix(in srgb,var(--surface) 86%,var(--selected))); }
+.sleep-summary-icon { display:grid; place-items:center; width:52px; height:52px; flex:0 0 52px; border-radius:50%; background:color-mix(in srgb,var(--accent) 12%,var(--surface)); color:var(--accent-text); }
+.sleep-summary-label { margin-bottom:var(--sp-1); color:var(--accent-text); font-size:var(--fs-meta); }
+.sleep-summary strong { display:block; margin-bottom:var(--sp-1); font-size:var(--fs-heading); font-weight:600; line-height:1.4; font-variant-numeric:tabular-nums; }
+.sleep-summary.is-running strong { font-size:var(--fs-title); letter-spacing:1px; }
+.sleep-summary .muted { font-size:var(--fs-meta); }
+.sleep-quick { display:grid; gap:var(--sp-3); }
+.sleep-section-heading { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:var(--fs-secondary); }
+.sleep-section-heading small { margin-left:auto; font-size:var(--fs-caption); }
+.sleep-presets { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:var(--sp-2); }
+.sleep-preset { position:relative; display:grid; justify-items:center; gap:2px; padding:var(--sp-3) var(--sp-1); border:1px solid var(--border); border-radius:var(--r-card); background:var(--raised); transition:background var(--motion-fast),border-color var(--motion-fast); }
+.sleep-preset strong { font-size:var(--fs-heading); font-weight:600; line-height:1.4; font-variant-numeric:tabular-nums; }
+.sleep-preset>span { color:var(--muted); font-size:var(--fs-caption); }
+.sleep-preset:hover:not(:disabled),.sleep-preset.selected { border-color:var(--accent); background:var(--selected); }
+.sleep-preset.selected { color:var(--accent-text); }
+.sleep-preset>svg { position:absolute; top:6px; right:6px; }
+.sleep-current { justify-content:flex-start; gap:var(--sp-2); height:44px; width:100%; padding:0 var(--sp-3); border:1px solid var(--border); background:var(--raised); color:var(--text); font-size:var(--fs-secondary); font-weight:500; }
+.sleep-current>svg { color:var(--muted); }
+.sleep-current .muted { margin-left:auto; font-size:var(--fs-caption); }
+.sleep-current:hover:not(:disabled),.sleep-current[aria-pressed="true"] { border-color:var(--accent); background:var(--selected); }
+.sleep-form { padding-top:var(--sp-4); border-top:1px solid var(--border); }
+.sleep-form .field-stack { gap:var(--sp-3); }
+.sleep-form legend { margin:0; font-size:var(--fs-secondary); }
+.sleep-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--sp-3); }
+.sleep-duration { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:var(--sp-2); }
+.sleep-action { grid-column:1/-1; }
+.sleep-form :is(.input,.select) { height:44px; min-width:0; border-color:var(--border); }
+.sleep-form :is(.input,.select):focus-visible { border-color:var(--accent); }
+.sleep-hint { font-size:var(--fs-meta); }
+.sleep-actions { display:flex; gap:var(--sp-2); }
+.sleep-actions>.btn { height:44px; }
+.sleep-actions>.btn-primary { flex:1; }

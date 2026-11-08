@@ -2,6 +2,7 @@ import { SpinnerGapIcon, WarningCircleIcon, XIcon } from '@phosphor-icons/react'
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ControlPopover } from './ControlPopover';
+import { OPEN_DIALOG, topDialog } from './ui/layers';
 import './desktop-feedback.css';
 
 type Failure = { id: string; title: string; reason: string };
@@ -15,17 +16,17 @@ export function PlaybackFeedback(props: PlaybackFeedbackProps) {
   const [target, setTarget] = useState<HTMLElement | null>(null);
   useEffect(() => {
     const locate = () => {
-      const dialog = Array.from(document.querySelectorAll('dialog[open]')).at(-1);
+      const dialog = topDialog();
       const next = dialog ? dialog.querySelector<HTMLElement>('[data-desktop-playback-slot]') : document.querySelector<HTMLElement>('.desktop-lyrics-controls [data-desktop-playback-slot]') ?? document.querySelector<HTMLElement>('.playbar [data-desktop-playback-slot],.listening-transport [data-desktop-playback-slot]');
       setTarget(old => old === next ? old : next);
     };
     locate();
     const observer = new MutationObserver(locate);
-    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open'] });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open','data-state'] });
     return () => observer.disconnect();
   }, []);
   if (!target) return null;
-  const dialog = target.closest('dialog');
+  const dialog = target.closest(OPEN_DIALOG);
   return createPortal(<>
     {props.preparing && dialog && !dialog.querySelector('.play-toggle') && <button className="btn btn-ghost btn-sm playback-pending" aria-busy="true" onClick={props.onStop}><SpinnerGapIcon size={18}/>取消播放准备</button>}
     <PlaybackIssue {...props}/>

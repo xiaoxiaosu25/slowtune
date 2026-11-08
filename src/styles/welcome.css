@@ -1,0 +1,69 @@
+/* ==========================================================================
+   19. 登录页与构建提示
+   ========================================================================== */
+.welcome-screen { position:relative; min-height:100dvh; color:var(--text); background:var(--bg); container-type:inline-size; isolation:isolate; }
+.welcome-background,.welcome-shade { position:absolute; inset:0; width:100%; height:100%; z-index:-2; }
+.welcome-background { object-fit:cover; object-position:var(--welcome-x) var(--welcome-y); }
+.welcome-shade { background:var(--welcome-shade-color); opacity:var(--welcome-shade); z-index:-1; pointer-events:none; }
+.welcome-screen[data-background="plain"] .welcome-shade { display:none; }
+.welcome-layout { display:flex; flex-direction:column; min-height:100dvh; max-width:1600px; margin:auto; padding:32px clamp(24px,5vw,80px); gap:32px; }
+.welcome-header,.welcome-footer { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.welcome-header { min-height:44px; }
+.welcome-signature { display:flex; align-items:center; gap:10px; font-size:var(--fs-heading); font-weight:600; letter-spacing:.01em; color:var(--on-art); text-shadow:var(--welcome-signature-shadow); }
+.welcome-header>.btn { color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:50%; width:44px; height:44px; }
+.welcome-content { display:flex; flex:1; align-items:center; width:100%; padding-block:24px; }
+.welcome-card { width:400px; max-width:100%; margin-left:auto; padding:44px 36px 28px; border:1px solid var(--border); border-radius:var(--r-overlay); background:color-mix(in srgb,var(--surface) 97%,transparent); box-shadow:var(--welcome-card-shadow); }
+.welcome-screen[data-position="left"] .welcome-card { margin-left:0; margin-right:auto; }
+.welcome-screen[data-position="center"] .welcome-card { margin-inline:auto; }
+.welcome-eyebrow { display:block; font-size:var(--fs-caption); font-weight:600; letter-spacing:.15em; line-height:1.6; color:var(--muted); }
+.welcome-card h1 { margin:20px 0 12px; font-size:var(--welcome-title-size); font-weight:600; letter-spacing:.12em; line-height:1.3; }
+.welcome-tagline { margin:0; color:var(--muted); font-size:var(--fs-body); line-height:1.8; }
+.welcome-action { margin-top:36px; }
+.welcome-login,.welcome-status { display:grid; gap:16px; }
+.welcome-login .field { gap:10px; }
+.welcome-password { position:relative; display:block; }
+.welcome-password .input { width:100%; min-height:46px; padding-right:48px; }
+.welcome-password>.btn { position:absolute; right:1px; top:50%; transform:translateY(-50%); width:44px; height:44px; }
+.welcome-enter { width:100%; justify-content:space-between; min-height:46px; padding-inline:16px; }
+.welcome-help { font-size:var(--fs-meta); line-height:1.8; color:var(--muted); }
+.welcome-help summary { cursor:pointer; width:fit-content; }
+.welcome-help p { margin-top:8px; }
+.welcome-card-footnote { display:block; margin-top:36px; padding-top:18px; border-top:1px solid var(--border-subtle); font-size:var(--fs-meta); color:var(--muted); }
+.welcome-status { min-height:112px; align-content:center; }
+.welcome-status .muted { margin:0; font-size:var(--fs-secondary); line-height:1.7; }
+.welcome-loading { display:flex; align-items:center; gap:12px; font-size:var(--fs-body); }
+.welcome-spinner { animation:welcome-spin 1.4s linear infinite; flex-shrink:0; }
+@keyframes welcome-spin { to { transform:rotate(360deg); } }
+.welcome-footer { color:var(--on-art); text-shadow:var(--welcome-footer-shadow); font-size:var(--fs-meta); line-height:1.7; }
+.welcome-screen[data-background="plain"] .welcome-signature,.welcome-screen[data-background="plain"] .welcome-footer { color:var(--muted); text-shadow:none; }
+@container (max-width:640px) {
+  .welcome-background { object-position:var(--welcome-mobile-x) var(--welcome-mobile-y); }
+  .welcome-layout { padding:20px 20px max(20px,env(safe-area-inset-bottom)); gap:24px; }
+  .welcome-content { align-items:flex-end; padding-block:64px 0; }
+  .welcome-card { width:100%; margin:0!important; padding:28px 24px 24px; border-radius:var(--r-overlay); }
+  .welcome-card h1 { font-size:var(--welcome-title-size-compact); margin-top:16px; }
+  .welcome-action { margin-top:28px; }
+  .welcome-card-footnote { margin-top:24px; padding-top:16px; }
+  .welcome-footer { gap:8px; font-size:var(--fs-caption); flex-wrap:wrap; }
+}
+.welcome-settings { margin-top:40px; padding-top:32px; border-top:1px solid var(--border); }
+.settings-form-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.welcome-preview-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.welcome-preview-toolbar h4 { margin:0; }
+.welcome-preview-frame { position:relative; width:100%; overflow:hidden; border:1px solid var(--control-border); border-radius:var(--r-card); touch-action:none; cursor:grab; background:var(--bg); }
+.welcome-preview-frame:active { cursor:grabbing; }
+.welcome-preview-frame.mobile { max-width:320px; margin-inline:auto; }
+.theme-preview.welcome-preview-scene { position:absolute; display:block; top:0; left:0; padding:0; border:0; border-radius:0; gap:0; transform-origin:top left; pointer-events:none; }
+.welcome-screen-preview,.welcome-screen-preview .welcome-layout { min-height:800px; height:800px; }
+.welcome-preview-input { color:var(--muted); display:flex; align-items:center; min-height:46px; }
+.welcome-range-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.welcome-settings input[type="range"] { width:100%; min-height:32px; accent-color:var(--accent); }
+.welcome-import { position:relative; overflow:hidden; cursor:pointer; }
+.welcome-import input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.access-settings form { max-width:640px; }
+.access-settings .welcome-password { max-width:420px; }
+@media (max-width:480px) { .welcome-range-grid { grid-template-columns:1fr; gap:12px; } }
+@media (prefers-reduced-motion:reduce) { .welcome-spinner { animation:none; } }
+.build-notice { display:grid; align-content:center; justify-items:start; gap:var(--sp-4); min-height:100dvh; max-width:680px; margin:0 auto; padding:var(--sp-7) var(--sp-5); background:var(--bg); color:var(--text); }
+.build-notice h1 { font-size:var(--fs-title); line-height:1.4; }
+.build-notice p { color:var(--muted); font-size:var(--fs-secondary); line-height:1.9; }

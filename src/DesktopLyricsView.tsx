@@ -11,6 +11,8 @@ import { DesktopImmersiveChrome } from './desktop-chrome';
 import { useDesktopLyricSize } from './DesktopLyricFont';
 import { ControlPopover } from './ControlPopover';
 import { LyricOffsetControls } from './LyricOffsetControls';
+import { useArtworkLayers } from './use-artwork-layers';
+import { OPEN_LAYER } from './ui/layers';
 
 export function LyricsToggle({ active, onClick }: { active: boolean; onClick: () => void }) {
   const label = active ? '关闭沉浸歌词' : '打开沉浸歌词';
@@ -18,17 +20,8 @@ export function LyricsToggle({ active, onClick }: { active: boolean; onClick: ()
 }
 
 function LyricBackdrop({ artwork }: { artwork?: string }) {
-  const [layers, setLayers] = useState<{ url: string; key: number }[]>([]);
-  const sequence = useRef(0);
-  useEffect(() => {
-    let cancelled = false;
-    if (!artwork) { setLayers([]); return; }
-    const img = new Image(); img.referrerPolicy = 'no-referrer';
-    img.onload = () => { if (!cancelled) setLayers(old => [...old.slice(-1), { url: artwork, key: ++sequence.current }]); };
-    img.onerror = () => { if (!cancelled) setLayers([]); }; img.src = artwork;
-    return () => { cancelled = true; img.onload = img.onerror = null; };
-  }, [artwork]);
-  return <div className="desktop-lyrics-backdrop" aria-hidden="true">{layers.map(layer => <img key={layer.key} src={layer.url} alt="" referrerPolicy="no-referrer" onAnimationEnd={() => setLayers(old => old.at(-1)?.key === layer.key ? [layer] : old)}/>)}</div>;
+  const { layers, settle } = useArtworkLayers(artwork);
+  return <div className="desktop-lyrics-backdrop" aria-hidden="true">{layers.map(layer => <img key={layer.key} src={layer.url} alt="" referrerPolicy="no-referrer" onAnimationEnd={() => settle(layer.key)}/>)}</div>;
 }
 
 export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo, controls, onSeek, onClose, onChooseLyrics }: { lyrics: LyricsController; playback: LyricPlayback; artwork?: string; visual: ReactNode; songInfo: ReactNode; controls: ReactNode; onSeek: (seconds: number) => void; onClose: () => void; onChooseLyrics: () => void }) {
@@ -47,7 +40,7 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
     if(!window.matchMedia('(hover:hover) and (pointer:fine)').matches||!idleState.current.playing)return;
     idleTimer.current=setTimeout(()=>{
       const current=idleState.current,focused=window.document.activeElement;
-      if(!current.playing||current.browsing||current.settings||window.document.querySelector(':popover-open,dialog[open]')||focused&&surface.current?.contains(focused)&&focused!==reading.current)return;
+      if(!current.playing||current.browsing||current.settings||window.document.querySelector(OPEN_LAYER)||focused&&surface.current?.contains(focused)&&focused!==reading.current)return;
       setToolsVisible(false);
     },3000);
   };

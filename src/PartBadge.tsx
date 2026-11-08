@@ -1,14 +1,15 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Track } from './api';
 import { PartMetadataStore } from './multipart';
+import { OPEN_DIALOG, topDialog } from './ui/layers';
 
 export function PartBadge({ track, store, active, onOpen, current = false, viewKey = '' }: { track: Track; store: PartMetadataStore; active: boolean; onOpen: () => void; current?: boolean; viewKey?: string }) {
   const element = useRef<HTMLSpanElement>(null);
   const entry = useSyncExternalStore(store.subscribe, () => store.peek(track.ref.id));
   useEffect(() => {
     if (!active || track.ref.provider !== 'bilibili') return;
-    const top = Array.from(document.querySelectorAll('dialog[open]')).at(-1);
-    if (top && element.current?.closest('dialog') !== top) return;
+    const top = topDialog();
+    if (top && element.current?.closest(OPEN_DIALOG) !== top) return;
     const controller = new AbortController();
     if (track.parts?.length) store.seed(track);
     const observer = new IntersectionObserver(records => {

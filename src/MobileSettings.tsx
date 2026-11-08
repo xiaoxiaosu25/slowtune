@@ -13,6 +13,7 @@ import { AboutPanel } from './AboutPanel';
 import { getThemeState, subscribeTheme, setThemePalette, setThemePreference, themePalettes } from './theme';
 import { MobileSettingRow } from './MobileSettingsControls';
 import { mobileSettingsTitles, type MobileSettingsSection } from './mobile-settings';
+import { OPEN_DIALOG, requestLayerClose } from './ui/layers';
 
 const modes = [{ value: 'system', label: '跟随系统' }, { value: 'light', label: '白天' }, { value: 'dark', label: '黑夜' }] as const;
 
@@ -54,7 +55,7 @@ export function MobileSettings({ active, section, onSection, ...props }: Props) 
   const reload = useRef(props.onReload); reload.current = props.onReload;
   useEffect(() => { reload.current(); }, []);
   useEffect(() => {
-    if (!active) host.current?.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(dialog => dialog.dispatchEvent(new Event('cancel', {cancelable:true})));
+    if (!active) host.current?.querySelectorAll(OPEN_DIALOG).forEach(requestLayerClose);
   }, [active]);
   const openAbout = () => onSection('about');
   const youtubeEnabled = props.sources?.youtube.enabled ?? props.status?.providers.youtube.enabled ?? props.status?.providers.youtube.available ?? false;

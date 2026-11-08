@@ -155,7 +155,14 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
       ['discovery',async()=>{await nav('发现');if(await page.locator('.app').getAttribute('data-layout')==='mobile'){await page.getByRole('button',{name:'音乐推荐栏目操作',exact:true}).click();await page.getByRole('dialog',{name:'音乐推荐栏目操作',exact:true}).getByRole('button',{name:'歌曲列表',exact:true}).click();}else await page.getByRole('button',{name:'音乐推荐列表视图',exact:true}).click();return page.locator('[data-shelf-id="music-recommendation"] .track-list');}],
       ['favorites',async()=>{await nav('歌单');await selectPlaylist(page,'我的收藏');return page.locator('.list-view .track-list');}],
       ['playlist',async()=>{await nav('歌单');await selectPlaylist(page,'重复条目歌单');return page.locator('.list-view .track-list');}],
-      ['follows',async()=>{await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.getByRole('button',{name:'关注的最近更新列表视图',exact:true}).click();return page.locator('.follows-page .track-list');}],
+      ['follows',async()=>{
+        await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();
+        if(await page.locator('.app').getAttribute('data-layout')==='mobile'){
+          await page.getByRole('button',{name:'关注页面操作',exact:true}).click();
+          await page.getByRole('dialog',{name:'关注页面操作',exact:true}).getByRole('button',{name:'歌曲列表',exact:true}).click();
+        }else await page.getByRole('button',{name:'关注的最近更新列表视图',exact:true}).click();
+        return page.locator('.follows-page .track-list');
+      }],
       ['search',async()=>{await nav('发现');const mobile=await page.locator('.app').getAttribute('data-layout')==='mobile';if(mobile){await nav('搜索');await page.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('超长歌曲标题与现场演出完整版，用于验证搜索列表中的列对齐');await page.getByRole('main',{name:'搜索音乐',exact:true}).getByRole('button',{name:'搜索',exact:true}).click();}else {await page.getByLabel('搜索歌曲或视频').fill('超长歌曲标题与现场演出完整版，用于验证搜索列表中的列对齐');await page.getByRole('button',{name:'开始搜索',exact:true}).click();}return page.getByRole(mobile?'main':'dialog',{name:'搜索音乐',exact:true}).locator('.track-list').first();}],
     ];
     for(const [name,open] of scenarios){
@@ -181,12 +188,24 @@ test('list actions: loaded and filtered playback, search drafts, queue identity 
     writeFileSync(join(artifacts,'list-layout-report.json'),JSON.stringify(measurements,null,2));
   });
   await t.test('light and dark layouts align toolbar controls, fit all target widths and keep mobile touch buttons at least 48px',async()=>{
-    await page.reload();await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.getByRole('button',{name:'关注的最近更新封面视图',exact:true}).click();await page.locator('.follows-page .music-card').nth(1).waitFor();
+    await page.setViewportSize({width:1440,height:1000});await page.reload();await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.getByRole('button',{name:'关注的最近更新封面视图',exact:true}).click();await page.locator('.follows-page .music-card').nth(1).waitFor();
     const measurements=[];
     for(const theme of ['light','dark'])for(const width of [1440,1024,390,320]){
       await page.emulateMedia({colorScheme:theme});await page.setViewportSize({width,height:1000});await page.waitForFunction(()=>document.querySelector('.app')?.dataset.layout===(innerWidth>760?'desktop':'mobile'));await page.evaluate(()=>document.fonts.ready);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-      const buttons=await page.locator('.follow-toolbar>.btn').evaluateAll(elements=>elements.map(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return {label:el.textContent,top:r.top,height:r.height,radius:s.borderRadius,background:s.backgroundColor};}));assert(buttons.every(x=>x.height===(width<=760?48:40)&&x.radius==='12px'),JSON.stringify({theme,width,buttons}));if(width>760)assert(buttons.every(x=>x.top===buttons[0].top),'desktop actions align');measurements.push({theme,width,buttons});
+      const buttons=await page.locator('.follow-toolbar>.btn, .mobile-follow-play').evaluateAll(elements=>elements.map(el=>{
+        const bounds=el.getBoundingClientRect(),style=getComputedStyle(el);
+        return {label:el.getAttribute('aria-label')??el.textContent,top:bounds.top,width:bounds.width,height:bounds.height,radius:style.borderRadius,background:style.backgroundColor};
+      }));
+      const detail=JSON.stringify({theme,width,buttons});
+      if(width<=760){
+        assert.deepEqual(buttons.map(({label,radius})=>[label,radius]),[['刷新','8px'],['关注页面操作','50%'],['播放本页','999px']],detail);
+        assert(buttons.every(button=>button.width>=48&&button.height>=48),detail);
+      }else{
+        assert(buttons.length>0&&buttons.every(button=>button.height===40&&button.radius==='8px'),detail);
+        assert(buttons.every(button=>button.top===buttons[0].top),'desktop actions align');
+      }
+      measurements.push({theme,width,buttons});
       await page.screenshot({path:join(artifacts,`updates-${theme}-${width}.png`)});
       if(width===1440){await page.getByRole('button',{name:'查看 UP / 博主 · '+a.title,exact:true}).first().click();await page.getByRole('button',{name:'打开合集 测试合集',exact:true}).click();await page.locator('.follows-page .track-row').nth(1).waitFor();await page.screenshot({path:join(artifacts,`collection-${theme}.png`)});await nav('关注');await page.getByRole('button',{name:'最近更新',exact:true}).click();await page.locator('.follows-page .music-card').nth(1).waitFor();}
     }

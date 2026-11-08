@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { DotsThreeIcon } from '@phosphor-icons/react';
+import { OPEN_DIALOG } from './ui/layers';
 import './action-menu.css';
 
 export type MenuAction = { id: string; label: string; ariaLabel?: string; icon?: ReactNode; disabled?: boolean; hint?: string; danger?: boolean; onSelect?: () => void; href?: string } | { separator: true };
@@ -32,7 +33,7 @@ export function ActionMenu({ label, title, subtitle, target, actions, className 
     const show = (event: MouseEvent | KeyboardEvent) => {
       if (!matchMedia('(min-width:761px)').matches || event.defaultPrevented || menu.contains(event.target as Node)) return;
       const element = event.target instanceof Element ? event.target : null;
-      if (element?.closest('dialog') !== scope.closest('dialog') || element?.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
+      if (element?.closest(OPEN_DIALOG) !== scope.closest(OPEN_DIALOG) || element?.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return;
       if (event instanceof KeyboardEvent && event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return;
       event.preventDefault(); event.stopPropagation();
       const focused = element?.closest<HTMLElement>('button,a[href],[tabindex]');

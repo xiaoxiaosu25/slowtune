@@ -47,7 +47,6 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   await page.goto(fixture.base); await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await page.locator('.playing-art-vinyl .vinyl-material').evaluate(img => img.decode());
   await page.evaluate(() => document.fonts.ready);
-  const normal = await geometry(page);
   const normalVinyl = await page.locator('.vinyl-record').boundingBox(), normalDisc = await page.locator('.playing-art-disc .playing-art-frame').boundingBox();
   assert(Math.abs(normalVinyl.width - normalDisc.width) < 1, 'normal desktop vinyl matches the round cover diameter');
   assert.equal(await page.locator('.playing-title-trigger').evaluate(el => getComputedStyle(el).textAlign), 'center');
@@ -59,6 +58,9 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   await page.waitForFunction(() => document.querySelector('audio').currentTime > .2);
   await page.locator('.listening-transport .play-toggle').click();
   await seek(page, 9.5);
+  // Starting playback adds the current-quality control. Compare the same paused layout on both sides.
+  await page.getByRole('button', { name: '当前音质', exact: true }).waitFor();
+  const normal = await geometry(page);
   const source = await page.locator('audio').getAttribute('src'), prepares = fixture.preparations.length, lyricReads = requests.length;
   const element = await page.locator('audio').elementHandle();
   assert.equal(engineLoads.length, 0, 'the renderer is not downloaded in ordinary mode');
