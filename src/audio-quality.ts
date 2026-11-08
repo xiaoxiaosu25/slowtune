@@ -17,6 +17,40 @@ export function desktopPlaybackPlan(plan:PlaybackPlan):PlaybackPlan{
   return desktopSurface()?{...plan,timeouts:{resolve:60,initial:30,stall:30,...plan.timeouts}}:plan;
 }
 
+/** Read the candidate delivery before the player releases its current lease. */
+export async function checkAudioDelivery(playUrl: string, signal: AbortSignal) {
+  const prefixBytes = 1024;
+  const budget = AbortSignal.any([signal, AbortSignal.timeout(20000)]);
+  let response: Response | undefined;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  try {
+    response = await fetch(playUrl, { headers: { Range: `bytes=0-${prefixBytes - 1}` }, signal: budget });
+    if (!response.ok) {
+      const code = response.status === 403 ? 'restricted' : response.status === 429 ? 'rate-limited' : 'network';
+      throw { code };
+    }
+    if (!response.body || !response.headers.get('Content-Type')?.toLowerCase().startsWith('audio/')) throw { code: 'protocol' };
+    // A direct server may ignore Range. In that case, read one nonempty chunk and cancel the stream.
+    const end = response.headers.get('Content-Range')?.match(/^bytes 0-(\d+)\/\d+$/)?.[1];
+    const expected = response.status === 206 ? Number(end) + 1 : 1;
+    if (!Number.isInteger(expected) || expected < 1 || expected > prefixBytes) throw { code: 'protocol' };
+    reader = response.body.getReader();
+    let received = 0;
+    while (received < expected) {
+      const { done, value } = await reader.read();
+      budget.throwIfAborted();
+      if (done) throw { code: 'protocol' };
+      received += value.byteLength;
+    }
+  } catch (error) {
+    signal.throwIfAborted();
+    if (budget.aborted) throw { code: 'timeout' };
+    throw error;
+  } finally {
+    await (reader ? reader.cancel() : response?.body?.cancel())?.catch(() => {});
+  }
+}
+
 export class BestAudioBridge extends MusicPlayerBridge {
   private preparedEntries: Map<string, MusicEntry>;
   private verifiedAudio: WeakMap<EntryRef, VerifiedAudio>;

@@ -4,7 +4,7 @@ import { StudioPlayer } from '@studio/player/core';
 import { QueueController, type QueueItem } from '@studio/player/queue';
 import { MediaSessionController } from '@studio/player/media-session';
 import { SleepTimerController, type SleepTimerRule, type SleepTimerSnapshot } from '@studio/player/sleep-timer';
-import { BestAudioBridge, retainVerifiedAudio } from './audio-quality';
+import { BestAudioBridge, checkAudioDelivery, retainVerifiedAudio } from './audio-quality';
 import type {DesktopAudioApi,PlaybackFailureFact} from '../server/audio-quality';
 import type { AudioFormat, EntryRef } from '@studio/music-sources';
 import type { MusicClient } from '@studio/music-sources/client';
@@ -231,7 +231,11 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     queue.addEventListener('error',queueError);
     // Sleep rules stay outside the playback queue: the countdown ticks every second while it runs.
     const onSleep=()=>setSleep(sleep.snapshot);
-    const onSleepExpire=()=>{if(desktopSurface()){operation.current?.abort();owned.recovery.cancelEnvironment();}};
+    const onSleepExpire=()=>{
+      const desktop=desktopSurface(),pending=operation.current;
+      if(desktop||pending?.signal===audioPreparing.current||pending?.signal===versionPreparing.current)pending?.abort();
+      if(desktop)owned.recovery.cancelEnvironment();
+    };
     const onSleepComplete=()=>{if(desktopSurface()&&sleep.snapshot.status==='expired'&&sleep.snapshot.action==='close')window.slowTuneDesktop?.quit();};
     sleep.addEventListener('change',onSleep);
     sleep.addEventListener('expire',onSleepExpire);
@@ -389,7 +393,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       const intent=e.intent,wasStopped=desktopSurface()&&replaceCurrent&&e.player.state==='stopped';let prepared:Awaited<ReturnType<typeof prepareSelection>>|undefined,staged:PlaybackEngine['staged'];versionPreparing.current=signal;
       try{
         prepared=await prepareSelection(e,active,selection,signal,operationId);
-        signal.throwIfAborted();if(e.intent!==intent||(e.queue.snapshot.current?.id??e.restored)!==id||e.sleep.snapshot.status==='expired'||!wasStopped&&e.player.state==='stopped'||!enabled.current&&prepared.track.ref.provider==='youtube')return false;
+        signal.throwIfAborted();if(e.intent!==intent||(e.queue.snapshot.current?.id??e.restored)!==id||!wasStopped&&e.player.state==='stopped'||!enabled.current&&prepared.track.ref.provider==='youtube')return false;
         staged={id,track:prepared.track,plan:prepared.plan,used:false};e.staged=staged;resumeBatchItem(e,id);e.ownCommit=true;
         const controls={rate:e.player.playbackRate,volume:e.player.volume,muted:e.player.muted},epoch=controlsEpoch.current;
         let task;try{task=withPlaybackDiagnostic(operationId,()=>e.queue.selectId(id,{restart:true,autoplay:!current||!e.player.paused&&e.player.playbackRequested}));}finally{e.ownCommit=false;}
@@ -522,8 +526,9 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       const staged={id:original.resourceId,plan:prepared,signal,used:false};
       const cancelPreparation=()=>e.player.sourceController.cancelSourcePreparation();
       try{
+        await checkAudioDelivery(prepared.playUrl,signal);
         signal.throwIfAborted();
-        if(e.player.currentPlan!==original||e.queue.snapshot.current?.id!==id||e.sleep.snapshot.status==='expired')return false;
+        if(e.player.currentPlan!==original||e.queue.snapshot.current?.id!==id||!e.player.canPrepareSource)return false;
         e.audioChange=staged;
         signal.addEventListener('abort',cancelPreparation,{once:true});
         await e.player.prepareSource({reason:'seek'});

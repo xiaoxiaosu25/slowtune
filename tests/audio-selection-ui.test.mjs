@@ -38,11 +38,44 @@ test('audio selection uses actual HTTP preparation, one media element, selection
     for(let cycle=0;cycle<100;cycle++){const formatId=cycle%2?'30232':'30280';assert.equal(await invoke('changeAudio',{preference:'auto',formatId}),true);await page.waitForFunction(position=>{const a=document.querySelector('audio');return a.readyState>=2&&a.currentTime>=position-.15&&a.paused;},before.time);assert.equal((await state()).elements,1);}
     const bounded=await invoke('records');assert.equal(bounded.tracks,1);assert.equal(bounded.preparing,0);assert(bounded.aliases<=2&&bounded.committed<=2);
     const still=await state();assert.equal(await invoke('changeAudio',{preference:'auto',formatId:'missing'}),false);assert.equal((await state()).format,'30232');assert.equal((await state()).current,still.current);
-    await dialog.getByRole('button',{name:'关闭',exact:true}).click();await scenario('delivery-http403');await invoke('changeAudio',{preference:'compatible'});await page.waitForFunction(()=>!!window.qualityProbe.error);await invoke('setAudioPreference','economy');await service.rpc('change',{scenario:'healthy'});await invoke('retry');await page.waitForFunction(()=>window.qualityProbe.snapshot.format?.id==='30280'&&document.querySelector('audio').readyState>=2&&document.querySelector('audio').currentTime>1);const retried=await state();assert.equal(retried.selection.preference,'compatible');assert.equal(retried.preference,'economy');assert(retried.paused);assert.equal(retried.current,before.current);
+    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    const candidateReleased=()=>page.waitForResponse(response=>
+      response.request().method()==='DELETE'&&new URL(response.url()).pathname.startsWith('/v1/leases/')&&response.status()===204);
+    await page.evaluate(()=>{window.audioBeforeRejectedSwitch=document.querySelector('audio').currentSrc;});
+    for(const status of [403,429]){
+      await scenario(`probe-http${status}`);
+      const [,applied]=await Promise.all([candidateReleased(),invoke('changeAudio',{preference:'compatible'})]);
+      assert.equal(applied,false);
+      const denied=await state();
+      assert(denied.error);
+      assert(denied.paused);
+      assert.equal(denied.current,still.current);
+      assert.equal(denied.format,still.format);
+      assert.deepEqual(denied.selection,still.selection);
+      assert(Math.abs(denied.time-still.time)<.15);
+      assert(await page.evaluate(()=>document.querySelector('audio').currentSrc===window.audioBeforeRejectedSwitch));
+      const reads=(await service.rpc('snapshot')).events.filter(event=>event.kind==='media'&&event.formatId==='30280');
+      assert.deepEqual(reads.map(event=>[event.probe,event.status]),[[true,status]]);
+    }
+    await invoke('setAudioPreference','economy');await scenario('healthy');
+    assert.equal(await invoke('changeAudio',{preference:'compatible'}),true);
+    await page.waitForFunction(()=>window.qualityProbe.snapshot.format?.id==='30280'&&document.querySelector('audio').readyState>=2&&document.querySelector('audio').currentTime>1);
+    const retried=await state();assert.equal(retried.selection.preference,'compatible');assert.equal(retried.preference,'economy');assert(retried.paused);assert.equal(retried.current,before.current);
     await scenario('quality-prepare-hang');await begin('changeAudio',{preference:'auto',formatId:'30232'});await until(snapshot=>snapshot.events.some(event=>event.kind==='playurl'&&event.status===null));await service.rpc('change',{scenario:'healthy'});await begin('play',{ref:{provider:'bilibili',kind:'video',id:'BV1000000001',part:'902'},resourceId:'second',title:'第二段'});await playing();assert.equal((await state()).part,'902');assert.equal((await state()).format,'30216');
     const stable=await state();await scenario('quality-prepare-hang');await begin('changeAudio',{preference:'auto',formatId:'30232'});await until(snapshot=>snapshot.events.some(event=>event.kind==='playurl'&&event.status===null));await invoke('sourceChanged');await service.rpc('change',{scenario:'healthy'});await page.waitForFunction(()=>!window.qualityProbe.preparing);assert.equal((await state()).format,stable.format);
     await invoke('stop');await invoke('setAudioPreference','auto');await scenario('quality-prepare-delay');await begin('playChartItem',synthetic);await until(snapshot=>snapshot.events.some(event=>event.kind==='playurl'&&event.status===null));await invoke('setAudioPreference','economy');await playing();assert.equal((await state()).format,'30280','A pending selection retains its original policy');
-    await scenario('healthy');const running=await state();assert.equal(await invoke('changeAudio',{preference:'economy'}),true);await playing();const resumed=await state();assert.equal(resumed.format,'30216');assert.equal(resumed.current,running.current);assert(resumed.time>=running.time-.15);
+    const beforeSleep=await state();
+    await scenario('probe-body-hang');
+    await begin('changeAudio',{preference:'economy'});
+    await until(snapshot=>snapshot.events.some(event=>event.kind==='media'&&event.probe&&event.status===206));
+    const releasedOnExpiry=candidateReleased();
+    await invoke('startSleep',{trigger:{type:'duration',durationMs:40},action:'pause'});
+    const [,appliedAfterExpiry]=await Promise.all([releasedOnExpiry,page.evaluate(()=>window.qualityTask)]);
+    assert.equal(appliedAfterExpiry,false);
+    await page.waitForFunction(()=>window.qualityProbe.sleep.status==='expired'&&!window.qualityProbe.sleep.actionPending);
+    const expired=await state();assert(expired.paused);assert.equal(expired.format,beforeSleep.format);assert.equal(expired.current,beforeSleep.current);
+    await scenario('healthy');await invoke('toggle');await playing();
+    const running=await state();assert.equal(await invoke('changeAudio',{preference:'economy'}),true);await playing();const resumed=await state();assert.equal(resumed.format,'30216');assert.equal(resumed.current,running.current);assert(resumed.time>=running.time-.15);
     await scenario('quality-prepare-delay');await begin('changeAudio',{preference:'compatible'});await until(snapshot=>snapshot.events.some(event=>event.kind==='playurl'&&event.status===null));await invoke('toggle');await page.waitForFunction(()=>window.qualityProbe.snapshot.format?.id==='30280'&&!window.qualityProbe.preparing&&document.querySelector('audio').readyState>=2);assert((await state()).paused,'A pause during preparation is retained by the selected audio');
     await scenario('quality-prepare-hang');await begin('changeAudio',{preference:'economy'});await until(snapshot=>snapshot.events.some(event=>event.kind==='playurl'&&event.status===null));await invoke('cancel');await service.rpc('change',{scenario:'healthy'});await page.waitForFunction(()=>!window.qualityProbe.preparing);assert.equal((await state()).format,'30280');assert((await state()).paused);
     const beforeClose=await state();await scenario('quality-prepare-hang');
@@ -64,7 +97,7 @@ test('audio selection uses actual HTTP preparation, one media element, selection
     await page.evaluate(()=>document.querySelector('audio').dispatchEvent(new Event('error')));await chartRecovery;
     await page.waitForFunction(()=>document.querySelector('audio').readyState>=2&&window.qualityProbe.snapshot.format?.id==='30280');
     const chartAfter=await state();assert.equal(chartAfter.format,chartBefore.format);assert.equal(chartAfter.selection.preference,'compatible');assert.equal(chartAfter.current,chartBefore.current);assert.equal(chartAfter.part,chartBefore.part);assert(chartAfter.paused);await invoke('setAudioPreference','economy');
-    assert.equal((await state()).elements,1);assert.deepEqual(issues,[]);await invoke('release');await until(snapshot=>snapshot.activeFetches===0&&snapshot.openBodies===0);const reads=(await service.rpc('snapshot')).events.filter(event=>event.kind==='media').length;await page.reload();await page.waitForFunction(()=>!!window.qualityProbe);assert.equal((await state()).preference,'economy');assert.equal((await state()).format,undefined);assert.equal((await service.rpc('snapshot')).events.filter(event=>event.kind==='media').length,reads);report.cases.push({surface,policySelection:true,pausedContinuity:true,playingContinuity:true,pauseDuringPrepare:true,cancelPreservesCurrent:true,preferencePersistence:true,manualPinned:true,permissionRetry:true,cancelLateSelection:true,pendingSnapshot:true,chartRecoveryAfterFailedAudio:true,singleMedia:true,continuityCycles:100,boundedRecords:bounded});
+    assert.equal((await state()).elements,1);assert.deepEqual(issues,[]);await invoke('release');await until(snapshot=>snapshot.activeFetches===0&&snapshot.openBodies===0);const reads=(await service.rpc('snapshot')).events.filter(event=>event.kind==='media').length;await page.reload();await page.waitForFunction(()=>!!window.qualityProbe);assert.equal((await state()).preference,'economy');assert.equal((await state()).format,undefined);assert.equal((await service.rpc('snapshot')).events.filter(event=>event.kind==='media').length,reads);report.cases.push({surface,policySelection:true,pausedContinuity:true,playingContinuity:true,pauseDuringPrepare:true,cancelPreservesCurrent:true,preferencePersistence:true,manualPinned:true,failedDeliveryPreservesCurrent:true,sleepExpiryCancelsPendingSwitch:true,switchAfterSleepExpiry:true,permissionRetry:true,cancelLateSelection:true,pendingSnapshot:true,chartRecoveryAfterFailedAudio:true,singleMedia:true,continuityCycles:100,boundedRecords:bounded});
   });
   report.shutdown=await service.close();service=undefined;assert(Object.values(report.shutdown).every(value=>value===0));
 });
@@ -81,6 +114,9 @@ test('full App exposes audio preferences and the current-track dialog on desktop
     if(surface==='mobile')await page.getByRole('button',{name:'打开正在播放',exact:true}).click();
     await page.getByRole('button',{name:'更多播放选项',exact:true}).click();const defaults=page.locator('select[aria-label="默认音质"]:visible');await defaults.selectOption('compatible');const count=prepares;await page.waitForTimeout(100);assert.equal(prepares,count);
     await page.getByRole('button',{name:'音质与音轨',exact:true}).click();const dialog=page.getByRole('dialog',{name:'音质与音轨'});await dialog.getByRole('option',{name:/8 kHz/}).waitFor({state:'attached'});assert.equal(await dialog.getByRole('combobox',{name:'默认音质'}).inputValue(),'compatible');
+    await dialog.getByRole('combobox',{name:'本次播放选择'}).selectOption('format:wav');
+    await dialog.getByRole('button',{name:'应用到当前曲'}).click();
+    await dialog.getByText('本次指定音轨 · 来源音轨规格',{exact:true}).waitFor();
     await page.screenshot({path:join(output,surface+'.png'),fullPage:true});await page.keyboard.press('Escape');assert.equal(await dialog.count(),0);assert.equal(await page.locator('audio').count(),1);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await context.close();
   }
   console.log('Full App audio controls: '+output);
