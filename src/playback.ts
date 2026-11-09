@@ -526,7 +526,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       const staged={id:original.resourceId,plan:prepared,signal,used:false};
       const cancelPreparation=()=>e.player.sourceController.cancelSourcePreparation();
       try{
-        await checkAudioDelivery(prepared.playUrl,signal);
+        await checkAudioDelivery(prepared,signal);
         signal.throwIfAborted();
         if(e.player.currentPlan!==original||e.queue.snapshot.current?.id!==id||!e.player.canPrepareSource)return false;
         e.audioChange=staged;

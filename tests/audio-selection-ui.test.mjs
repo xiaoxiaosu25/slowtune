@@ -42,8 +42,8 @@ test('audio selection uses actual HTTP preparation, one media element, selection
     const candidateReleased=()=>page.waitForResponse(response=>
       response.request().method()==='DELETE'&&new URL(response.url()).pathname.startsWith('/v1/leases/')&&response.status()===204);
     await page.evaluate(()=>{window.audioBeforeRejectedSwitch=document.querySelector('audio').currentSrc;});
-    for(const status of [403,429]){
-      await scenario(`probe-http${status}`);
+    for(const [name,status] of [['probe-http403',403],['probe-http429',429],['probe-html',206]]){
+      await scenario(name);
       const [,applied]=await Promise.all([candidateReleased(),invoke('changeAudio',{preference:'compatible'})]);
       assert.equal(applied,false);
       const denied=await state();

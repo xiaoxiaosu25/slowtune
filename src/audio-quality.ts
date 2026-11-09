@@ -1,4 +1,4 @@
-import {MusicSourceError,type MusicApi,type MusicEntry,type EntryRef,type CallOptions} from '@studio/music-sources';
+import {MusicSourceError,type AudioFormat,type MusicApi,type MusicEntry,type EntryRef,type CallOptions} from '@studio/music-sources';
 import { MusicPlayerBridge } from '@studio/music-sources/player';
 import type { PlaybackPlan } from '@studio/player';
 import { audioMime, prepareBestAudio, supportedAudioTypes, desktopAudioCapability, type DesktopAudioApi, type VerifiedAudio, type VerifiedMusicEntry } from '../server/audio-quality';
@@ -17,31 +17,55 @@ export function desktopPlaybackPlan(plan:PlaybackPlan):PlaybackPlan{
   return desktopSurface()?{...plan,timeouts:{resolve:60,initial:30,stall:30,...plan.timeouts}}:plan;
 }
 
+// The source package's audio probe also imports host delivery code.
+function matchesAudioContainer(bytes: Uint8Array, format: AudioFormat) {
+  const ascii = (start: number, end: number) => new TextDecoder().decode(bytes.subarray(start, end));
+  const header = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (format.mimeType === 'audio/mp4' || format.container === 'mp4') {
+    return ascii(4, 8) === 'ftyp' && header.getUint32(0) >= 8;
+  }
+  switch (format.container) {
+    case 'webm': return header.getUint32(0) === 0x1a45dfa3;
+    case 'ogg': return ascii(0, 4) === 'OggS';
+    case 'flac': return ascii(0, 4) === 'fLaC';
+    case 'wav': return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE';
+  }
+  return (format.container === 'mp3' || format.mimeType === 'audio/mpeg') &&
+    (ascii(0, 3) === 'ID3' || (header.getUint16(0) & 0xffe0) === 0xffe0);
+}
+
 /** Read the candidate delivery before the player releases its current lease. */
-export async function checkAudioDelivery(playUrl: string, signal: AbortSignal) {
+export async function checkAudioDelivery(plan: PlaybackPlan, signal: AbortSignal) {
+  const format = plan.metadata?.format as AudioFormat | undefined;
+  if (!format) throw { code: 'protocol' };
+  const headerBytes = 12;
   const prefixBytes = 1024;
   const budget = AbortSignal.any([signal, AbortSignal.timeout(20000)]);
   let response: Response | undefined;
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
-    response = await fetch(playUrl, { headers: { Range: `bytes=0-${prefixBytes - 1}` }, signal: budget });
+    response = await fetch(plan.playUrl, { headers: { Range: `bytes=0-${prefixBytes - 1}` }, signal: budget });
     if (!response.ok) {
       const code = response.status === 403 ? 'restricted' : response.status === 429 ? 'rate-limited' : 'network';
       throw { code };
     }
     if (!response.body || !response.headers.get('Content-Type')?.toLowerCase().startsWith('audio/')) throw { code: 'protocol' };
-    // A direct server may ignore Range. In that case, read one nonempty chunk and cancel the stream.
+    // If a direct server ignores Range, collect only the bytes required by the container check.
     const end = response.headers.get('Content-Range')?.match(/^bytes 0-(\d+)\/\d+$/)?.[1];
-    const expected = response.status === 206 ? Number(end) + 1 : 1;
-    if (!Number.isInteger(expected) || expected < 1 || expected > prefixBytes) throw { code: 'protocol' };
+    const expected = response.status === 206 ? Number(end) + 1 : headerBytes;
+    if (!Number.isInteger(expected) || expected < headerBytes || expected > prefixBytes) throw { code: 'protocol' };
+    const prefix = new Uint8Array(expected);
     reader = response.body.getReader();
     let received = 0;
     while (received < expected) {
       const { done, value } = await reader.read();
       budget.throwIfAborted();
       if (done) throw { code: 'protocol' };
-      received += value.byteLength;
+      const chunk = value.subarray(0, expected - received);
+      prefix.set(chunk, received);
+      received += chunk.byteLength;
     }
+    if (!matchesAudioContainer(prefix, format)) throw { code: 'protocol' };
   } catch (error) {
     signal.throwIfAborted();
     if (budget.aborted) throw { code: 'timeout' };

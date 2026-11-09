@@ -40,6 +40,10 @@ globalThis.fetch=async(input,init={})=>{
         else{
           const headers={'Content-Type':quality?'audio/mp4':'audio/webm','Content-Length':String(end-start+1),'Accept-Ranges':'bytes',...(range?{'Content-Range':`bytes ${applies&&selected.endsWith('bad-range')?start+1:start}-${end}/${audio.length}`}:{})};
           let body=audio.slice(start,end+1);
+          if(applies&&selected==='probe-html'){
+            headers['Content-Type']='text/html';
+            body=new TextEncoder().encode('<html>'.padEnd(end-start+1,' '));
+          }
           if(applies&&selected.endsWith('body-hang'))body=new ReadableStream({start(controller){const abort=()=>controller.error(init.signal.reason);init.signal.addEventListener('abort',abort,{once:true});if(init.signal.aborted)abort();}});
           if(applies&&selected.endsWith('truncated'))body=body.slice(0,20);
           response=new Response(body,{status:range?206:200,headers});
