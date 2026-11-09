@@ -23,7 +23,7 @@ test('desktop library keeps songs above the player, menus reachable and desktop 
   const manage = page.getByRole('button', { name: '歌单管理', exact: true });
   await manage.click();
   await page.waitForFunction(() => document.querySelector('.playlist-manage-menu>button')?.getAttribute('aria-expanded') === 'true');
-  const menu = library.locator('.playlist-manage-menu [popover]');
+  const menu = library.locator('.playlist-manage-menu').getByRole('menu');
   assert.equal(await menu.getByRole('menuitem').first().innerText(), '播放全部');
   const buttonStyle = await manage.evaluate(button => {
     const style = getComputedStyle(button), play = getComputedStyle(document.querySelector('.playlist-copy .play-all'));

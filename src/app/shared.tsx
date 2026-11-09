@@ -1,8 +1,10 @@
 import { createContext, useContext, useState } from 'react';
+import { motion } from 'motion/react';
 import { CompassIcon, ListBulletsIcon, MusicNotesIcon, TelevisionSimpleIcon, UsersIcon, YoutubeLogoIcon } from '@phosphor-icons/react';
 import type { Track } from '../api';
 import { artworkUrl } from '../../server/artwork-url';
 import { isTrack, type QueueTrack } from '../chart-playback';
+import { listeningArtworkId, listeningArtworkSpring } from './components/listening-motion';
 
 export const names = { all: '全部', bilibili: 'B站', youtube: 'YouTube 视频' };
 
@@ -40,11 +42,13 @@ export function useArtworkUrl(track?: QueueTrack | null) {
   return visible ? artworkUrl(track.artwork ?? (isTrack(track) ? cache[artworkKey(track)] : undefined)) : undefined;
 }
 
-export function Cover({ track, className = '' }: { track?: QueueTrack | null; className?: string }) {
+export function Cover({ track, className = '', sharedArtwork = false }: { track?: QueueTrack | null; className?: string; sharedArtwork?: boolean }) {
   const artwork = useArtworkUrl(track);
   const [failed, setFailed] = useState('');
+  const Image = sharedArtwork ? motion.img : 'img';
+  const layout = sharedArtwork ? { layoutId: listeningArtworkId, transition: { layout: listeningArtworkSpring } } : {};
   return artwork && failed !== artwork
-    ? <img className={className} src={artwork} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(artwork)}/>
+    ? <Image {...layout} className={className} src={artwork} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(artwork)}/>
     : <span className={'unknown-cover ' + className} aria-label="封面未知">
       <MusicNotesIcon size={28}/>
     </span>;

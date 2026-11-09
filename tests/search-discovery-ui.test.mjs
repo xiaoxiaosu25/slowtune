@@ -90,7 +90,7 @@ test('immersive quick calibration previews without restarting audio and saves on
   await page.goto(fixture.base);await page.getByRole('button',{name:'打开正在播放',exact:true}).click();await page.locator('.listening-transport .play-toggle').click();await page.waitForFunction(()=>document.querySelector('audio').currentTime>.2);await page.locator('.listening-transport .play-toggle').click();
   await page.getByRole('button',{name:'打开沉浸歌词',exact:true}).click();await page.locator('.desktop-lyrics-host .slow-lyric-line').first().waitFor();
   const audio=await page.locator('audio').elementHandle(),prepares=fixture.preparations.length;
-  await page.getByRole('button',{name:'校准时间',exact:true}).click();let panel=page.locator('.lyric-offset-popover [popover]:popover-open');
+  await page.getByRole('button',{name:'校准时间',exact:true}).click();let panel=page.locator('.lyric-offset-popover :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])');
   await panel.getByRole('button',{name:'延后 0.05 秒',exact:true}).click();assert.equal(await panel.getByLabel('歌词延后秒数').inputValue(),'0.05');assert.equal(writes.length,0);
   await page.keyboard.press('Escape');await page.getByRole('button',{name:'校准时间',exact:true}).click();assert.equal(await panel.getByLabel('歌词延后秒数').inputValue(),'0','closing reverts the unsaved draft');
   await panel.getByLabel('歌词时间精调').fill('2.85');await panel.getByRole('button',{name:'保存偏移',exact:true}).click();await panel.getByRole('button',{name:'保存偏移',exact:true}).isDisabled();await page.waitForFunction(()=>document.querySelector('.lyric-offset-value small')?.textContent==='已保存');

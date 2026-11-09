@@ -1,8 +1,11 @@
-import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { HeartIcon, MusicNotesIcon, PlayIcon, DotsThreeIcon, ArrowUpIcon, ArrowDownIcon, TrashIcon, PlusIcon, CameraIcon, PencilSimpleIcon, ArrowsDownUpIcon, ListBulletsIcon, CaretDownIcon, CheckIcon, QueueIcon, UsersIcon, LinkIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState, SongPlaybackSelection, SongPlaylistEntry, SongVersion } from '../server/song-library-types';
 import { Modal } from './Modal';
 import { Dialog } from './ui/Dialog';
+import { PlaylistNameDialog } from './PlaylistNameDialog';
+import { PlaylistDeleteDialog } from './PlaylistDeleteDialog';
+import { TrackListSkeleton, TrackRowCue } from './app/components/TrackRowCue';
 import { PlayAllButton } from './ListActions';
 import { MobileBrowseTitle } from './MobileBrowseTitle';
 import { errorText, availabilityText } from './api';
@@ -84,6 +87,7 @@ export function SongEditor({ song, state, commit, onSearch, onPlay, onClose, onC
   </Modal>;
 }
 type Props = {
+  playingSongId?: string;
   state: SongLibraryState | null; selected: string; onSelect: (id: string) => void; commit: SongCommit; onBackup: () => void; onSearch: (song?: Song, onReturn?: () => void) => void;
   onPlay: (selection: SongPlaybackSelection, song: Song) => void; onPlayAll: (items: { selection: SongPlaybackSelection; song: Song }[]) => void; busy: boolean;
   onChange: (state: SongLibraryState) => void;
@@ -123,7 +127,7 @@ export function SongLibraryWorkspace(props: Props) {
   return <><MemoSongLibraryPage {...props} {...(props.desktop ? actions : {})}/>{managing && props.state && <MemoDesktopSongDialog library={props.state} commit={managerActions.commit} youtubeEnabled={props.youtubeEnabled ?? true} onChange={actions.onChange} onClose={managerActions.onClose} onSearch={actions.onSearch} onPlay={actions.onPlay}/>}</>;
 }
 
-export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, onSearch, onPlay, onPlayAll, busy, onChange, loadError, onRetry, youtubeEnabled = true, disabledDisplay = 'dim', source = 'all', sourceControls, desktop = false, onManage, versionPlayback, onEnqueue, onEnqueueNext, onEnqueueAll, onNotice, onCreator, hidden = false }: Props) {
+export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, onSearch, onPlay, onPlayAll, busy, onChange, loadError, onRetry, youtubeEnabled = true, disabledDisplay = 'dim', source = 'all', sourceControls, desktop = false, onManage, versionPlayback, onEnqueue, onEnqueueNext, onEnqueueAll, onNotice, onCreator, hidden = false, playingSongId }: Props) {
   const [filter, setFilter] = useState(''), [editing, setEditing] = useState<string>(), [name, setName] = useState(''), [creating, setCreating] = useState<'new' | 'rename'>(), [destination, setDestination] = useState(''), [remove, setRemove] = useState(false);
   const [maintenance, setMaintenance] = useState(false);
   const [desktopContext, setDesktopContext] = useState<SongDialogContext>(), [managing, setManaging] = useState(false), [adding, setAdding] = useState<Song>();
@@ -131,6 +135,7 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
   const [playlistFormError, setPlaylistFormError] = useState('');
   const [coverTarget, setCoverTarget] = useState<string>();
   const [mobileSheet,setMobileSheet]=useState<'playlists'|'manage'|'sort'>();
+  const PlaylistSheet = mobileSheet === 'sort' ? Modal : Dialog;
   const [mobileAction,setMobileAction]=useState<string>(),[queueBusy,setQueueBusy]=useState(false),[queueError,setQueueError]=useState('');
   useEffect(() => { setCoverTarget(undefined); }, [selected, desktop]);
   useEffect(() => { setPlaylistFormError(''); }, [creating, remove]);
@@ -152,7 +157,7 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
       versionsBySong,
     };
   }, [state, desktop]);
-  if (!state) return loadError ? <div className="feedback" role="alert"><p>歌单与收藏暂时无法读取。{loadError}</p><button className="btn btn-secondary" onClick={onRetry}>重试读取歌单</button></div> : <p className="loading">正在读取歌单与收藏…</p>;
+  if (!state) return loadError ? <div className="feedback" role="alert"><p>歌单与收藏暂时无法读取。{loadError}</p><button className="btn btn-secondary" onClick={onRetry}>重试读取歌单</button></div> : <TrackListSkeleton label="正在读取歌单与收藏…" />;
   const playlist = state.snapshot.playlists.find(playlist => playlist.id === selected), favorites = selected === songFavoritesId;
   const members = favorites ? state.snapshot.favorites.map(favorite => ({ id: favorite.favoriteId, songId: favorite.songId, entry: undefined as SongPlaylistEntry | undefined })) : (playlist?.entries ?? []).map(entry => ({ id: entry.entryId, songId: entry.songId, entry }));
   const rows = members.flatMap((member, position) => { const song = index.songs.get(member.songId); return song ? [{ ...member, position, song, selection: { kind: 'song' as const, songId: song.id, ...(member.entry?.pinnedVersionId ? { pinnedVersionId: member.entry.pinnedVersionId } : {}) } }] : []; });
@@ -175,7 +180,7 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
     <div className="playlist-intro">{desktop ? <button className="playlist-cover-button" aria-label="更换封面" title="更换封面" disabled={busy || !favorites && !playlist} onClick={() => setCoverTarget(selected)}><PlaylistCover image={coverImage} song={autoCoverSong} className="playlist-art"/><span className="playlist-cover-overlay"><CameraIcon size={28}/><span>更换封面</span></span></button> : <SongCover song={rows[0]?.song} className="playlist-art"/>}<div className="playlist-copy">{desktop?<PlaylistHeading title={playlistName}>{playlistName}</PlaylistHeading>:<div className="mobile-playlist-heading"><h1 aria-label={playlistName}><button aria-label="选择歌单" onClick={()=>setMobileSheet('playlists')}><span>{playlistName}</span><CaretDownIcon size={18}/></button></h1><button className="btn btn-icon" aria-label="歌单管理" onClick={()=>setMobileSheet('manage')}><DotsThreeIcon size={25}/></button></div>}<p>{members.length} 首歌曲</p><div className="toolbar">{desktop&&playAllButton}{desktop && <PlaylistActions key={selected} target=".playlist-intro" className="playlist-manage-menu" library={state} selections={visible.map(({selection,song})=>({selection,song}))} targetId={selected} busy={busy} commit={commit} youtubeEnabled={youtubeEnabled} trigger={<><DotsThreeIcon size={20}/><span>管理</span></>} onPlay={onPlayAll} onEnqueue={onEnqueueAll} onRename={()=>{if(playlist){setName(playlist.name);setCreating('rename');}}} onDelete={()=>setRemove(true)} onCover={()=>setCoverTarget(selected)} onCreate={()=>{setName('');setCreating('new');}} onManage={()=>onManage?onManage():setManaging(true)} onBackup={onBackup}/>}</div></div></div>
     {!desktop&&<div className="toolbar mobile-playlist-tools">{playAllButton}<button className="btn btn-secondary" onClick={()=>onSearch()}><PlusIcon size={20}/>添加歌曲</button><button className="btn btn-icon" aria-label="排序" title="排序" onClick={()=>{setQueueError('');setMobileSheet('sort');}}><ArrowsDownUpIcon size={20}/></button></div>}
     <div className="playlist-list-toolbar"><label className="search-field search-field-inline"><input aria-label="搜索歌单内音乐" placeholder="搜索歌单内音乐" value={filter} onChange={event => setFilter(event.target.value)}/></label>{sourceControls}{desktop&&<span className="muted">{visible.length === members.length ? `${visible.length} 首歌曲` : `${visible.length} / ${members.length} 首歌曲`}</span>}</div>
-    <PagedList id={'songs:' + selected + ':' + filter} group="library" label="歌单歌曲" items={visible}>{items => items.length ? <div className="track-list">{items.map(row => {
+    <PagedList id={'songs:' + selected + ':' + filter} group="library" label="歌单歌曲" items={visible}>{items => items.length ? <div className="track-list">{items.map((row, pageIndex) => {
       const versions = index.versionsBySong.get(row.songId) ?? [], chosen = chosenFor(row), favorite = index.favorites.get(row.songId);
       const actions:MenuAction[]=[
         {id:'play',label:'立即播放',icon:<PlayIcon size={18}/>,disabled:blocked(row),hint:blocked(row)?'YouTube 已关闭':undefined,onSelect:()=>onPlay(row.selection,row.song)},
@@ -191,8 +196,9 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
         {id:'down',label:'下移',ariaLabel:'下移 '+row.song.title,icon:<ArrowDownIcon size={18}/>,disabled:busy||row.position===members.length-1,onSelect:()=>move(row.id,1)},
         ...(row.entry?[{id:'remove',label:'从歌单移除',ariaLabel:'从歌单移除 '+row.song.title,icon:<TrashIcon size={18}/>,danger:true,disabled:busy,onSelect:()=>void commit([{type:'remove-entry',playlistId:selected,entryId:row.id}])}]:[]),
       ];
-      return <div className={'song-library-row' + (blocked(row) && disabledDisplay === 'dim' ? ' source-disabled' : '')} key={row.id}>
-        <span className="row-number">{row.position + 1}</span>
+      return <div className={'song-library-row' + (blocked(row) && disabledDisplay === 'dim' ? ' source-disabled' : '')}
+        style={desktop && pageIndex < 12 ? { '--track-enter-index': pageIndex } as CSSProperties : undefined} key={row.id}>
+        {desktop ? <TrackRowCue number={row.position + 1} title={row.song.title} playing={playingSongId === row.songId} disabled={blocked(row)} onPlay={() => onPlay(row.selection, row.song)} /> : <span className="row-number">{row.position + 1}</span>}
         <button className="row-cover" aria-label={'播放 ' + row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}><SongCover song={row.song}/></button>
         <div className="row-info">
           {desktop ? <button className="track-name" title={row.song.title} disabled={blocked(row)} onClick={() => onPlay(row.selection, row.song)}>{row.song.title}</button> : <MobileBrowseTitle className="track-name" title={row.song.title} disabled={blocked(row)} onPlay={() => onPlay(row.selection, row.song)}/>}
@@ -207,15 +213,15 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
         {desktop ? <ActionMenu className="song-row-menu" label={'更多操作 '+row.song.title} title={row.song.title} subtitle={chosen?(row.entry?.pinnedVersionId?'歌单固定 · ':'默认 · ')+(chosen.label||chosen.facts.title):'播放时自动匹配'} target=".song-library-row" actions={actions}/> : <button className="btn btn-icon" aria-label={'更多操作 ' + row.song.title} aria-expanded={mobileAction===row.id} onClick={()=>{setQueueError('');setMobileAction(row.id);}}><DotsThreeIcon size={24}/></button>}
       </div>;
     })}</div> : <div className="empty"><MusicNotesIcon size={36}/><h3>这里还没有匹配的歌曲</h3><button className="btn btn-secondary" onClick={() => onSearch()}>去搜索音乐</button></div>}</PagedList>
-    {!desktop&&actionRow&&<Modal title="歌曲操作" className="mobile-actions-sheet mobile-song-actions" onClose={()=>setMobileAction(undefined)}><div className="song-editor-heading"><SongCover song={actionRow.song}/><div><h3>{actionRow.song.title}</h3><p className="muted">{actionRow.song.artists?.join(' / ')||'歌手未填写'}</p></div></div><div className="mobile-action-list">
+    {!desktop&&actionRow&&<Dialog title="歌曲操作" className="mobile-actions-sheet mobile-song-actions" onClose={()=>setMobileAction(undefined)}><div className="song-editor-heading"><SongCover song={actionRow.song}/><div><h3>{actionRow.song.title}</h3><p className="muted">{actionRow.song.artists?.join(' / ')||'歌手未填写'}</p></div></div><div className="mobile-action-list">
       {onEnqueue&&<button disabled={queueBusy||blocked(actionRow)} onClick={async()=>{setQueueBusy(true);setQueueError('');try{if(await onEnqueue(actionRow.selection,actionRow.song)!==false)setMobileAction(undefined);else setQueueError('未能加入队列，请重试。');}catch(issue){setQueueError(errorText(issue));}finally{setQueueBusy(false);}}}><QueueIcon size={22}/><span>{queueBusy?'正在加入…':'加入队列'}</span></button>}
       <button onClick={()=>{setMobileAction(undefined);setDestination('');setAddError('');setAdding(actionRow.song);}}><PlusIcon size={22}/><span>加入歌单</span></button>
       <button aria-label={'编辑歌曲 '+actionRow.song.title} onClick={()=>{setMobileAction(undefined);setEditing(actionRow.songId);}}><MusicNotesIcon size={22}/><span>歌曲与版本</span></button>
       {actionVersion&&onCreator&&<button onClick={()=>{setMobileAction(undefined);onCreator(actionRow.song,actionVersion);}}><UsersIcon size={22}/><span>查看 UP / 博主</span></button>}
       {actionVersion&&<a href={versionUrl(actionVersion)} target="_blank" rel="noreferrer"><LinkIcon size={22}/><span>查看来源</span></a>}
       {actionRow.entry&&<button className="danger-text" disabled={busy} onClick={()=>void mobileCommit([{type:'remove-entry',playlistId:selected,entryId:actionRow.id}]).then(saved=>{if(saved)setMobileAction(undefined);})}><TrashIcon size={22}/><span>从歌单移除</span></button>}
-    </div>{actionRow.entry&&<label className="field"><span className="field-label">歌单播放版本</span><select className="select" aria-label={'固定版本 '+actionRow.song.title} value={actionRow.entry.pinnedVersionId??''} disabled={busy} onChange={event=>void mobileCommit([{type:'pin-entry',playlistId:selected,entryId:actionRow.id,versionId:event.target.value||null}])}><option value="">跟随歌曲默认</option>{(index.versionsBySong.get(actionRow.songId)??[]).map(version=><option key={version.id} value={version.id}>{version.label||version.facts.title}</option>)}</select></label>}{queueError&&<p className="feedback" role="alert">{queueError}</p>}</Modal>}
-    {!desktop&&mobileSheet&&<Modal mobilePage={mobileSheet==='sort'} title={mobileSheet==='playlists'?'选择歌单':mobileSheet==='sort'?'调整歌曲顺序':'歌单管理'} className="mobile-actions-sheet" onClose={()=>setMobileSheet(undefined)}><div className={mobileSheet==='sort'?'mobile-sort-list':'mobile-action-list'}>
+    </div>{actionRow.entry&&<label className="field"><span className="field-label">歌单播放版本</span><select className="select" aria-label={'固定版本 '+actionRow.song.title} value={actionRow.entry.pinnedVersionId??''} disabled={busy} onChange={event=>void mobileCommit([{type:'pin-entry',playlistId:selected,entryId:actionRow.id,versionId:event.target.value||null}])}><option value="">跟随歌曲默认</option>{(index.versionsBySong.get(actionRow.songId)??[]).map(version=><option key={version.id} value={version.id}>{version.label||version.facts.title}</option>)}</select></label>}{queueError&&<p className="feedback" role="alert">{queueError}</p>}</Dialog>}
+    {!desktop&&mobileSheet&&<PlaylistSheet mobilePage={mobileSheet==='sort'} title={mobileSheet==='playlists'?'选择歌单':mobileSheet==='sort'?'调整歌曲顺序':'歌单管理'} className="mobile-actions-sheet" onClose={()=>setMobileSheet(undefined)}><div className={mobileSheet==='sort'?'mobile-sort-list':'mobile-action-list'}>
       {mobileSheet==='sort'?<><p className="muted">调整后立即保存，当前播放与队列保留。</p>{rows.map(row=><div className="mobile-sort-row" key={row.id}><span>{row.position+1}. {row.song.title}</span><button className="btn btn-icon" aria-label={'上移 '+row.song.title} disabled={busy||row.position===0} onClick={()=>move(row.id,-1)}><ArrowUpIcon size={21}/></button><button className="btn btn-icon" aria-label={'下移 '+row.song.title} disabled={busy||row.position===members.length-1} onClick={()=>move(row.id,1)}><ArrowDownIcon size={21}/></button></div>)}</>:mobileSheet==='playlists'?<>
         {[{id:songFavoritesId,name:'我的收藏',count:state.snapshot.favorites.length},...state.snapshot.playlists.map(item=>({id:item.id,name:item.name,count:item.entries.length}))].map(item=><button key={item.id} aria-pressed={selected===item.id} onClick={()=>{onSelect(item.id);setMobileSheet(undefined);setFilter('');}}><MusicNotesIcon size={23}/><span>{item.name}<small>{item.count} 首</small></span>{selected===item.id&&<CheckIcon size={22}/>}</button>)}
       </>:<>
@@ -225,13 +231,36 @@ export function SongLibraryPage({ state, selected, onSelect, commit, onBackup, o
         <button onClick={()=>{setMobileSheet(undefined);onBackup();}}><ArrowsDownUpIcon size={22}/><span>导入 / 导出</span></button>
         {playlist&&<button className="danger-text" disabled={busy} onClick={()=>{setMobileSheet(undefined);setRemove(true);}}><TrashIcon size={22}/><span>删除歌单</span></button>}
       </>}
-    </div>{mobileSheet==='sort'&&queueError&&<p className="feedback" role="alert">{queueError}</p>}</Modal>}
-    {creating && <Dialog title={creating === 'rename' ? '歌单改名' : '新建歌单'} onClose={() => setCreating(undefined)}><form onSubmit={event => { event.preventDefault(); changePlaylist([creating === 'rename' && playlist ? { type: 'rename-playlist', playlistId: playlist.id, name: name.trim() } : { type: 'create-playlist', name: name.trim() }], () => setCreating(undefined)); }}><label className="field"><span className="field-label">歌单名称</span><input className="input" aria-label="歌单名称" data-autofocus="true" value={name} maxLength={200} required onChange={event => setName(event.target.value)}/></label>{playlistFormError && <p className="feedback" role="alert">{playlistFormError}</p>}<button className="btn btn-primary" disabled={busy || !name.trim()}>保存歌单</button></form></Dialog>}
+    </div>{mobileSheet==='sort'&&queueError&&<p className="feedback" role="alert">{queueError}</p>}</PlaylistSheet>}
+    {creating && (
+      <PlaylistNameDialog
+        mode={creating}
+        name={name}
+        busy={busy}
+        onNameChange={setName}
+        onSave={name => changePlaylist([
+          creating === 'rename' && playlist
+            ? { type: 'rename-playlist', playlistId: playlist.id, name }
+            : { type: 'create-playlist', name },
+        ], () => setCreating(undefined))}
+        onClose={() => setCreating(undefined)}
+        feedback={playlistFormError && <p className="feedback" role="alert">{playlistFormError}</p>}
+      />
+    )}
     {desktop && coverTarget === selected && (favorites || playlist) && <DesktopPlaylistCoverDialog key={selected} library={state} targetId={selected} songs={rows.map(row => row.song)} image={coverImage} busy={busy} commit={commit} onClose={() => setCoverTarget(undefined)}/>}
-    {remove && playlist && <Modal title="删除歌单" onClose={() => setRemove(false)}><p>删除「{playlist.name}」及 {playlist.entries.length} 个成员，歌曲资料和当前队列保留。</p>{playlistFormError && <p className="feedback" role="alert">{playlistFormError}</p>}<button className="btn btn-danger" disabled={busy} onClick={() => changePlaylist([{ type: 'delete-playlist', playlistId: playlist.id }], () => setRemove(false))}>确认删除</button></Modal>}
+    {remove && playlist && (
+      <PlaylistDeleteDialog
+        busy={busy}
+        onClose={() => setRemove(false)}
+        onConfirm={() => changePlaylist([{ type: 'delete-playlist', playlistId: playlist.id }], () => setRemove(false))}
+        feedback={playlistFormError && <p className="feedback" role="alert">{playlistFormError}</p>}
+      >
+        删除「{playlist.name}」及 {playlist.entries.length} 个成员，歌曲资料和当前队列保留。
+      </PlaylistDeleteDialog>
+    )}
     {edited && <SongEditor key={edited.id} song={edited} state={state} commit={commit} onPlay={onPlay} onSearch={onSearch} onClose={() => setEditing(undefined)} onChange={onChange} versionPlayback={versionPlayback}/>}
     {maintenance && <SongMaintenancePanel library={state} onChange={onChange} onClose={() => setMaintenance(false)}/>}
     {(desktopContext || managing) && <DesktopSongDialog library={state} context={desktopContext} commit={(edits,revision)=>commit(edits,revision,true)} youtubeEnabled={youtubeEnabled} onChange={onChange} onPlay={onPlay} onSearch={onSearch} onClose={() => { setDesktopContext(undefined); setManaging(false); }}/>}
-    {adding && <Modal title={'加入歌单 · ' + adding.title} className="form-modal" onClose={() => setAdding(undefined)}><form onSubmit={event => { event.preventDefault(); setAddError(''); void commit([{ type: 'add-entry', playlistId: destination, songId: adding.id }],undefined,true).then(saved => { if (saved) setAdding(undefined); else setAddError('未能添加，选择已保留，请重试。'); }).catch(issue => setAddError(errorText(issue))); }}><label className="field"><span className="field-label">选择目标歌单</span><select className="select" aria-label="添加目标歌单" data-autofocus="true" value={destination} disabled={busy} onChange={e => setDestination(e.target.value)}><option value="">选择歌单</option>{state.snapshot.playlists.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>{!state.snapshot.playlists.length && <p className="muted">还没有自建歌单，请先新建一个歌单。</p>}{addError && <p className="feedback" role="alert">{addError}</p>}<div className="modal-actions"><button className="btn btn-ghost" type="button" onClick={() => setAdding(undefined)}>取消</button><button className="btn btn-primary" disabled={busy || !destination}>添加歌曲</button></div></form></Modal>}
+    {adding && <Dialog title={'加入歌单 · ' + adding.title} className="form-modal" onClose={() => setAdding(undefined)}><form onSubmit={event => { event.preventDefault(); setAddError(''); void commit([{ type: 'add-entry', playlistId: destination, songId: adding.id }],undefined,true).then(saved => { if (saved) setAdding(undefined); else setAddError('未能添加，选择已保留，请重试。'); }).catch(issue => setAddError(errorText(issue))); }}><label className="field"><span className="field-label">选择目标歌单</span><select className="select" aria-label="添加目标歌单" data-autofocus="true" value={destination} disabled={busy} onChange={e => setDestination(e.target.value)}><option value="">选择歌单</option>{state.snapshot.playlists.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>{!state.snapshot.playlists.length && <p className="muted">还没有自建歌单，请先新建一个歌单。</p>}{addError && <p className="feedback" role="alert">{addError}</p>}<div className="modal-actions"><button className="btn btn-ghost" type="button" onClick={() => setAdding(undefined)}>取消</button><button className="btn btn-primary" disabled={busy || !destination}>添加歌曲</button></div></form></Dialog>}
   </section>;
 }

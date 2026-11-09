@@ -23,10 +23,11 @@ test('desktop feedback stays in the player or active dialog and preserves recove
   await page.route('**/v1/call/metadata', route => failMetadata ? route.fulfill({ status: 503, json: { protocol: 2, error: { code: 'network' } } }) : route.continue());
   const artifacts = resolve('local/verification/desktop-feedback'); await mkdir(artifacts, { recursive: true });
   await page.goto(fixture.origin); await navigate(page, '歌单');
-  const libraryTop = () => page.locator('.list-view').evaluate(element => element.getBoundingClientRect().top);
+  const libraryTop = () => page.locator('.list-view').evaluate(element =>
+    element.getBoundingClientRect().top - element.closest('.main-content').getBoundingClientRect().top);
   const beforeTop = await libraryTop();
   const issueButton = () => page.getByRole('button', { name: '播放失败，查看详情', exact: true });
-  const issuePanel = () => page.locator('.playback-feedback-popover [popover]:popover-open');
+  const issuePanel = () => page.locator('.playback-feedback-popover :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])');
   const noBanner = async () => assert.equal(await page.locator('.main-content>.feedback').count(), 0);
   let release;
   gate = new Promise(resolve => { release = resolve; }); t.after(() => release?.());
@@ -159,7 +160,7 @@ test('desktop recommendation failures stay local, retain music and recover witho
   const beforeTop = await contentTop();
   const refresh = () => bili.getByRole('button', { name: 'B站推荐换一批', exact: true }).click();
   const status = () => bili.getByRole('button', { name: 'B站推荐：暂未更新，查看详情', exact: true });
-  const panel = () => bili.locator('.discovery-status-popover [popover]:popover-open');
+  const panel = () => bili.locator('.discovery-status-popover :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])');
   const noBanner = async () => assert.equal(await page.locator('.main-content>.feedback,.main-content>.loading').count(), 0);
 
   issue = 'network'; await refresh(); await status().waitFor();

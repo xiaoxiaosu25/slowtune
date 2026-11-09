@@ -2,9 +2,14 @@
    14. 播放条
    ========================================================================== */
 .playbar { position:fixed; bottom:var(--sp-4); left:0; right:0; width:min(1280px,calc(100% - 32px)); height:88px; margin-inline:auto; border:1px solid var(--border); border-radius:var(--r-overlay); background:color-mix(in srgb,var(--surface) 96%,transparent); backdrop-filter:blur(20px); box-shadow:var(--shadow-md); z-index:calc(var(--z-sticky) + 2); isolation:isolate; }
-/* 封面微光：封面模糊成光，从封面所在的左侧漫到条面，约在条宽四成处消失；暂停时收暗。
-   只铺在底层，不改变任何文字和控件的颜色。 */
-.playbar-glow { --glow-left:0%; position:absolute; inset:0; z-index:-1; overflow:hidden; border-radius:inherit; pointer-events:none; opacity:var(--cover-glow-paused); transition:opacity var(--dur-ambient) ease-out; -webkit-mask-image:linear-gradient(90deg,#000 calc(var(--glow-left) + 96px),transparent calc(var(--glow-left) + 560px)); mask-image:linear-gradient(90deg,#000 calc(var(--glow-left) + 96px),transparent calc(var(--glow-left) + 560px)); }
+/* 微光保留在封面一侧，在最窄桌面布局的文字起点前降至四分之一，再向右渐隐。 */
+.playbar-glow {
+  --glow-left:0%;
+  --glow-mask:linear-gradient(90deg,black calc(var(--glow-left) + var(--sp-5)),rgb(0 0 0 / 25%) calc(var(--glow-left) + 64px),transparent calc(var(--glow-left) + 560px));
+  position:absolute; inset:0; z-index:-1; overflow:hidden; border-radius:inherit; pointer-events:none;
+  opacity:var(--cover-glow-paused); transition:opacity var(--dur-ambient) ease-out;
+  -webkit-mask-image:var(--glow-mask); mask-image:var(--glow-mask);
+}
 .playbar-glow[data-playing] { opacity:var(--cover-glow); }
 .playbar-glow>img { position:absolute; top:-90%; left:calc(var(--glow-left) - 72px); width:420px; height:280%; max-width:none; object-fit:cover; filter:blur(28px) saturate(1.4); animation:playbar-glow-in var(--dur-ambient) ease-out; }
 .playbar-glow>img:not(:last-child) { opacity:0; animation:none; transition:opacity var(--dur-ambient) ease-out; }
@@ -18,6 +23,8 @@
 .now-playing strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-secondary); font-weight:600; line-height:1.6; }
 .now-playing:hover strong { color:var(--accent-text); }
 .now-playing small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; color:var(--muted); font-size:var(--fs-meta); }
+.playbar .now-playing small { color:color-mix(in srgb,var(--muted) 80%,var(--text)); }
+.playbar .now-playing:hover strong { color:color-mix(in srgb,var(--accent-text) 50%,var(--text)); }
 .playbar-center { display:grid; gap:2px; min-width:0; }
 .playbar-controls { display:flex; align-items:center; justify-content:center; gap:var(--sp-5); }
 .transport { display:flex; align-items:center; justify-content:center; gap:var(--sp-4); }
@@ -107,6 +114,7 @@ input[type=range]:disabled { opacity:.4; cursor:default; }
 .control-popover { display:inline-flex; flex-shrink:0; }
 .control-popover-panel { position:fixed; inset:auto; margin:0; width:264px; max-width:calc(100vw - 24px); max-height:calc(100dvh - 24px); overflow:auto; padding:var(--sp-2); border:1px solid var(--border); border-radius:var(--r-overlay); background:var(--surface); color:var(--text); box-shadow:var(--shadow-lg); }
 .control-popover-panel::backdrop { background:transparent; }
+.control-popover-panel.floating-control { position:static; z-index:var(--z-overlay); max-height:var(--radix-popover-content-available-height); }
 .control-popover-panel>button,.control-popover-panel>a { display:flex; align-items:center; gap:var(--sp-3); width:100%; min-height:44px; padding:var(--sp-2) var(--sp-3); border-radius:var(--r-control); font-size:var(--fs-secondary); text-align:left; }
 .control-popover-panel>:is(button,a):hover:not(:disabled) { background:var(--hover); }
 .control-popover-panel>:is(button,a)>svg { flex-shrink:0; color:var(--muted); }

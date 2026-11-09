@@ -1,3 +1,5 @@
+import { motion, useReducedMotion } from 'motion/react';
+import { Provider as TooltipProvider, Root as Tooltip, Trigger as TooltipTrigger, Content as TooltipContent, Portal as TooltipPortal } from '@radix-ui/react-tooltip';
 import {
   PlaybackSlot,
   Transport,
@@ -19,10 +21,11 @@ export function Playbar() {
   const { desktop, page, open, current, isFavorite, favoritePending, saving, lib, favorite, queueVisible, snapshot } =
     useWorkspace();
   const artwork = useArtworkUrl(current);
+  const reducedMotion = useReducedMotion();
   return (
     <>
       {desktop && page !== 'playing' && (
-        <footer className="playbar" aria-label="播放器">
+        <motion.footer className="playbar" aria-label="播放器" layoutRoot>
           <CoverGlow artwork={artwork} playing={snapshot.playing} />
           <div className="playbar-inner">
             <div className="playbar-now">
@@ -31,7 +34,7 @@ export function Playbar() {
                 aria-label="打开正在播放"
                 onClick={() => open({ type: 'playing' })}
               >
-                <Cover track={current} />
+                <Cover track={current} sharedArtwork={!reducedMotion} />
                 <span>
                   <strong title={current?.title}>{current ? displayTitle(current) : '选择一首音乐'}</strong>
                   <small>{current ? creator(current) : '好音乐，等你发现'}</small>
@@ -68,19 +71,27 @@ export function Playbar() {
               <Volume />
               <PlaybackRate />
               <SleepButton />
-              <button
-                className={'btn btn-icon ' + (queueVisible ? 'saved' : '')}
-                title="播放队列"
-                aria-label="打开播放队列"
-                aria-expanded={queueVisible}
-                onClick={() => open({ type: 'queue' })}
-              >
-                <QueueIcon size={25} />
-              </button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={'btn btn-icon ' + (queueVisible ? 'saved' : '')}
+                      aria-label="打开播放队列"
+                      aria-expanded={queueVisible}
+                      onClick={() => open({ type: 'queue' })}
+                    >
+                      <QueueIcon size={25} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipPortal>
+                    <TooltipContent className="control-tooltip" side="top" sideOffset={8}>播放队列</TooltipContent>
+                  </TooltipPortal>
+                </Tooltip>
+              </TooltipProvider>
               <PlayerOptions dock />
             </div>
           </div>
-        </footer>
+        </motion.footer>
       )}
     </>
   );

@@ -3,7 +3,7 @@ import { mobileSettingsSection } from './mobile-settings';
 import { mobilePlaylistId } from './mobile-library';
 import { readMobileFollowView } from './mobile-follow';
 import { mobilePageSuspended, suspendMobilePages } from './mobile-pages';
-import { isDialogLayer, openLayers, requestLayerClose } from './ui/layers';
+import { closeLayer, openLayers } from './ui/layers';
 
 type Entry = { session: string; id: number; key: string; page: string; layers: number[]; scroll: number; suspendedReaders?: number[]; readers?: string[] };
 const stateKey = 'slowTuneMobileNavigation';
@@ -91,8 +91,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
       suspendMobilePages(true,openLayers().filter(element=>target.suspendedReaders?.includes(identity(element))));
       for (const element of openLayers().reverse()) {
         if (target.layers.includes(identity(element))) continue;
-        if (isDialogLayer(element)) requestLayerClose(element);
-        else element.hidePopover();
+        closeLayer(element);
       }
       if (latest.current.page !== target.page) latest.current.onRestore(target.page);
       const retainedLayers = openLayers().map(identity).filter(id => target.layers.includes(id));

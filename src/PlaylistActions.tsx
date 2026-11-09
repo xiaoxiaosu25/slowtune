@@ -3,8 +3,8 @@ import { CameraIcon, ListBulletsIcon, PencilSimpleIcon, PlayIcon, PlusIcon, Queu
 import type { SongLibraryState, SongPlaybackSelection, Song } from '../server/song-library-types';
 import type { SongCommit } from './song-management';
 import { ActionMenu, type MenuAction } from './ActionMenu';
-import { Modal } from './Modal';
-import { Dialog } from './ui/Dialog';
+import { PlaylistDeleteDialog } from './PlaylistDeleteDialog';
+import { PlaylistNameDialog } from './PlaylistNameDialog';
 import { errorText } from './api';
 import { desktopFeature } from './DesktopRegion';
 import { DesktopPlaylistCoverDialog as coverDialogUrl } from 'virtual:desktop-feature-urls';
@@ -52,8 +52,27 @@ export function PlaylistActions({ library, targetId, commit, busy, target, class
   ];
   return <>
     <ActionMenu label="歌单管理" title={title} subtitle={selections && selections.length !== items.length ? `当前筛选 ${selections.length} / ${items.length} 首` : items.length + ' 首歌曲'} target={target} className={className} trigger={trigger} buttonClassName="btn-secondary" actions={actions}/>
-    {dialog === 'rename' && playlist && <Dialog title="歌单改名" onClose={() => setDialog(undefined)}><form onSubmit={event => { event.preventDefault(); void save([{ type: 'rename-playlist', playlistId: targetId, name: name.trim() }]); }}><label className="field"><span className="field-label">歌单名称</span><input className="input" aria-label="歌单名称" data-autofocus="true" value={name} maxLength={200} required onChange={event => setName(event.target.value)}/></label>{error && <p className="feedback" role="alert">{error}</p>}<button className="btn btn-primary" disabled={busy || !name.trim()}>保存歌单</button></form></Dialog>}
-    {dialog === 'delete' && playlist && <Modal title="删除歌单" onClose={() => setDialog(undefined)}><p>删除「{title}」及 {items.length} 个成员，歌曲资料和当前队列保留。</p>{error && <p className="feedback" role="alert">{error}</p>}<div className="modal-actions"><button className="btn btn-ghost" onClick={() => setDialog(undefined)}>取消</button><button className="btn btn-danger" disabled={busy} onClick={() => void save([{ type: 'delete-playlist', playlistId: targetId }])}>确认删除</button></div></Modal>}
+    {dialog === 'rename' && playlist && (
+      <PlaylistNameDialog
+        mode="rename"
+        name={name}
+        busy={busy}
+        onNameChange={setName}
+        onSave={name => void save([{ type: 'rename-playlist', playlistId: targetId, name }])}
+        onClose={() => setDialog(undefined)}
+        feedback={error && <p className="feedback" role="alert">{error}</p>}
+      />
+    )}
+    {dialog === 'delete' && playlist && (
+      <PlaylistDeleteDialog
+        busy={busy}
+        onClose={() => setDialog(undefined)}
+        onConfirm={() => void save([{ type: 'delete-playlist', playlistId: targetId }])}
+        feedback={error && <p className="feedback" role="alert">{error}</p>}
+      >
+        删除「{title}」及 {items.length} 个成员，歌曲资料和当前队列保留。
+      </PlaylistDeleteDialog>
+    )}
     {dialog === 'cover' && <CoverDialog library={library} targetId={targetId} songs={items.map(item => item.song)} image={image} busy={busy} commit={commit} onClose={() => setDialog(undefined)}/>}
   </>;
 }

@@ -83,7 +83,7 @@ test('YouTube switch: live shared state, preserved library/queue, three displays
   assert.equal(await youtubeRow.count(),0);assert.equal(await page.locator('.queue-track').filter({hasText:'YouTube 已有歌曲'}).count(),0);
   assert.deepEqual((await saved()).items.map(track=>track.instanceId),queueIds);assert.deepEqual(snapshot,initial);
   await openSettingsPage(page,'音乐来源');await page.screenshot({path:join(artifacts,'desktop-settings.png'),fullPage:true});
-  await toggle.check();await other.waitForFunction(()=>document.querySelector('input[aria-label="启用 YouTube"]').checked);
+  await toggle.check();await other.waitForFunction(()=>document.querySelector('[role="switch"][aria-label="启用 YouTube"]')?.getAttribute('aria-checked')==='true');
   await closeSettingsPage(page);assert.equal(await youtubeRow.count(),1);assert.equal(await youtubeRow.getByRole('button',{name:'播放 YouTube 已有歌曲',exact:true}).isEnabled(),true);
   assert.deepEqual(await page.locator('.source-tabs button').allTextContents(),['全部','B站','YouTube 视频']);
   for(const failed of [true,false]){

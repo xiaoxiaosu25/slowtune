@@ -8,6 +8,7 @@ import './song-catalog.css';
 import { desktopCatalogLibrary } from '../server/song-catalog-display';
 import { SongOrganizationPanel } from './SongOrganizationPanel';
 import { PagedList } from './Pagination';
+import { VirtualRows } from './VirtualRows';
 import { errorText, availabilityText } from './api';
 import { SongMaintenanceTask, useSongMaintenance, type SongTask } from './SongMaintenanceTask';
 import { desktopSongIndex } from './desktop-song-index';
@@ -178,6 +179,8 @@ const SongManager = memo(function SongManager({ library, onChange, onEdit, onTas
   library: SongLibraryState; onChange: (state: SongLibraryState) => void; onEdit: (context: SongDialogContext) => void; onTask: (task: SongTask) => void; message: string;
 }) {
   const [filter, setFilter] = useState<Filter>('all'), [query, setQuery] = useState(''), [selected, setSelected] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const scroll = useRef<HTMLDivElement>(null);
   const operation = useSongMaintenance(onChange);
   const index = desktopSongIndex(library.snapshot), songs = index.retainedSongs;
   const filtered = useMemo(() => {
@@ -192,23 +195,30 @@ const SongManager = memo(function SongManager({ library, onChange, onEdit, onTas
       <div className="song-manager-filters" role="group" aria-label="歌曲筛选">{([['all', '全部歌曲'], ['missing', '存在失效版本'], ['pending', '待检查']] as const).map(([value, label]) => <button aria-pressed={filter === value} className={filter === value ? 'selected' : ''} key={value} onClick={() => setFilter(value)}>{label}<small>{index.counts[value]}</small></button>)}</div>
       <div className="song-manager-batch"><span className="muted">已选 {selected.length} / 20 个版本</span><div className="toolbar"><button className="btn btn-secondary btn-sm" disabled={operation.busy || !selected.length} onClick={() => void operation.check(library, selected)}>检查所选版本</button><button className="btn btn-ghost btn-sm danger-text" disabled={operation.busy || !selectedVersions.length || selectedVersions.some(v => !isMissingVersion(v))} onClick={() => onTask({ type: 'clean-unavailable', versionIds: selected })}>清理所选失效版本</button><button className="btn btn-ghost btn-sm" disabled={operation.busy || !selected.length} onClick={() => setSelected([])}>清除选择</button></div></div>
     </div>
-    <div className="song-workspace-body song-manager-list">
+    <div className="song-workspace-body song-manager-list" ref={scroll}>
       {filter === 'missing' && <p className="muted song-manager-note">仅列出已确认来源不存在的版本。网络、登录或限流问题归入“待检查”。</p>}
       {operation.error && <p className="feedback" role="alert">{operation.error}</p>}{(operation.message || message) && <p className="song-inline-message" role="status">{operation.message || message}</p>}{operation.busy && <p role="status">正在检查来源… <button className="btn btn-ghost btn-sm" onClick={operation.cancel}>取消检查</button></p>}
-      <PagedList id={'song-manager:' + filter + ':' + query} group="song-manager" label="已保存歌曲" items={filtered}>{items => items.length ? <div>{items.map(song => {
+      <PagedList id={'song-manager:' + filter + ':' + query} group="song-manager" label="已保存歌曲" items={filtered}>{items => items.length ? <VirtualRows items={items} scrollRef={scroll} itemKey={song => song.id} estimate={108}>{song => {
         const versions = index.versionsBySong.get(song.id) ?? [], playlists = index.playlistsBySong.get(song.id) ?? [], favorite = index.favorites.has(song.id);
+        const expansionKey = filter + ':' + song.id;
+        const open = expanded[expansionKey] ?? filter !== 'all';
         return <article className="song-manager-row" key={song.id}><div className="song-manager-song"><SongCover song={song}/><button className="song-manager-open" aria-label={'管理歌曲 ' + song.title} onClick={() => onEdit({ songId: song.id })}><strong>{song.title}</strong><small>{song.artists?.join(' / ') || '歌手未填写'}</small></button><span className="song-manager-membership">{favorite ? '已收藏' : ''}{favorite && playlists.length ? ' · ' : ''}{playlists.map(p => p.name).join('、')}</span><button className="btn btn-ghost btn-sm" onClick={() => onEdit({ songId: song.id })}>管理<ArrowRightIcon size={16}/></button></div>
-          {versions.length ? <SongManagerVersions key={filter} versions={versions} filter={filter} selected={selected} busy={operation.busy} toggle={toggle}/> : <p className="muted song-manager-no-version">没有已保存版本，播放时自动匹配。</p>}
+          {versions.length ? <SongManagerVersions versions={versions} filter={filter} selected={selected} busy={operation.busy} toggle={toggle}
+            open={open} onOpenChange={value => {
+              if (value !== open) setExpanded(old => ({ ...old, [expansionKey]: value }));
+            }} /> : <p className="muted song-manager-no-version">没有已保存版本，播放时自动匹配。</p>}
         </article>;
-      })}</div> : <div className="empty"><MusicNotesIcon size={32}/><h3>{songs.length ? '没有符合条件的歌曲' : '还没有收藏或加入歌单的歌曲'}</h3><p>收藏歌曲或加入歌单后，可以在这里管理。</p></div>}</PagedList>
+      }}</VirtualRows> : <div className="empty"><MusicNotesIcon size={32}/><h3>{songs.length ? '没有符合条件的歌曲' : '还没有收藏或加入歌单的歌曲'}</h3><p>收藏歌曲或加入歌单后，可以在这里管理。</p></div>}</PagedList>
     </div>
     <footer className="song-workspace-footer"><span className="muted">共 {filtered.length} 首歌曲 · 检查不会自动删除版本</span></footer>
   </div>;
 });
 
-function SongManagerVersions({ versions, filter, selected, busy, toggle }: { versions: SongVersion[]; filter: Filter; selected: string[]; busy: boolean; toggle: (id: string) => void }) {
-  const [open, setOpen] = useState(filter !== 'all');
-  return <details className="song-manager-versions" open={open} onToggle={event => setOpen(event.currentTarget.open)}>
+function SongManagerVersions({ versions, filter, selected, busy, toggle, open, onOpenChange }: {
+  versions: SongVersion[]; filter: Filter; selected: string[]; busy: boolean; toggle: (id: string) => void;
+  open: boolean; onOpenChange: (open: boolean) => void;
+}) {
+  return <details className="song-manager-versions" open={open} onToggle={event => onOpenChange(event.currentTarget.open)}>
     <summary>{versions.length} 个版本 · 展开选择和检查{versions.some(isMissingVersion) && <span className="version-status-unavailable"> · 存在失效版本</span>}{versions.some(v => v.availability.state === 'uncertain') && <span> · 暂时无法确认</span>}</summary>
     {open && <div>{versions.filter(v => filter === 'missing' ? isMissingVersion(v) : true).map(version => <label className="song-manager-version" key={version.id}><input type="checkbox" aria-label={'选择版本 ' + versionName(version)} checked={selected.includes(version.id)} disabled={busy || !selected.includes(version.id) && selected.length >= 20} onChange={() => toggle(version.id)}/><span><strong>{versionName(version)}</strong><small>{version.ref.provider === 'bilibili' ? 'B站' : 'YouTube'}{version.facts.uploader ? ' · ' + version.facts.uploader : ''}</small></span><VersionStatus version={version}/></label>)}</div>}
   </details>;

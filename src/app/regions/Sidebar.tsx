@@ -1,4 +1,5 @@
 import { GlobalTools } from '../components/WorkspaceControls';
+import { motion, useReducedMotion } from 'motion/react';
 import { useMemo } from 'react';
 import { PlaylistCover } from '../../PlaylistCover';
 import { PlaylistActions } from '../../PlaylistActions';
@@ -10,6 +11,7 @@ import { useWorkspace } from '../workspace-context';
 
 /** 桌面侧栏：品牌、主导航、我的歌单与全局工具。 */
 export function Sidebar() {
+  const reducedMotion = useReducedMotion();
   const {
     page,
     navigate,
@@ -97,7 +99,7 @@ export function Sidebar() {
               <small>{brand.english.toUpperCase()}</small>
             </span>
           </button>
-          <nav className="sidebar-nav" aria-label="主导航">
+          <nav className="sidebar-nav" data-sliding-selection={desktop && !reducedMotion || undefined} aria-label="主导航">
             {nav.map((n) => (
               <button
                 key={n.id}
@@ -105,6 +107,9 @@ export function Sidebar() {
                 aria-current={page === n.id ? 'page' : undefined}
                 onClick={() => navigate(n.id)}
               >
+                {page === n.id && desktop && !reducedMotion && (
+                  <motion.span className="sidebar-selection" layoutId="desktop-sidebar-selection" aria-hidden="true" />
+                )}
                 <n.icon size={22} weight={page === n.id ? 'fill' : 'regular'} />
                 <span>{n.label}</span>
               </button>

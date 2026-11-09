@@ -1,4 +1,5 @@
 .control-popover-panel.context-menu{width:264px;max-width:calc(100vw - 24px);border-radius:var(--r-overlay);padding:6px;overscroll-behavior:contain}
+.control-popover-panel.floating-menu{position:static;z-index:var(--z-overlay);max-height:min(calc(100dvh - 24px),var(--radix-popper-available-height,100dvh))}
 .context-menu-heading{padding:8px 10px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;display:grid;gap:3px}
 .context-menu-heading strong{font-size:var(--fs-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .context-menu-heading small{font-size:var(--fs-meta);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

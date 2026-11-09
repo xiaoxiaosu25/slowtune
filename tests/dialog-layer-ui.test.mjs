@@ -44,27 +44,35 @@ async function active(locator) {
   return locator.evaluate(element => element === document.activeElement);
 }
 
-test('desktop rename opens above other layers with the name focused', async t => {
+test('desktop rename opens above other layers at form width with the name focused', async t => {
   const { page } = await openPlaylist(t);
   const dialog = await openRename(page);
   assert.equal(await dialog.getAttribute('data-layer'), 'dialog');
-  assert(await active(dialog.getByRole('textbox', { name: '歌单名称' })));
+  const name = dialog.getByRole('textbox', { name: '歌单名称' });
+  const save = dialog.getByRole('button', { name: '保存歌单', exact: true });
+  assert(await active(name));
   assert(await dialog.evaluate(element => {
     const box = element.getBoundingClientRect();
     return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
   }));
+  const [dialogBox, nameBox, saveBox] = await Promise.all([dialog.boundingBox(), name.boundingBox(), save.boundingBox()]);
+  assert(dialogBox && nameBox && saveBox);
+  assert(Math.abs(dialogBox.width - 480) <= 1, `dialog width: ${dialogBox.width}px`);
+  const gap = saveBox.y - (nameBox.y + nameBox.height);
+  assert(Math.abs(gap - 24) <= 1, `name to save gap: ${gap}px`);
 });
 
-test('Tab and Shift+Tab cycle through the original rename control order', async t => {
+test('Tab and Shift+Tab cycle through the rename field, actions and close button', async t => {
   const { page } = await openPlaylist(t);
   const dialog = await openRename(page);
   const name = dialog.getByRole('textbox', { name: '歌单名称' });
+  const cancel = dialog.getByRole('button', { name: '取消', exact: true });
   const save = dialog.getByRole('button', { name: '保存歌单', exact: true });
   const close = dialog.getByRole('button', { name: '关闭', exact: true });
   assert(await active(name));
   for (const [key, expected] of [
-    ['Tab', save], ['Tab', close], ['Tab', name],
-    ['Shift+Tab', close], ['Shift+Tab', save], ['Shift+Tab', name],
+    ['Tab', cancel], ['Tab', save], ['Tab', close], ['Tab', name],
+    ['Shift+Tab', close], ['Shift+Tab', save], ['Shift+Tab', cancel], ['Shift+Tab', name],
   ]) {
     await page.keyboard.press(key);
     assert(await active(expected), key + ' reaches the expected control');
@@ -148,6 +156,64 @@ test('both playlist menu entries save the new name and dismiss rename', async t 
   await openRename(page);
   await save('歌单菜单改名');
   await page.locator('.sidebar-playlist').filter({ hasText: '歌单菜单改名' }).click({ button: 'right' });
-  await page.locator('.context-menu:popover-open').getByRole('menuitem', { name: '歌单改名', exact: true }).click();
+  await page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem', { name: '歌单改名', exact: true }).click();
   await save('右键菜单改名');
+});
+
+test('delete focuses Cancel, restores the menu origin and can retry a failed write', async t => {
+  const { page, library } = await openPlaylist(t);
+  const dialog = page.getByRole('dialog', { name: '删除歌单', exact: true });
+  const cancel = dialog.getByRole('button', { name: '取消', exact: true });
+  const confirm = dialog.getByRole('button', { name: '确认删除', exact: true });
+  const heading = library.getByRole('heading', { name: playlistName, exact: true });
+  let writes = 0;
+  await page.route('**/api/song-library/edits', route => {
+    writes++;
+    return writes === 1
+      ? route.fulfill({ status: 503, json: { error: { code: 'storage' } } })
+      : route.continue();
+  });
+
+  await libraryAction(page, '删除歌单');
+  await cancel.waitFor();
+  assert.equal(await dialog.getAttribute('data-layer'), 'dialog');
+  assert(await active(cancel));
+  await page.keyboard.press('Tab');
+  assert(await active(confirm));
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  await page.waitForFunction(() => document.activeElement?.matches('.playlist-manage-menu > button'));
+  assert.equal(writes, 0);
+  await heading.waitFor();
+
+  const sidebar = page.locator('.sidebar-playlist').filter({ hasText: playlistName });
+  await sidebar.click({ button: 'right' });
+  await page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem', { name: '删除歌单', exact: true }).click();
+  await cancel.waitFor();
+  assert(await active(cancel));
+  await confirm.click();
+  await dialog.getByRole('alert').waitFor();
+  assert(await confirm.isEnabled());
+  await confirm.click();
+  await dialog.waitFor({ state: 'detached' });
+  await sidebar.waitFor({ state: 'detached' });
+  assert.equal(writes, 2);
+});
+
+test('mobile Back closes delete without reopening the management sheet', async t => {
+  const { page, library } = await openPlaylist(t, true);
+  const route = await page.evaluate(() => history.state.slowTuneMobileNavigation.page);
+  await libraryAction(page, '删除歌单');
+  const dialog = page.getByRole('dialog', { name: '删除歌单', exact: true });
+  await dialog.waitFor();
+  assert.equal(await dialog.getAttribute('data-layer'), 'dialog');
+  assert(await active(dialog.getByRole('button', { name: '取消', exact: true })));
+  await page.waitForFunction(() => history.state?.slowTuneMobileNavigation?.layers.length === 1);
+  await page.evaluate(() => history.back());
+  await dialog.waitFor({ state: 'detached' });
+  assert.equal(await page.getByRole('dialog', { name: '歌单管理', exact: true }).count(), 0);
+  await library.getByRole('heading', { name: playlistName, exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => history.state.slowTuneMobileNavigation.page), route);
+  await page.evaluate(() => history.back());
+  await page.getByRole('region', { name: '音乐库', exact: true }).waitFor();
 });

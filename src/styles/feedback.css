@@ -13,4 +13,9 @@
 .loading { padding:var(--sp-4) 0; }
 .loading .btn { margin-left:var(--sp-2); }
 .load-more { display:flex; min-width:110px; margin:var(--sp-5) auto; }
-.toast { position:fixed; bottom:calc(var(--player-height) + var(--sp-4)); left:50%; transform:translateX(-50%); max-width:calc(100% - var(--sp-6)); padding:var(--sp-3) var(--sp-5); border-radius:var(--r-overlay); background:var(--text); color:var(--bg); font-size:var(--fs-secondary); box-shadow:var(--shadow-lg); z-index:calc(var(--z-toast) + 1); }
+.app { --notice-offset:calc(var(--player-height) + var(--sp-4)); }
+.app.immersive { --notice-offset:var(--sp-5); }
+.app .workspace-toaster[data-sonner-toaster] { z-index:calc(var(--z-toast) + 1); }
+.app:has([data-layer="dialog"][data-state="open"]) .workspace-toaster[data-sonner-toaster] { visibility:hidden; pointer-events:none; }
+.toast-copy { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-3) var(--sp-5); border-radius:var(--r-overlay); background:var(--text); color:var(--bg); font-size:var(--fs-secondary); box-shadow:var(--shadow-lg); overflow-wrap:anywhere; }
+.toast-copy .btn { color:inherit; }

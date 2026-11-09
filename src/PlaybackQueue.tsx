@@ -6,6 +6,7 @@ import { ActionMenu, type MenuAction } from './ActionMenu';
 import { isTrack, type QueueTrack } from './chart-playback';
 import { PlayAllButton, AddToPlaylistButton } from './ListActions';
 import type { DisabledDisplay } from './source-settings';
+import { VirtualRows } from './VirtualRows';
 
 export function PlaybackQueue({items,currentId,playing,order,renderCover,title,onClose,onPlayAll,onSelect,onMove,onRemove,onClear,onSearch,onCreator,authorBusy,onImport,youtubeEnabled=true,disabledDisplay='dim',desktop=false,onMoveNext,onMoveLast,trackActions}:{
   desktop?:boolean;onMoveNext?:(id:string)=>void;onMoveLast?:(id:string)=>void;trackActions?:(track:Track)=>MenuAction[];
@@ -15,15 +16,16 @@ export function PlaybackQueue({items,currentId,playing,order,renderCover,title,o
   onClose:()=>void;onPlayAll:()=>void;onSelect:(id:string)=>void;onMove:(id:string,to:number)=>void;onRemove:(id:string)=>void;onClear:()=>void;onSearch:()=>void;onCreator:(track:Track)=>void;authorBusy:boolean;
 }) {
   const active=useRef<HTMLDivElement>(null);
+  const scroll=useRef<HTMLDivElement>(null);
   const blocked=(track:QueueTrack)=>!youtubeEnabled&&isTrack(track)&&track.ref.provider==='youtube';
   const visible=items.filter(track=>disabledDisplay!=='hide'||!blocked(track)),playable=items.filter(track=>!blocked(track));
-  useEffect(()=>{active.current?.scrollIntoView({block:'nearest'});},[currentId,items.length]);
+  useEffect(()=>{if (visible.length <= 50) active.current?.scrollIntoView({block:'nearest'});},[currentId,items.length,visible.length]);
   return <aside className="queue-panel" aria-label="播放队列">
     <div className="queue-heading"><div><span className="eyebrow">你的聆听列表</span><h2 className="catalog-title">播放队列 <small className="catalog-count">{visible.length} 首</small></h2></div><button className="btn btn-icon" title="关闭播放队列" aria-label="关闭播放队列" onClick={onClose}><XIcon size={22}/></button></div>
     <div className="toolbar queue-toolbar"><PlayAllButton compact className="queue-play-all" count={playable.length} onClick={onPlayAll}/>{onImport&&<AddToPlaylistButton compact count={playable.filter(isTrack).length} onClick={onImport}/>}</div>
     {visible.length<items.length&&<p className="muted" role="status">已隐藏 {items.length-visible.length} 首 YouTube 歌曲，队列资料保留。</p>}
     {items.length>0&&<div className="queue-mode"><span>{order==='shuffle'?<ShuffleIcon size={16}/>:<QueueIcon size={16}/>} {order==='shuffle'?'随机播放':'按列表顺序播放'}</span><small>点击歌曲从头播放</small></div>}
-    <div className="queue-content">{visible.length?<div className="queue-list">{visible.map((track,index)=>{
+    <div className="queue-content" ref={scroll}>{visible.length?<div className="queue-list"><VirtualRows items={visible} scrollRef={scroll} itemKey={track=>track.resourceId} estimate={68} gap={4} activeKey={currentId}>{(track,index)=>{
       const isCurrent=currentId===track.resourceId;
       return <div ref={isCurrent?active:undefined} className={'queue-track '+(blocked(track)?'source-closed ':'')+(blocked(track)&&disabledDisplay==='dim'?'source-disabled ':'')+(isCurrent?'current':'')} key={track.resourceId}>
         <button className="queue-track-main" disabled={blocked(track)} onClick={()=>onSelect(track.resourceId)} aria-label={'播放队列歌曲 '+track.title} aria-current={isCurrent?'true':undefined}>
@@ -46,7 +48,7 @@ export function PlaybackQueue({items,currentId,playing,order,renderCover,title,o
           <button className="danger" onClick={()=>onRemove(track.resourceId)}><TrashIcon size={18}/>移除</button>
         </ControlPopover>}
       </div>;
-    })}</div>:<div className="queue-empty"><QueueIcon size={40}/><h3>队列还是空的</h3><p>播放一首音乐，或在歌曲菜单中加入队列。</p><button className="btn btn-secondary" onClick={onSearch}>去搜索音乐</button></div>}</div>
+    }}</VirtualRows></div>:<div className="queue-empty"><QueueIcon size={40}/><h3>队列还是空的</h3><p>播放一首音乐，或在歌曲菜单中加入队列。</p><button className="btn btn-secondary" onClick={onSearch}>去搜索音乐</button></div>}</div>
     {items.length>0&&<div className="queue-footer"><span>{visible.length} 首音乐</span><button className="btn btn-ghost btn-sm queue-clear" onClick={onClear}><TrashIcon size={17}/>清空队列并停止</button></div>}
   </aside>;
 }

@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { ArrowClockwiseIcon, CaretDownIcon, CaretUpIcon, DotsThreeIcon, ListBulletsIcon, PlusIcon, SquaresFourIcon } from '@phosphor-icons/react';
-import { Modal } from './Modal';
+import { Dialog } from './ui/Dialog';
 import { discoverySize, type CatalogView } from './CatalogView';
 import type { DiscoveryShelfProps } from './DiscoveryShelf';
 import type { Track } from './api';
@@ -18,10 +18,10 @@ export function MobileDiscoveryShelf({ shelf, loading, renderCovers, renderList,
     {loading && <p className="mobile-shelf-loading" role="status">{shelf.id === 'follow-updates' ? '正在读取更新…' : items.length ? '正在更新推荐…' : '正在寻找音乐…'}</p>}
     {feedback}
     {shelf.error ? renderError(shelf.error) : items.length ? <><div id={bodyId}>{view === 'covers' ? <div className={'mobile-shelf-covers '+(shelf.kind==='recommendation'?'mobile-shelf-tracks mobile-shelf-featured':'mobile-shelf-gallery')} role="group" aria-label={shelf.title}>{renderCovers(shown,shelf.id==='follow-updates')}</div> : renderList(shown)}</div>{(expanded || items.length > shown.length) && <button className="btn btn-ghost mobile-shelf-expand" aria-controls={bodyId} aria-expanded={expanded} onClick={toggleExpanded}>{expanded ? '收起' : `展开更多 · 还有 ${items.length - shown.length} 首`}{expanded ? <CaretUpIcon size={18}/> : <CaretDownIcon size={18}/>}</button>}</> : !loading && (empty ?? <p className="muted">暂时没有可展示的音乐。</p>)}
-    {menu && <Modal title={shelf.title + '栏目操作'} className="mobile-actions-sheet" onClose={() => setMenu(false)}><div className="mobile-action-list">
+    {menu && <Dialog title={shelf.title + '栏目操作'} className="mobile-actions-sheet" onClose={() => setMenu(false)}><div className="mobile-action-list">
       {onImport && <button disabled={!items.length} onClick={() => run(() => onImport(items, shelf.title))}><PlusIcon size={23}/><span>加入歌单</span></button>}
       <button aria-pressed={view === 'covers'} onClick={() => run(() => onView('covers'))}><SquaresFourIcon size={23}/><span>封面浏览</span></button>
       <button aria-pressed={view === 'list'} onClick={() => run(() => onView('list'))}><ListBulletsIcon size={23}/><span>歌曲列表</span></button>
-    </div>{controls && <div className="mobile-shelf-options">{controls}</div>}<div className="mobile-shelf-info">{info}{status}</div></Modal>}
+    </div>{controls && <div className="mobile-shelf-options">{controls}</div>}<div className="mobile-shelf-info">{info}{status}</div></Dialog>}
   </section>;
 }

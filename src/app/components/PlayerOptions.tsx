@@ -13,6 +13,7 @@ import {
 import { MobilePlayerOptions } from '../../MobilePlayerOptions';
 import { AudioPreferenceSelect } from '../../AudioQualityOptions';
 import { ControlPopover } from '../../ControlPopover';
+import { closeLayer, OPEN_LAYER } from '../../ui/layers';
 import { DesktopLyricFont } from '../../DesktopLyricFont';
 import { DesktopLyricMotion } from '../../DesktopLyricMotion';
 import { mobileVisuals, type MobileVisual } from '../useMobileVisual';
@@ -252,11 +253,11 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
       <button
         disabled={!current}
         onClick={(event) => {
-          const popover = event.currentTarget.closest<HTMLElement>('[popover]');
-          popover?.hidePopover();
+          const popover = event.currentTarget.closest<HTMLElement>(OPEN_LAYER);
+          if (popover) closeLayer(popover);
           popover
             ?.closest('.control-popover')
-            ?.querySelector<HTMLButtonElement>('button[popovertarget]')
+            ?.querySelector<HTMLButtonElement>(':scope > button')
             ?.focus();
           setAudioQualityOpen(true);
         }}
@@ -284,7 +285,7 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
         onClick={(event) => {
           event.currentTarget
             .closest('.control-popover')
-            ?.querySelector<HTMLButtonElement>('button[popovertarget]')
+            ?.querySelector<HTMLButtonElement>(':scope > button')
             ?.focus();
           openLyricsManagement();
         }}

@@ -236,8 +236,8 @@
   .app[data-layout="mobile"] .queue-heading { margin-bottom:8px; }
   .app[data-layout="mobile"] .queue-mode { margin-bottom:8px; padding-bottom:8px; }
   .app[data-layout="mobile"] .queue-footer { margin-top:8px; padding-top:8px; }
-  .app[data-layout="mobile"]>.toast { width:max-content; max-width:calc(100% - 32px); bottom:calc(var(--mobile-nav-height) + var(--mobile-player-height) + 30px + env(safe-area-inset-bottom)); }
-  .app[data-layout="mobile"].immersive>.toast { top:auto; bottom:16px; }
+  .app[data-layout="mobile"] { --notice-offset:calc(var(--mobile-nav-height) + var(--mobile-player-height) + 30px + env(safe-area-inset-bottom)); }
+  .app[data-layout="mobile"].immersive { --notice-offset:var(--sp-4); }
 
   .app[data-layout="mobile"] .mobile-discovery-shelf { margin-top:0; scroll-margin-top:calc(var(--header-height) + 12px); }
   .app[data-layout="mobile"] .mobile-discovery-shelf+.mobile-discovery-shelf { margin-top:28px; padding-top:16px; }

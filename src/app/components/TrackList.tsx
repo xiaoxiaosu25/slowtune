@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import {
   PlayIcon,
   SkipForwardIcon,
@@ -24,6 +25,7 @@ import type { EntryContext } from '../../multipart';
 import { searchFilterReasons, type SongQuery } from '../../../server/search-policy';
 import { Badge, Cover, artworkKey, displayTitle, favoritesId } from '../shared';
 import { useWorkspace } from '../workspace-context';
+import { TrackRowCue } from './TrackRowCue';
 
 export function useSourceActions() {
   const {
@@ -198,6 +200,7 @@ type TrackRowProps = {
   list?: Track[];
   timestamps?: boolean;
   searchContext?: SongQuery;
+  enterIndex?: number;
 };
 
 export function TrackRow({
@@ -207,6 +210,7 @@ export function TrackRow({
   list,
   timestamps = false,
   searchContext,
+  enterIndex,
 }: TrackRowProps) {
   const {
     isFavorite,
@@ -238,6 +242,10 @@ export function TrackRow({
     playlist,
   } = useWorkspace();
   const entryContext: EntryContext = context === 'normal' ? 'video' : 'part';
+  const isCurrent = !!current && key(current.ref) === key(t.ref);
+  const number = String((searchContext
+    ? results[t.ref.provider]?.items.findIndex(item => item.resourceId === t.resourceId) ?? index
+    : index) + 1).padStart(2, '0');
   const saved = entryContext === 'video' ? isVideoFavorite(t) : isFavorite(t);
   const playTrack = () =>
     context === 'queue'
@@ -261,18 +269,14 @@ export function TrackRow({
         (filterReasons.length ? 'search-filtered-row ' : '') +
         (sourceBlocked(t) ? 'source-closed ' : '') +
         (sourceBlocked(t) && youtubeDisplay === 'dim' ? 'source-disabled ' : '') +
-        (current && key(current.ref) === key(t.ref) ? 'current' : '')
+        (isCurrent ? 'current' : '')
       }
+      style={desktop && enterIndex !== undefined && enterIndex < 12 ? { '--track-enter-index': enterIndex } as CSSProperties : undefined}
     >
       {context !== 'queue' && context !== 'part' && (
-        <span className="row-number">
-          {String(
-            (searchContext
-              ? (results[t.ref.provider]?.items.findIndex((item) => item.resourceId === t.resourceId) ??
-                index)
-              : index) + 1,
-          ).padStart(2, '0')}
-        </span>
+        desktop
+          ? <TrackRowCue number={number} title={t.title} playing={isCurrent && snapshot.playing} disabled={sourceBlocked(t)} onPlay={() => void playTrack()} />
+          : <span className="row-number">{number}</span>
       )}
       <button
         className="row-cover"
@@ -496,6 +500,7 @@ export function TrackList({
           key={t.resourceId}
           track={t}
           index={offset + i}
+          enterIndex={i}
           list={all}
           timestamps={timestamps}
           searchContext={searchContext}

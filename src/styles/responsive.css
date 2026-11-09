@@ -186,7 +186,7 @@
   .stage-controls .stage-queue { flex-wrap:nowrap; }
   .stage-controls .stage-queue>svg { width:18px; height:18px; }
   .player-shortcuts { display:none; }
-  .modal { width:100%; max-width:100%; max-height:88dvh; margin:auto 0 0; padding:var(--sp-5) var(--sp-4); border-radius:var(--r-overlay) var(--r-overlay) 0 0; }
+  .modal { width:100%; max-width:100%; max-height:88dvh; margin:auto 0 0; padding:var(--sp-5) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom)); border-radius:var(--r-overlay) var(--r-overlay) 0 0; }
   .modal-header { top:calc(var(--sp-5) * -1); margin:calc(var(--sp-5) * -1) 0 var(--sp-4); padding-top:var(--sp-5); }
   .modal .row-sub { flex-wrap:wrap; gap:var(--sp-1); }
   .search-modal { width:calc(100% - 16px); max-width:calc(100% - 16px); height:calc(100dvh - 24px); max-height:calc(100dvh - 24px); margin:auto; border-radius:var(--r-overlay); padding:var(--sp-4); }
@@ -249,7 +249,6 @@
   .recommendation-preview-count { margin-left:52px; }
   .recommendation-compatibility .btn { max-width:100%; height:auto; min-height:44px; white-space:normal; line-height:1.6; padding:var(--sp-2) var(--sp-3); }
   .diagnostics { grid-template-columns:88px 1fr; }
-  .toast { bottom:calc(150px + env(safe-area-inset-bottom)); }
   .empty { padding:var(--sp-6) var(--sp-3); }
 }
 @media(max-height:800px) {

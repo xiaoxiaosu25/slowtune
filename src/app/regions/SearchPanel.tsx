@@ -1,4 +1,5 @@
 import { renderTrackList } from '../components/TrackList';
+import { TrackListSkeleton } from '../components/TrackRowCue';
 import { ErrorFeedback } from '../components/WorkspaceControls';
 import { PlaybackSlot, Transport } from '../components/PlaybackControls';
 import { ArrowLeftIcon, MagnifyingGlassIcon, MusicNotesIcon } from '@phosphor-icons/react';
@@ -376,7 +377,7 @@ export function SearchPanel() {
                                 visible,
                               )
                             ) : r.busy ? (
-                              <div className="loading">正在搜索…</div>
+                              <TrackListSkeleton label="正在搜索…" />
                             ) : (
                               !r.error && (
                                 <div className="empty">

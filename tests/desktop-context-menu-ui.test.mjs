@@ -15,7 +15,7 @@ test('desktop context actions preserve playback, versions, keyboard focus and ob
   await page.route('**/*', route => new URL(route.request().url()).origin === fixture.origin ? route.continue() : route.abort());
   await page.route('**/v1/call/prepare', route => { preparations.push(route.request().postDataJSON().request.ref); return route.continue(); });
   const output = resolve('local/verification/desktop-context-menu'); await mkdir(output, { recursive: true });
-  const menu = () => page.locator('.context-menu:popover-open');
+  const menu = () => page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])');
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
   const choose = name => menu().getByRole('menuitem', { name, exact: true }).click();
   await page.goto(fixture.origin); await navigate(page, '歌单');
@@ -26,9 +26,10 @@ test('desktop context actions preserve playback, versions, keyboard focus and ob
   await page.keyboard.press('Escape'); assert(await play.evaluate(element => element === document.activeElement));
   await first.getByRole('button', { name: '更多操作 晴天', exact: true }).click();
   assert.deepEqual(await menu().getByRole('menuitem').allTextContents(), rightActions);
-  await page.keyboard.press('End'); assert.equal(await page.evaluate(() => document.activeElement.textContent), '下移');
-  await page.keyboard.press('Home'); assert.equal(await page.evaluate(() => document.activeElement.textContent), '立即播放');
-  await page.keyboard.press('ArrowDown'); assert.equal(await page.evaluate(() => document.activeElement.textContent), '下一首播放');
+  for (const [key, label] of [['End', '下移'], ['Home', '立即播放'], ['ArrowDown', '下一首播放']]) {
+    await page.keyboard.press(key);
+    await page.waitForFunction(text => document.activeElement?.textContent === text, label);
+  }
   await page.keyboard.press('Escape'); await play.focus(); await page.keyboard.press('ContextMenu');
   await menu().waitFor(); await page.keyboard.press('Escape');
   assert(await play.evaluate(element => element === document.activeElement));
@@ -84,9 +85,17 @@ test('desktop context actions preserve playback, versions, keyboard focus and ob
   }
   await page.setViewportSize({ width: 800, height: 500 });
   await play.scrollIntoViewIfNeeded(); await play.focus(); await page.keyboard.press('Shift+F10');
-  const bounds = await menu().evaluate(element => { const rect = element.getBoundingClientRect(); return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: innerWidth, height: innerHeight }; });
-  assert(bounds.left >= 0 && bounds.top >= 0 && bounds.right <= bounds.width && bounds.bottom <= bounds.height);
+  await page.waitForFunction(() => {
+    const element = document.querySelector('.context-menu[data-state=open]');
+    if (!element?.contains(document.activeElement)) return false;
+    const bounds = element.getBoundingClientRect();
+    return bounds.left >= 0 && bounds.top >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight;
+  });
   await page.keyboard.press('End');
+  await page.waitForFunction(() => {
+    const choices = document.querySelectorAll('.context-menu[data-state=open] [role=menuitem]');
+    return choices.length && choices[choices.length - 1] === document.activeElement;
+  });
   assert(await menu().evaluate(element => { const item = document.activeElement.getBoundingClientRect(), rect = element.getBoundingClientRect(); return item.top >= rect.top && item.bottom <= rect.bottom + 1; }));
   await page.screenshot({ path: resolve(output, 'short-window.png') });
   await page.keyboard.press('Escape');
@@ -106,7 +115,7 @@ test('restored queues stay silent when scheduling next and disabled sources keep
   const page = await browser.newPage({viewport:{width:1280,height:800}}); page.setDefaultTimeout(8000);
   await page.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());
   await page.goto(fixture.origin); await navigate(page,'歌单');
-  const menu=()=>page.locator('.context-menu:popover-open');
+  const menu=()=>page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])');
   await page.getByRole('button',{name:'播放 晴天',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('audio')?.currentTime>.1);
   await page.reload(); await navigate(page,'歌单');
@@ -154,7 +163,7 @@ test('queue additions preserve a pending play request', { timeout: 120000 }, asy
       await search.getByLabel('弹窗搜索关键词').fill('晴天'); await search.getByRole('button', { name: '搜索', exact: true }).click();
       await search.locator('.track-row').first().click({ button: 'right' });
     } else await page.locator('.song-library-row').nth(1).click({ button: 'right' });
-    await page.locator('.context-menu:popover-open').getByRole('menuitem', { name: action === '歌单加入队尾' ? '加入队尾' : action === '来源下一首播放' ? '下一首播放' : action, exact: true }).click();
+    await page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem', { name: action === '歌单加入队尾' ? '加入队尾' : action === '来源下一首播放' ? '下一首播放' : action, exact: true }).click();
     const count = action === '歌单加入队尾' ? 2 : 1;
     await page.waitForFunction(count => JSON.parse(localStorage.getItem('slow-listening:playback:v3'))?.items.length === count, count);
     release();
@@ -183,8 +192,8 @@ test('moving a scheduled next item to the tail cancels its priority without repl
   const before = await saved();
   await page.getByRole('button', { name: '打开播放队列', exact: true }).click();
   const row = page.locator('.queue-track').filter({ hasText: '晴天（重复保存）' });
-  await row.click({ button: 'right' }); await page.locator('.context-menu:popover-open').getByRole('menuitem', { name: '移到下一首', exact: true }).click();
-  await row.click({ button: 'right' }); await page.locator('.context-menu:popover-open').getByRole('menuitem', { name: '移到队尾', exact: true }).click();
+  await row.click({ button: 'right' }); await page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem', { name: '移到下一首', exact: true }).click();
+  await row.click({ button: 'right' }); await page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem', { name: '移到队尾', exact: true }).click();
   const moved = await saved();
   assert.deepEqual(moved.items.map(item => item.instanceId), [before.items[0].instanceId, before.items[2].instanceId, before.items[1].instanceId]);
   assert.equal(moved.current, before.current);
@@ -210,7 +219,7 @@ test('clearing the queue cancels a source addition still reading metadata', { ti
   t.after(() => release());
   await page.route('**/v1/call/metadata', async route => { started(); await held; await route.continue().catch(() => {}); finish(); });
   await search.locator('.track-row').first().click({ button: 'right' });
-  await page.locator('.context-menu:popover-open').getByRole('menuitem', { name: '加入队尾', exact: true }).click(); await reading;
+  await page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem', { name: '加入队尾', exact: true }).click(); await reading;
   await search.getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('button', { name: '打开播放队列', exact: true }).click();
   await page.getByRole('button', { name: '清空队列并停止', exact: true }).click();

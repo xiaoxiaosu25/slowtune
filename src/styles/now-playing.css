@@ -3,7 +3,8 @@
    ========================================================================== */
 .listening-stage { position:relative; display:flex; flex:1; min-height:0; align-items:center; justify-content:center; padding:clamp(12px,3cqh,40px); border-radius:var(--r-card); background:var(--bg); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--border) 60%,transparent); isolation:isolate; overflow:clip; }
 .listening-stage::after { content:''; position:absolute; inset:0; z-index:-1; background:color-mix(in srgb,var(--bg) 35%,transparent); pointer-events:none; }
-.listening-backdrop { position:absolute; left:-8%; top:-5%; width:76%; height:110%; max-width:none; object-fit:cover; filter:blur(88px) saturate(.7); opacity:.22; z-index:-2; pointer-events:none; }
+.listening-atmosphere { position:absolute; inset:0; z-index:-2; pointer-events:none; background:radial-gradient(ellipse at 20% 35%,color-mix(in srgb,var(--listening-art-tone,var(--bg)) 16%,var(--bg)),var(--bg) 75%); }
+.listening-backdrop { position:absolute; left:-8%; top:-5%; width:76%; height:110%; max-width:none; object-fit:cover; filter:blur(88px) saturate(.7); opacity:.22; }
 .listening-content { position:relative; display:grid; grid-template-columns:minmax(0,460px) minmax(280px,520px); align-items:center; justify-content:center; gap:96px; width:100%; height:100%; max-width:1120px; min-width:0; min-height:0; }
 .playing-art-slot { --playing-art-max:460px; display:grid; place-items:center; width:100%; height:100%; min-width:0; min-height:0; container-type:size; }
 .playing-art-switch { position:relative; display:block; width:min(100%,100cqh,var(--playing-art-max)); aspect-ratio:1; padding:0; min-width:44px; min-height:44px; border-radius:var(--r-card); isolation:isolate; }
@@ -102,4 +103,3 @@
 .player-help .restore-hint { text-align:left; }
 .player-help .player-shortcuts { display:flex; justify-content:flex-start; }
 .playing-song-actions .control-popover-panel>:is(button,a),.playing-song-actions .popover-heading { font-size:var(--fs-body); }
-.immersive>.toast { top:calc(var(--header-height) + var(--sp-3)); bottom:auto; font-size:var(--fs-body); }

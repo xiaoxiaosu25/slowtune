@@ -17,6 +17,7 @@ type Props = {
 };
 
 export function PlaybackVersionsDialog(props: Props) {
+  // Saving an unowned source can open the native song grouping dialog above this one.
   return <Modal title="播放版本" className="playback-versions-dialog" onClose={props.onClose}><p className="playback-versions-title">{props.song?.title||props.current?.title||'等待音乐'}</p><div className="playback-versions-body"><PlaybackVersions {...props}/></div><footer className="playback-versions-footer"><div className="playback-versions-context">{props.playbackControl}<span>试听只切换当前播放，设为默认需单独操作。</span></div><button className="btn btn-secondary" onClick={props.onClose}>完成</button></footer></Modal>;
 }
 

@@ -44,3 +44,6 @@
 .nav-item { display:flex; align-items:center; gap:var(--sp-4); width:100%; min-height:44px; padding:0 var(--sp-4); border-radius:var(--r-control); color:var(--muted); font-size:var(--fs-body); text-align:left; transition:background var(--motion-fast),color var(--motion-fast); }
 .nav-item:hover { background:var(--hover); color:var(--text); }
 .nav-item.active { background:var(--selected); color:var(--accent-text); font-weight:600; }
+.sidebar-nav[data-sliding-selection]>.nav-item { position:relative; isolation:isolate; }
+.sidebar-nav[data-sliding-selection]>.nav-item.active { background:transparent; }
+.sidebar-selection { position:absolute; inset:0; z-index:-1; border-radius:inherit; background:var(--selected); pointer-events:none; }

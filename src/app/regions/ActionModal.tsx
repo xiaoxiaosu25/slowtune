@@ -7,6 +7,8 @@ import { SleepPanel } from '../../SleepPanel';
 import { FollowTrackButton } from '../../FollowsPage';
 import { Modal } from '../../Modal';
 import { Dialog } from '../../ui/Dialog';
+import { PlaylistNameDialog } from '../../PlaylistNameDialog';
+import { PlaylistDeleteDialog } from '../../PlaylistDeleteDialog';
 import { SongBackupPanel } from '../../SongBackupPanel';
 import { PreferSongAction } from '../../SearchPreferences';
 import { Cover, displayTitle, Badge, artworkKey } from '../shared';
@@ -66,11 +68,64 @@ export function ActionModal() {
     mode,
     rememberPartMode,
   } = useWorkspace();
-  const Popup = popup?.type === 'new' || popup?.type === 'rename' ? Dialog : Modal;
+  const close = () => {
+    linkWork.current?.abort();
+    actionWork.current?.abort();
+    authorWork.current?.abort();
+    setAuthorBusy(false);
+    setActionBusy(false);
+    setPopup(null);
+  };
+  const feedback = error && (
+    <div className="feedback" data-tone="error" role="alert">
+      <p>{error}</p>
+      <button type="button" className="btn btn-ghost" onClick={() => void reload()}>
+        重读资料 / 检查服务
+      </button>
+      {pending && (
+        <button type="button" className="btn btn-ghost" disabled={saving} onClick={retryWrite}>
+          重试保留编辑
+        </button>
+      )}
+    </div>
+  );
+  if (popup?.type === 'new' || popup?.type === 'rename') {
+    return (
+      <PlaylistNameDialog
+        mode={popup.type}
+        name={field}
+        busy={saving}
+        onNameChange={setField}
+        onSave={name => void mutate({
+          edits: [
+            popup.type === 'new'
+              ? { type: 'create-playlist', name }
+              : { type: 'rename-playlist', playlistId: popup.id, name },
+          ],
+        })}
+        onClose={close}
+        feedback={feedback}
+      />
+    );
+  }
+  if (popup?.type === 'delete') {
+    return (
+      <PlaylistDeleteDialog
+        className="form-modal"
+        busy={saving}
+        onClose={close}
+        onConfirm={() => void mutate({ edits: [{ type: 'delete-playlist', playlistId: popup.id }] })}
+        feedback={feedback}
+      >
+        删除歌单“{lib?.snapshot.playlists.find((playlist) => playlist.id === popup.id)?.name}”及其条目？当前播放队列保留。
+      </PlaylistDeleteDialog>
+    );
+  }
+  const Panel = popup?.type === 'link' || popup?.type === 'sleep' ? Dialog : Modal;
   return (
     <>
       {popup && (
-        <Popup
+        <Panel
           mobilePage={popup.type === 'backup' || popup.type === 'maintenance'}
           className={
             ['track', 'parts'].includes(popup.type)
@@ -85,9 +140,6 @@ export function ActionModal() {
           }
           title={
             {
-              new: '新建歌单',
-              rename: '歌单改名',
-              delete: '删除歌单',
               backup: '备份与恢复',
               maintenance: '失效歌曲管理',
               link: '粘贴链接',
@@ -96,72 +148,9 @@ export function ActionModal() {
               sleep: '睡眠定时器',
             }[popup.type]
           }
-          onClose={() => {
-            linkWork.current?.abort();
-            actionWork.current?.abort();
-            authorWork.current?.abort();
-            setAuthorBusy(false);
-            setActionBusy(false);
-            setPopup(null);
-          }}
+          onClose={close}
         >
           {popup.type === 'sleep' && <SleepPanel timer={playback.sleepTimer} desktop={desktop} />}
-          {['new', 'rename'].includes(popup.type) && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void mutate({
-                  edits: [
-                    popup.type === 'new'
-                      ? { type: 'create-playlist', name: field.trim() }
-                      : { type: 'rename-playlist', playlistId: popup.id, name: field.trim() },
-                  ],
-                });
-              }}
-            >
-              <label className="field">
-                <span className="field-label">歌单名称</span>
-                <input
-                  className="input"
-                  data-autofocus="true"
-                  value={field}
-                  onChange={(e) => setField(e.target.value)}
-                  maxLength={200}
-                  required
-                />
-              </label>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setPopup(null)}>
-                  取消
-                </button>
-                <button className="btn btn-primary" disabled={!field.trim() || saving}>
-                  {saving ? '保存中…' : '保存歌单'}
-                </button>
-              </div>
-            </form>
-          )}
-          {popup.type === 'delete' && (
-            <>
-              <p>
-                删除歌单“{lib?.snapshot.playlists.find((p) => p.id === popup.id)?.name}
-                ”及其条目？当前播放队列保留。
-              </p>
-              <div className="modal-actions">
-                <button className="btn btn-secondary" onClick={() => setPopup(null)}>
-                  取消
-                </button>
-                <button
-                  className="btn btn-danger"
-                  disabled={saving}
-                  onClick={() =>
-                    void mutate({ edits: [{ type: 'delete-playlist', playlistId: popup.id }] })
-                  }
-                >
-                  确认删除
-                </button>
-              </div>
-            </>
-          )}
           {popup.type === 'backup' && lib && <SongBackupPanel library={lib} onCommitted={updateLibrary} />}
           {popup.type === 'link' && (
             <form
@@ -397,20 +386,8 @@ export function ActionModal() {
               changePreference={(mode) => rememberPartMode(popup.track!.ref.id, mode)}
             />
           )}
-          {error && !['track', 'parts'].includes(popup.type) && (
-            <div className="feedback" data-tone="error" role="alert">
-              <p>{error}</p>
-              <button className="btn btn-ghost" onClick={() => void reload()}>
-                重读资料 / 检查服务
-              </button>
-              {pending && (
-                <button className="btn btn-ghost" disabled={saving} onClick={retryWrite}>
-                  重试保留编辑
-                </button>
-              )}
-            </div>
-          )}
-        </Popup>
+          {!['track', 'parts'].includes(popup.type) && feedback}
+        </Panel>
       )}
     </>
   );

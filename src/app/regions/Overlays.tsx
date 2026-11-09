@@ -1,4 +1,5 @@
 import { ListeningSidePanel, WorkspaceQueue } from '../components/WorkspaceControls';
+import { WorkspaceNotice } from '../components/WorkspaceNotice';
 import {
   PlaybackSlot,
   DialogPlaybackControl,
@@ -242,14 +243,7 @@ export function WorkspaceDialogs() {
   return (
     <>
       {notice && !popup && (!desktop || (!error && !searchOpen)) && (
-        <div className="toast" role="status">
-          {notice}
-          {noticeAction && (
-            <button className="btn btn-ghost btn-sm" onClick={noticeAction.run}>
-              {noticeAction.label}
-            </button>
-          )}
-        </div>
+        <WorkspaceNotice text={notice} action={noticeAction} desktop={desktop} />
       )}
       {audioQualityOpen && (
         <AudioQualityDialog

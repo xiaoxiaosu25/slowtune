@@ -71,7 +71,7 @@ test('chart playback: direct first results, lazy whole charts, failures, cancell
   const direct=title=>page.getByRole('button',{name:'直接播放 '+title,exact:true}).click();
   const playing=title=>page.waitForFunction(title=>document.querySelector('.now-playing strong')?.textContent===title&&!document.querySelector('audio').paused,title);
   const finish=async()=>{await page.evaluate(()=>{const a=document.querySelector('audio');a.currentTime=a.duration-.05;});};
-  const openIssues=async()=>{const panel=page.locator('.playback-feedback-popover [popover]:popover-open');if(!await panel.count())await page.getByRole('button',{name:/^(播放失败|\d+ 首未能播放)，查看详情$/}).click();return panel;};
+  const openIssues=async()=>{const panel=page.locator('.playback-feedback-popover :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])');if(!await panel.count())await page.getByRole('button',{name:/^(播放失败|\d+ 首未能播放)，查看详情$/}).click();return panel;};
   const failureSummary=async()=>{const panel=await openIssues(),text=await panel.locator('.popover-heading').filter({hasText:/首榜单歌曲未能播放/}).textContent();await page.keyboard.press('Escape');return text;};
   await load(chartItems);
   await t.test('chart artwork and artists render and the separate search button opens the shared search dialog',async()=>{

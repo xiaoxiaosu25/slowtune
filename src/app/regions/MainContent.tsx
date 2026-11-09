@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from 'react';
+import { useReducedMotion } from 'motion/react';
 import { SourceTabs } from '../components/WorkspaceControls';
 import { MobileDiscoveryNavigation, MobileProfile } from '../../MobileChrome';
 import { MobileSettings } from '../../MobileSettings';
@@ -11,9 +13,25 @@ import { useWorkspace } from '../workspace-context';
 /** 主内容区：按当前页面显示浏览、歌单、正在播放与设置。 */
 export function MainContent() {
   const { desktop, page, desktopLyricsOpen, mobilePageOpen } = useWorkspace();
+  const main = useRef<HTMLElement>(null);
+  const previousPage = useRef(page);
+  const reducedMotion = useReducedMotion();
+  useLayoutEffect(() => {
+    const changed = previousPage.current !== page;
+    previousPage.current = page;
+    if (!changed || !desktop || reducedMotion || page === 'playing' || desktopLyricsOpen) return;
+    const element = main.current;
+    if (!element) return;
+    const animation = element.animate([
+      { opacity: .65, translate: '0 8px' },
+      { opacity: 1, translate: '0 0' },
+    ], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    return () => animation.cancel();
+  }, [desktop, desktopLyricsOpen, page, reducedMotion]);
   return (
     <>
       <main
+        ref={main}
         className="main-content"
         hidden={!desktop && page === 'search'}
         inert={desktopLyricsOpen || (!desktop && mobilePageOpen)}

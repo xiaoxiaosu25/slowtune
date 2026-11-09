@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { chromium } from './helpers/browser.mjs';
 import { createPlayingArtworkFixture } from './helpers/playing-artwork-fixture.mjs';
+import { measurePlaybarContrast, settlePlaybarGlow } from './helpers/playbar-contrast.mjs';
 
 const cover = '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270"><rect width="480" height="270" fill="#f7b267"/></svg>';
 const progress = '.playbar .progress-track';
@@ -16,11 +17,16 @@ after(async () => {
   finally { await fixture?.close(); }
 });
 
-async function openPlaybar(t) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+async function openPlaybar(t, { width = 1440, artwork = cover, appearance } = {}) {
+  const page = await browser.newPage({ viewport: { width, height: 900 } });
   t.after(() => page.close());
   page.setDefaultTimeout(8000);
-  await page.route('https://i1.hdslb.com/**', route => route.fulfill({ contentType: 'image/svg+xml', body: cover }));
+  if (appearance) await page.addInitScript(({ theme, palette, style }) => {
+    localStorage.setItem('slow-listening:theme:v1', theme);
+    localStorage.setItem('slow-listening:palette:v1', palette);
+    localStorage.setItem('slow-listening:player-style:v1', style);
+  }, appearance);
+  await page.route('https://i1.hdslb.com/**', route => route.fulfill({ contentType: 'image/svg+xml', body: artwork }));
   await page.goto(fixture.base);
   const playbar = page.locator('.playbar');
   await playbar.locator('button[aria-label="播放"]:enabled').waitFor();
@@ -64,6 +70,32 @@ test('the glow marks playback and clears the marker on pause', async t => {
   assert.notEqual(await glow.getAttribute('data-playing'), null);
   await pausePlayback(playbar);
   assert.equal(await glow.getAttribute('data-playing'), null);
+});
+
+test('playbar text keeps 4.5:1 contrast with extreme artwork at narrow desktop width', async t => {
+  for (const [theme, color] of [['light', '#000000'], ['dark', '#ffffff']]) {
+    for (const style of ['floating', 'bar']) {
+      await t.test(theme + ' ' + style, async t => {
+        const { page, playbar } = await openPlaybar(t, {
+          width: 800,
+          artwork: cover.replace('#f7b267', color),
+          appearance: { theme, palette: 'plum', style },
+        });
+        await startPlayback(playbar);
+        await settlePlaybarGlow(playbar);
+        assert.equal(await page.locator('html').getAttribute('data-theme'), theme);
+        assert.equal(await page.locator('html').getAttribute('data-palette'), 'plum');
+        assert.equal(await page.locator('.app').getAttribute('data-player-style'), style);
+        for (const hovered of [false, true]) {
+          if (hovered) await playbar.getByRole('button', { name: '打开正在播放', exact: true }).hover();
+          const { ratios } = await measurePlaybarContrast(page);
+          for (const [index, label] of ['title', 'subtitle'].entries()) {
+            assert(ratios[index] >= 4.5, `${label}, hovered=${hovered}: ${ratios[index]}`);
+          }
+        }
+      });
+    }
+  }
 });
 
 test('the next track clears the glow when it has no cover', async t => {

@@ -1,4 +1,5 @@
 import type { MusicClient } from '@studio/music-sources/client';
+import { MotionConfig } from 'motion/react';
 import { EntryGate } from './EntryGate';
 import type { StartupPreload } from './startup';
 import { ArtworkContext, YoutubeEnabledContext } from './app/shared';
@@ -13,6 +14,7 @@ import { Playbar } from './app/regions/Playbar';
 import { MobileDock } from './app/regions/MobileDock';
 import { SearchPanel } from './app/regions/SearchPanel';
 import { ActionModal } from './app/regions/ActionModal';
+import { DesktopCommandPalette } from './app/regions/DesktopCommandPalette';
 
 export function App() {
   return (
@@ -61,16 +63,19 @@ function Workspace(props: { client: MusicClient; preload: StartupPreload; onLogo
             data-layout={desktop ? 'desktop' : 'mobile'}
             data-player-style={playerStyle}
           >
-            <Sidebar />
-            <TopBar />
-            <MainContent />
-            <LyricsLayers />
-            <PlaybackLayers />
-            <Playbar />
-            <MobileDock />
-            <SearchPanel />
-            <ActionModal />
-            <WorkspaceDialogs />
+            <MotionConfig reducedMotion="user">
+              <Sidebar />
+              <TopBar />
+              <MainContent />
+              <LyricsLayers />
+              <PlaybackLayers />
+              <Playbar />
+              <MobileDock />
+              <SearchPanel />
+              <ActionModal />
+              <WorkspaceDialogs />
+              <DesktopCommandPalette />
+            </MotionConfig>
           </div>
         </WorkspaceContext.Provider>
       </ArtworkContext.Provider>

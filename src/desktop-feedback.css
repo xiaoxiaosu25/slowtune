@@ -27,8 +27,6 @@
   .desktop-operation-feedback>p { margin:8px 0; font-size:var(--fs-secondary); line-height:1.7; overflow-wrap:anywhere; }
   .desktop-operation-feedback .toolbar { gap:4px; }
   .desktop-operation-feedback .toolbar>.btn { font-size:var(--fs-meta); height:auto; min-height:32px; padding:6px 8px; white-space:normal; }
-  .app>.toast { top:auto; bottom:calc(var(--player-height) + 16px); left:auto; right:20px; transform:none; max-width:380px; }
-  .app.immersive>.toast { top:auto; bottom:24px; }
 }
 @media(min-width:761px) and (max-width:1050px) {
   .playbar .playback-feedback-popover>.btn>span { display:none; }

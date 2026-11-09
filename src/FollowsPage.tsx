@@ -9,7 +9,7 @@ import { PlayAllButton, RefreshButton, AddToPlaylistButton } from './ListActions
 import type { ListImportRequest } from './SongListImportPanel';
 import { PagedList, Pagination, usePagination } from './Pagination';
 import { initialFollowView, type FollowView } from './mobile-follow';
-import { Modal } from './Modal';
+import { Dialog } from './ui/Dialog';
 
 const identity=(creator:CreatorRef)=>`${creator.provider}:${creator.id}`;
 const sourceName=(provider:string)=>provider==='bilibili'?'B站':'YouTube';
@@ -182,14 +182,14 @@ export function FollowsPage({client,state,onChange,source,renderList,renderCover
       <div className="segmented" aria-label="关注视图"><button aria-label="关注的 UP" className={tab==='creators'?'selected':''} aria-pressed={tab==='creators'} onClick={()=>setTab('creators')}>作者</button><button aria-label="最近更新" className={tab==='updates'?'selected':''} aria-pressed={tab==='updates'} onClick={()=>setTab('updates')}>更新</button></div>
       <RefreshButton iconOnly busy={busy} onClick={()=>void load(false,true)}/>
       <button className="btn btn-icon" aria-label="关注页面操作" aria-expanded={mobileMenu} onClick={()=>setMobileMenu(true)}><DotsThreeIcon size={25}/></button>
-    </div>{mobileMenu&&<Modal title="关注页面操作" className="mobile-actions-sheet" onClose={()=>setMobileMenu(false)}><div className="mobile-action-list">
+    </div>{mobileMenu&&<Dialog title="关注页面操作" className="mobile-actions-sheet" onClose={()=>setMobileMenu(false)}><div className="mobile-action-list">
       <button onClick={()=>{setMobileMenu(false);setAddOpen(true);setWriteError('');}}><PlusIcon size={23}/><span>添加关注</span></button>
       {tab==='updates'&&<>
         {onImport&&<button disabled={!filteredFeed.length} onClick={()=>{setMobileMenu(false);onImport(filteredFeed,'关注的最近更新 · 本页');}}><ListBulletsIcon size={23}/><span>加入本页更新到歌单</span></button>}
         <button aria-pressed={updatesView.view==='covers'} onClick={()=>{updatesView.setView('covers');setMobileMenu(false);}}><SquaresFourIcon size={23}/><span>封面浏览</span></button>
         <button aria-pressed={updatesView.view==='list'} onClick={()=>{updatesView.setView('list');setMobileMenu(false);}}><ListBulletsIcon size={23}/><span>歌曲列表</span></button>
       </>}
-    </div></Modal>}</>:!mobile&&<div className="toolbar follow-toolbar">
+    </div></Dialog>}</>:!mobile&&<div className="toolbar follow-toolbar">
       {selected?<button className="btn btn-ghost" onClick={returnToParent}><ArrowLeftIcon size={18}/>{collection?'返回作者合集':returnLabel}</button>:<div className="segmented" aria-label="关注视图"><button className={tab==='creators'?'selected':''} aria-pressed={tab==='creators'} onClick={()=>setTab('creators')}>关注的 UP</button><button className={tab==='updates'?'selected':''} aria-pressed={tab==='updates'} onClick={()=>setTab('updates')}>最近更新</button></div>}
       {!selected&&tab==='updates'&&<CatalogViewToggle title="关注的最近更新" view={updatesView.view} onChange={updatesView.setView}/>}
       {!selected&&tab==='updates'&&<><PlayAllButton label="播放本页" count={filteredFeed.length} onClick={()=>onPlayAll(filteredFeed)}/>{onImport&&<AddToPlaylistButton count={filteredFeed.length} title="加入本页更新到歌单" onClick={()=>onImport(filteredFeed,'关注的最近更新 · 本页')}/>}</>}

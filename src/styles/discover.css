@@ -48,7 +48,7 @@
 .catalog-count { padding:2px var(--sp-2); border-radius:var(--r-pill); background:var(--raised); color:var(--muted); font-size:var(--fs-caption); font-weight:500; line-height:1.5; white-space:nowrap; font-variant-numeric:tabular-nums; }
 /* 说明弹层：标题旁的 ⓘ，悬停或聚焦显示、触屏点按锁定，内含来源链接。 */
 .info { display:inline-flex; align-items:center; }
-.info-popover { position:absolute; top:100%; left:0; z-index:var(--z-dropdown); display:grid; gap:var(--sp-2); width:min(360px,calc(100vw - 64px)); margin-top:var(--sp-2); padding:var(--sp-3) var(--sp-4); border:1px solid var(--border); border-radius:var(--r-overlay); background:var(--surface); box-shadow:var(--shadow-lg); color:var(--text); font-size:var(--fs-meta); font-weight:400; line-height:1.8; text-align:left; white-space:normal; }
+.info-popover { z-index:var(--z-dropdown); display:grid; gap:var(--sp-2); width:min(360px,calc(100vw - 64px)); max-height:var(--radix-popover-content-available-height); overflow:auto; padding:var(--sp-3) var(--sp-4); border:1px solid var(--border); border-radius:var(--r-overlay); background:var(--surface); box-shadow:var(--shadow-lg); color:var(--text); font-size:var(--fs-meta); font-weight:400; line-height:1.8; text-align:left; white-space:normal; }
 .info-popover p { margin:0; }
 .info-popover a { color:var(--accent-text); text-decoration:underline; text-underline-offset:3px; }
 .discovery-shelf { container-type:inline-size; }

@@ -260,6 +260,8 @@ export function LibraryViews() {
     pagesSuspended,
     listeningReturnPage,
     playlistPage,
+    currentSong,
+    snapshot,
     lib,
     libraryError,
     readLibrary,
@@ -300,6 +302,7 @@ export function LibraryViews() {
         )}
       {playlistPage && (
         <SongLibraryWorkspace
+          playingSongId={snapshot.playing ? currentSong?.id : undefined}
           hidden={!desktop && page === 'playing'}
           onEnqueue={async (selection, song) => {
             const ok = await playback.enqueueSelection(selection, song);

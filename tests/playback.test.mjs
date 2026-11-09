@@ -167,7 +167,7 @@ test('Song playback: fresh selections, live pause/resume and silent queue restor
     const before = await savedQueue(), count = preparations.length;
     await page.evaluate(() => { window.__styleAudio = document.querySelector('audio'); window.__styleProgress = document.querySelector('.playbar input[aria-label="播放进度"]'); window.__stylePosition = window.__styleAudio.currentTime; });
     await playbar.getByRole('button', { name: '更多播放选项', exact: true }).click();
-    const options = playbar.locator('.player-options > .control-popover-panel');
+    const options = playbar.locator('.player-options .control-popover-panel');
     await options.getByRole('radio', { name: '底部长条', exact: true }).check();
     await page.waitForFunction(() => document.querySelector('.app').dataset.playerStyle === 'bar');
     await options.getByRole('radio', { name: '悬浮播放岛', exact: true }).check();
@@ -367,7 +367,7 @@ test('Song playback: fresh selections, live pause/resume and silent queue restor
     if (await page.locator('audio').evaluate(audio => audio.paused)) await playbar.getByRole('button', { name: '播放', exact: true }).click();
     await page.waitForFunction(() => { const audio = document.querySelector('audio'); return !audio.paused && audio.currentTime > 1; });
     await playbar.getByRole('button', { name: '睡眠定时器', exact: true }).click();
-    const sleep = page.locator('dialog.modal');
+    const sleep = page.getByRole('dialog', { name: '睡眠定时器', exact: true });
     await sleep.getByRole('button', { name: '30 分钟', exact: true }).click();
     await sleep.locator('.sleep-summary.is-running').waitFor();
     assert.equal(await sleep.locator('[data-field="duration"]').inputValue(), '30');

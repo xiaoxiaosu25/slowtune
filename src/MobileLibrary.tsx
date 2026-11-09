@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowsDownUpIcon, CaretRightIcon, DotsThreeIcon, HeartIcon, ListBulletsIcon, MusicNotesIcon, PlusCircleIcon } from '@phosphor-icons/react';
 import type { SongLibraryState } from '../server/song-library-types';
 import { PlaylistCover } from './PlaylistCover';
-import { Modal } from './Modal';
+import { Dialog } from './ui/Dialog';
 import { SongMaintenancePanel } from './SongMaintenancePanel';
 import { SongCover } from './SongCover';
 
@@ -29,7 +29,7 @@ export function MobileLibrary({ library, error, onRetry, onSelect, onCreate, onB
       {library.snapshot.playlists.map(playlist => <button className="mobile-library-collection" key={playlist.id} onClick={() => onSelect(playlist.id)}><span className="mobile-library-copy"><strong>{playlist.name}</strong><small>{playlist.entries.length} 首歌曲</small><CaretRightIcon className="mobile-library-chevron" size={21} aria-hidden="true"/></span><span className="mobile-library-art" aria-hidden="true"><PlaylistCover image={playlist.desktopCover} song={songs.get(playlist.entries.find(entry => songs.get(entry.songId)?.artwork)?.songId ?? playlist.entries[0]?.songId ?? '')}/></span></button>)}
     </div>
     {!library.snapshot.playlists.length && <div className="empty"><MusicNotesIcon size={36}/><h3>把喜欢的音乐放在一起</h3><button className="btn btn-secondary" onClick={onCreate}>创建第一张歌单</button></div>}
-    {menu && <Modal title="音乐库管理" className="mobile-actions-sheet" onClose={() => setMenu(false)}><div className="mobile-action-list"><button onClick={() => { setMenu(false); setMaintenance(true); }}><ListBulletsIcon size={22}/><span>资料库维护</span></button><button onClick={() => { setMenu(false); onBackup(); }}><ArrowsDownUpIcon size={22}/><span>导入 / 导出</span></button></div></Modal>}
+    {menu && <Dialog title="音乐库管理" className="mobile-actions-sheet" onClose={() => setMenu(false)}><div className="mobile-action-list"><button onClick={() => { setMenu(false); setMaintenance(true); }}><ListBulletsIcon size={22}/><span>资料库维护</span></button><button onClick={() => { setMenu(false); onBackup(); }}><ArrowsDownUpIcon size={22}/><span>导入 / 导出</span></button></div></Dialog>}
     {maintenance && <SongMaintenancePanel library={library} onChange={onChange} onClose={() => setMaintenance(false)}/>}
   </section>;
 }

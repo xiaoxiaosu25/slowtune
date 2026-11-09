@@ -36,12 +36,12 @@ button:disabled { opacity:.42; cursor:not-allowed; }
   .search-preference-actions>.btn { flex:1 1 100%; white-space:normal; }
 }
 .source-settings { display:grid; gap:var(--sp-4); max-width:680px; }
-.source-setting-toggle { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4); padding:var(--sp-5); border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface-soft); }
+.source-setting-toggle { display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4); width:100%; padding:var(--sp-5); border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface-soft); text-align:start; }
 .source-setting-toggle small { display:block; margin-top:var(--sp-1); color:var(--muted); }
-.source-setting-toggle input { appearance:none; width:44px; height:28px; flex-shrink:0; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--muted); cursor:pointer; transition:background var(--motion-fast); }
-.source-setting-toggle input::before { content:''; display:block; width:20px; height:20px; margin:3px; border-radius:50%; background:var(--surface); box-shadow:var(--shadow-sm); transition:transform var(--motion-fast); }
-.source-setting-toggle input:checked { background:var(--accent); border-color:var(--accent); }
-.source-setting-toggle input:checked::before { transform:translateX(16px); background:var(--on-accent); }
+.source-switch-track { width:44px; height:28px; flex-shrink:0; border:1px solid var(--border); border-radius:var(--r-pill); background:var(--muted); transition:background var(--motion-fast); }
+.source-switch-thumb { display:block; width:20px; height:20px; margin:3px; border-radius:50%; background:var(--surface); box-shadow:var(--shadow-sm); transition:transform var(--motion-fast); }
+.source-setting-toggle[data-state="checked"]>.source-switch-track { background:var(--accent); border-color:var(--accent); }
+.source-switch-thumb[data-state="checked"] { transform:translateX(16px); background:var(--on-accent); }
 .source-closed :is(.track-name,.row-cover,.creator-link,.queue-track-main):disabled { opacity:1; }
 .source-disabled :is(.row-info,.row-cover,.row-creator,.row-source,.row-duration,.queue-track-main) { opacity:.58; filter:grayscale(1); }
 .source-closed .row-status { color:var(--muted); }

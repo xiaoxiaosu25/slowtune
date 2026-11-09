@@ -15,7 +15,7 @@ export const testGroups = {
     'source-playback-baseline', 'source-playback-app', 'audio-selection-ui', 'song-targets-desktop-ui', 'desktop-runtime-ui', 'desktop-feedback-ui', 'desktop-context-menu-ui', 'chart-cache-ui', 'playback-performance-ui',
     'playback', 'playing-artwork-ui', 'sleep-timer-ui', 'playback-retry', 'song-version-switch', 'playback-management-ui',
     'desktop-lyrics-ui', 'desktop-lyrics-motion-ui', 'desktop-lyrics-progress-ui', 'lyrics-ui', 'lyrics-experience-ui', 'comments-ui', 'search-discovery-ui', 'mobile-layout-ui', 'mobile-lyrics-recovery-ui', 'mobile-settings-ui', 'mobile-browse-ui',
-    'playlist-cover-ui', 'song-management-desktop-ui', 'desktop-library-layout-ui', 'mobile-secondary-ui', 'mobile-design-ui',
+    'playlist-cover-ui', 'song-management-desktop-ui', 'desktop-library-layout-ui', 'mobile-secondary-ui', 'mobile-design-ui', 'phase2-ui',
   ],
   desktop: ['desktop-host', 'desktop-lifecycle', 'desktop-state-recovery', 'desktop-restart'],
 };

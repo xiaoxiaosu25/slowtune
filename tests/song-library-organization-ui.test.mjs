@@ -53,7 +53,7 @@ test('organization is on demand, cancellable and local; adoption preserves playb
   const openEditor = async title => {
     const row = page.locator('.song-library-row').filter({ has: page.getByRole('button', { name: title, exact: true }) });
     await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
-    await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem', { name: '编辑歌曲 ' + title, exact: true }).click();
+    await page.locator('.song-row-menu :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem', { name: '编辑歌曲 ' + title, exact: true }).click();
     await page.getByRole('tab',{name:'歌曲资料',exact:true}).click();
   };
   await page.goto(origin); await page.locator('.sidebar-nav').getByRole('button', { name: '歌单', exact: true }).click();
@@ -95,7 +95,10 @@ test('organization is on demand, cancellable and local; adoption preserves playb
   assert.deepEqual(service.read().snapshot.versions, noChanges.snapshot.versions);
   await page.getByRole('button', { name: '重新生成建议', exact: true }).click(); await page.getByRole('button', { name: '采用建议 1', exact: true }).waitFor();
   assert.equal(await page.getByRole('checkbox', { name: '采用建议 1 的歌名', exact: true }).count(), 0, 'protected title cannot be selected');
-  service.execute(service.revision(), [{ type: 'edit-song', songId: 'song', artists: ['并发人工歌手'] }]);
+  await page.route('**/organization/adopt', async route => {
+    service.execute(service.revision(), [{ type: 'edit-song', songId: 'song', artists: ['并发人工歌手'] }]);
+    await route.continue();
+  }, { times: 1 });
   await page.getByRole('button', { name: '采用建议 1', exact: true }).click();
   await page.getByText('资料已变化，请重新生成建议后核对，现有资料和播放保持。', { exact: true }).waitFor();
   assert.deepEqual(service.read().snapshot.songs[0].artists, ['并发人工歌手']); assert.equal(await page.locator('audio').evaluate(a => a.paused), false);

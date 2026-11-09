@@ -37,6 +37,7 @@
   --r-control:8px; --r-card:12px; --r-overlay:16px; --r-pill:999px;
   /* 动效：微交互、常规、大面积进出；进入减速，退出加速。 */
   --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms;
+  --dur-row-step:20ms;
   --ease-enter:cubic-bezier(.2,.8,.2,1); --ease-exit:cubic-bezier(.4,0,1,1);
   --motion-fast:var(--dur-fast) var(--ease-enter); --motion-base:var(--dur-base) var(--ease-enter); --motion-slow:var(--dur-slow) var(--ease-enter);
   /* 封面氛围背景的交叉淡化，比界面动效更慢。 */

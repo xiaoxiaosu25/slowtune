@@ -83,7 +83,7 @@ export async function selectPlaylist(page, name) {
 export async function openTrackMenu(page, title) {
   const row = page.locator('.track-row').filter({ has: page.getByTitle(title, { exact: true }) }).first();
   await row.getByRole('button', { name: '更多操作 ' + title, exact: true }).click();
-  if(await row.locator('.context-menu:popover-open').count()) await row.getByRole('menuitem', { name:'歌曲详情与分 P…', exact:true }).click();
+  if(await row.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').count()) await row.getByRole('menuitem', { name:'歌曲详情与分 P…', exact:true }).click();
   const dialog=page.locator('.music-action-modal');
   await dialog.locator('.music-more .action-list').first().waitFor({state:'visible'});
   return dialog;
@@ -91,7 +91,7 @@ export async function openTrackMenu(page, title) {
 
 export async function openSourceDetails(page, title) {
   await page.getByRole('button', { name: '更多操作 ' + title, exact: true }).first().click();
-  const menu = page.locator('.context-menu:popover-open');
+  const menu = page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])');
   if (await menu.count()) await menu.getByRole('menuitem', { name: '歌曲详情与分 P…', exact: true }).click();
 }
 
@@ -99,7 +99,7 @@ export async function queueTrackMenu(page, title) {
   const row = page.locator('.queue-track').filter({ has: page.getByRole('button', { name: '播放队列歌曲 ' + title, exact: true }) });
   const menu = row.locator('.queue-actions');
   await menu.getByRole('button', { name: '队列操作 ' + title, exact: true }).click();
-  await menu.locator('[popover]').waitFor({ state: 'visible' });
+  await menu.locator(':is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').waitFor();
   return menu;
 }
 

@@ -22,6 +22,31 @@ import { LyricsView, BottomLyrics } from '../../LyricsView';
 import { LyricsToggle } from '../../DesktopLyricsView';
 import { displayTitle } from '../shared';
 import { useWorkspace } from '../workspace-context';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { FastAverageColor } from 'fast-average-color';
+
+function ListeningBackdrop({ artwork }: { artwork: string }) {
+  const [color, setColor] = useState<string>();
+  useEffect(() => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.referrerPolicy = 'no-referrer';
+    image.onload = () => {
+      const sampler = new FastAverageColor();
+      try {
+        const result = sampler.getColor(image, { algorithm: 'dominant', mode: 'speed', silent: true });
+        if (!result.error) setColor(result.rgb);
+      } finally {
+        sampler.destroy();
+      }
+    };
+    image.src = artwork;
+    return () => { image.onload = null; };
+  }, [artwork]);
+  return <div className="listening-atmosphere" aria-hidden="true" style={{ '--listening-art-tone': color } as CSSProperties}>
+    <img className="listening-backdrop" src={artwork} alt="" referrerPolicy="no-referrer" />
+  </div>;
+}
 
 /** 移动完整播放页。 */
 export function MobilePlayerView() {
@@ -223,7 +248,7 @@ export function ListeningStage() {
       {page === 'playing' && desktop && (
         <section className="listening-stage">
           {currentArtwork && (
-            <img className="listening-backdrop" src={currentArtwork} alt="" referrerPolicy="no-referrer" />
+            <ListeningBackdrop key={currentArtwork} artwork={currentArtwork} />
           )}
           <div className="listening-content">
             <PlayingArtwork
@@ -234,6 +259,7 @@ export function ListeningStage() {
               allowLyrics={false}
               desktop
               suspended={desktopLyricsOpen}
+              sharedArtwork
             />
             <div className="playing-detail">
               <div className="playing-title">

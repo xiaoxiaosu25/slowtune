@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Root, Portal, Overlay, Content, Title, Close } from '@radix-ui/react-dialog';
 import { XIcon } from '@phosphor-icons/react';
+import { closeNestedPopover } from './layers';
 
 export function Dialog({ title, onClose, children, className = '', showHeader = true }: {
   title: string;
@@ -32,6 +33,7 @@ export function Dialog({ title, onClose, children, className = '', showHeader = 
           className={'modal ' + className}
           data-layer="dialog"
           aria-describedby={undefined}
+          onEscapeKeyDown={event => closeNestedPopover(content.current, event)}
           onOpenAutoFocus={event => {
             event.preventDefault();
             const element = content.current;

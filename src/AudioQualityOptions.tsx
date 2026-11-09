@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {audioPreferences,type AudioPreference,type AudioSelection} from '../server/audio-selection';
 import {audioQualityLabel} from './audio-quality';
 import {errorText} from './api';
-import {Modal} from './Modal';
+import { Dialog } from './ui/Dialog';
 import type {usePlayback} from './playback';
 import './audio-quality.css';
 type Playback=ReturnType<typeof usePlayback>;
@@ -33,7 +33,7 @@ export function AudioQualityDialog({playback,generation,onClose}:{playback:Playb
     }finally{pendingApply.current=null;}
   };
   const close=()=>{pendingApply.current?.abort();onClose();};
-  return <Modal title="音质与音轨" className="audio-quality-dialog" onClose={close}>
+  return <Dialog title="音质与音轨" className="audio-quality-dialog" onClose={close}>
     <div className="audio-quality-content"><AudioPreferenceSelect playback={playback}/>
       <section aria-label="当前播放音质"><h3>当前播放</h3><p className="audio-quality-current" role="status">{audioQualityLabel(playback.snapshot.format)||'尚未取得音轨信息'}</p><p className="muted">{current?.formatId?'本次指定音轨':audioPreferences[current?.preference??'auto']} · 来源音轨规格</p></section>
       <label className="field"><span className="field-label">本次播放选择</span><select className="select" aria-label="本次播放选择" value={choice} onChange={event=>{setChoice(event.target.value);setMessage('');}} disabled={playback.preparing}>
@@ -46,5 +46,5 @@ export function AudioQualityDialog({playback,generation,onClose}:{playback:Playb
       {loading&&<p role="status">正在读取可用音轨…</p>}{(issue||playback.error)&&<p className="feedback" role="alert">{issue||playback.error}</p>}{message&&<p role="status">{message}</p>}
       <div className="audio-quality-actions"><button type="button" className="btn btn-secondary" disabled={loading||playback.preparing} onClick={()=>setRevision(value=>value+1)}>重读音轨</button><button type="button" className="btn btn-primary" disabled={!canApply||playback.preparing||loading} onClick={()=>void apply()}>{playback.preparing?'正在准备…':'应用到当前曲'}</button></div>
     </div>
-  </Modal>;
+  </Dialog>;
 }
