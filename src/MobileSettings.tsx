@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps } from 'react';
 import { CaretDownIcon, CheckCircleIcon } from '@phosphor-icons/react';
 import type { SettingsPage } from './SettingsPage';
@@ -13,6 +14,7 @@ import { AboutPanel } from './AboutPanel';
 import { getThemeState, subscribeTheme, setThemePalette, setThemePreference, themePalettes } from './theme';
 import { MobileSettingRow } from './MobileSettingsControls';
 import { mobileSettingsTitles, type MobileSettingsSection } from './mobile-settings';
+import { OPEN_DIALOG, requestLayerClose } from './ui/layers';
 
 const modes = [{ value: 'system', label: '跟随系统' }, { value: 'light', label: '白天' }, { value: 'dark', label: '黑夜' }] as const;
 
@@ -22,19 +24,19 @@ function MobileAppearance({ onWelcome }: { onWelcome: () => void }) {
     <section className="mobile-appearance-section" aria-labelledby="mobile-mode-heading">
       <h2 id="mobile-mode-heading">明暗模式</h2>
       <div className="mobile-theme-modes" role="group" aria-labelledby="mobile-mode-heading">{modes.map(mode =>
-        <button key={mode.value} aria-pressed={theme.preference === mode.value} onClick={() => setThemePreference(mode.value)}>{mode.label}</button>
+        <Button variant="plain" key={mode.value} aria-pressed={theme.preference === mode.value} onClick={() => setThemePreference(mode.value)}>{mode.label}</Button>
       )}</div>
       <p className="mobile-setting-note">跟随系统时，夜间也会自动使用黑夜模式。</p>
     </section>
     <section className="mobile-appearance-section" aria-labelledby="mobile-palette-heading">
       <h2 id="mobile-palette-heading">主题配色</h2>
       <div className="mobile-theme-options" role="group" aria-labelledby="mobile-palette-heading">{themePalettes.map(palette =>
-        <button key={palette.id} className="mobile-theme-choice" aria-label={palette.label} aria-pressed={theme.palette === palette.id} onClick={() => setThemePalette(palette.id)}>
+        <Button variant="plain" key={palette.id} className="mobile-theme-choice" aria-label={palette.label} aria-pressed={theme.palette === palette.id} onClick={() => setThemePalette(palette.id)}>
           <span className="mobile-theme-colors" aria-hidden="true">{(['light', 'dark'] as const).map(mode =>
             <span key={mode} className="theme-preview mobile-theme-color" data-palette={palette.id} data-theme={mode}/>
           )}</span>
           <span className="mobile-theme-name">{palette.label}<CheckCircleIcon size={20} weight="fill" aria-hidden="true"/></span>
-        </button>
+        </Button>
       )}</div>
     </section>
     <div className="mobile-setting-group"><MobileSettingRow label="欢迎页" description="背景图片与构图" onClick={onWelcome}/></div>
@@ -54,7 +56,7 @@ export function MobileSettings({ active, section, onSection, ...props }: Props) 
   const reload = useRef(props.onReload); reload.current = props.onReload;
   useEffect(() => { reload.current(); }, []);
   useEffect(() => {
-    if (!active) host.current?.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach(dialog => dialog.dispatchEvent(new Event('cancel', {cancelable:true})));
+    if (!active) host.current?.querySelectorAll(OPEN_DIALOG).forEach(requestLayerClose);
   }, [active]);
   const openAbout = () => onSection('about');
   const youtubeEnabled = props.sources?.youtube.enabled ?? props.status?.providers.youtube.enabled ?? props.status?.providers.youtube.available ?? false;

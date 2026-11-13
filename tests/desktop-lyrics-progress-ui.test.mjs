@@ -21,7 +21,7 @@ test('desktop can preview progressive lyrics while another provider waits; playb
   await page.addInitScript(record=>localStorage.setItem('slow-listening:playback:v3',JSON.stringify(record)),queueRecord(fixture.tracks));
   await page.goto(fixture.base);await page.getByRole('button',{name:'打开正在播放',exact:true}).click();await page.locator('.listening-transport .play-toggle').click();
   await page.waitForFunction(()=>document.querySelector('audio').currentTime>.2);const source=await page.locator('audio').getAttribute('src');
-  await page.getByRole('button',{name:'更多播放选项',exact:true}).click();await page.getByRole('button',{name:'歌词管理',exact:true}).click();await page.getByRole('button',{name:'更换或导入歌词',exact:true}).click();
+  await page.getByRole('button',{name:'更多播放选项',exact:true}).click();await page.getByRole('button',{name:'歌词设置',exact:true}).click();await page.getByRole('button',{name:'更换或导入歌词',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'选择歌词',exact:true});await dialog.getByLabel('歌词歌名').fill('渐进歌词');
   await dialog.getByText('正在搜索歌词…',{exact:true}).waitFor();const preview=dialog.getByRole('button',{name:'预览 LRCLIB 渐进歌词 123',exact:true});await preview.waitFor();assert.equal(await preview.isEnabled(),true);assert.equal(closed,false);
   await preview.click();await dialog.getByText('第一句',{exact:true}).waitFor();assert.equal(closed,false,'preview does not cancel the other provider');

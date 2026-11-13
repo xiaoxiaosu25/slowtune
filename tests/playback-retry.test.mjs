@@ -20,7 +20,7 @@ test('product manual recovery uses the failed source, position and newest transp
   const ref = part => ({ provider: 'bilibili', kind: 'video', id: 'BV1tX4y1W7Xm', part });
   const entry = r => ({ ref: r, resourceId: 'source-' + r.part, title: '来源 ' + r.part, url: 'https://www.bilibili.com/video/' + r.id, durationSeconds: 180 });
   const leases = [], released = new Set(), streams = new Set(), records = [], errors = [], external = [], requests = [];
-  let fault, failPrepare = false, gate, serial = 0,requestSerial=0;
+  let fault, failPrepare = false, gate, serial = 0,requestSerial=0,leaseExpiry,blockedLease;
   const json = (res, value, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)); };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -31,13 +31,14 @@ test('product manual recovery uses the failed source, position and newest transp
     if (url.pathname.startsWith('/v1/leases/')) { if (req.method === 'DELETE') released.add(url.pathname.split('/').at(-1)); res.writeHead(204); return res.end(); }
     if (req.method === 'POST') {
       const chunks = []; for await (const chunk of req) chunks.push(chunk); const body = JSON.parse(Buffer.concat(chunks));
+      if (url.pathname === '/api/playback/failure') return json(res, { failure: blockedLease && body.leaseId === blockedLease ? { attempt: 1, state: 'failed', code: 'rate-limited', status: 429 } : null });
       if (url.pathname === '/v1/call/metadata') return json(res, { protocol: 2, result: { ...entry({ ...body.ref, part: body.ref.part ?? '900' }), parts: ['900', '901'].map(part => entry(ref(part))) } });
       if (url.pathname === '/v1/call/prepare') {
         if (failPrepare) return json(res, { protocol: 2, error: { code: 'network', retryable: true } }, 503);
         const leaseId = ('lease-' + (++serial)).padEnd(32, '_'), selected = body.request.ref; leases.push({ leaseId, ref: selected });
         if (gate) { const current = gate; gate = undefined; current.started = true; await current.promise; }
         return json(res, { protocol: 2, result: { resourceId: entry(selected).resourceId, entry: entry(selected), leaseId,
-          format: { id: 'wav', codec: 'pcm', mimeType: 'audio/wav', container: 'wav' }, delivery: { requiresHost: false, url: `http://127.0.0.1:${server.address().port}/audio.wav?lease=${leaseId}` } } });
+          format: { id: 'wav', codec: 'pcm', mimeType: 'audio/wav', container: 'wav' }, delivery: { requiresHost: false, expiresAt: leaseExpiry, url: `http://127.0.0.1:${server.address().port}/audio.wav?lease=${leaseId}` } } });
       }
     }
     if (url.pathname === '/audio.wav') {
@@ -181,6 +182,23 @@ test('product manual recovery uses the failed source, position and newest transp
     // best effort and the real service separately owns abandoned lease expiry.
     await invoke('release'); await page.reload(); await page.waitForFunction(() => !!window.playbackProbe?.snapshot.items.length); await new Promise(r => setTimeout(r, 100)); assert.equal((await snap()).paused, true); assert.equal((await snap()).time, 0); assert.equal(leases.length, count);
     assert.equal((await snap()).current, saved.current); records.push({ name: 'normal-zero-and-silent-reload', after: await snap() });
+  });
+  await t.test('expiry watch respects a rate-limited media lease and leaves manual retry available',async()=>{
+    await page.clock.install();
+    leaseExpiry=Date.now()+85000;
+    await start();
+    const current=(await snap()).current,count=leases.length;
+    blockedLease=leases.at(-1).leaseId;
+    await page.evaluate(()=>document.querySelector('audio').dispatchEvent(new Event('error')));
+    await page.waitForFunction(()=>!!window.playbackProbe.error);
+    assert.equal(leases.length,count);
+    await page.clock.fastForward(31000);
+    await page.waitForFunction(()=>window.playbackProbe.diagnostics().some(event=>event.reason==='expired'&&['resolve-failed','resolve-success'].includes(event.code)));
+    assert.equal((await invoke('diagnostics')).findLast(event=>event.reason==='expired'&&event.code.startsWith('resolve-')).code,'resolve-failed');
+    assert.equal(leases.length,count,'expiry must not prepare a replacement after a rate limit');
+    leaseExpiry=undefined;
+    assert.equal(await invoke('retry'),true);
+    assert.equal(leases.length,count+1);assert.equal((await snap()).current,current);
   });
   await invoke('release'); await until(() => leases.every(l => released.has(l.leaseId)), 'all bridge leases must be released');
   assert.deepEqual(errors, []); assert.deepEqual(external, []);

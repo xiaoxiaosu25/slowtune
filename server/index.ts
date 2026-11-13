@@ -49,6 +49,8 @@ import { LyricProviders } from './lyrics-providers.js';
 import { createLyricsRouter } from './lyrics-http.js';
 import { DesktopPlayback, desktopAudioCapability, desktopSourcePath } from './desktop-playback.js';
 import { validateAudioSupport } from './search-settings.js';
+import { PlaybackLineHistory } from './playback-policy.js';
+import {audioSelection} from './audio-selection.js';
 
 const config = readConfig();
 const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
@@ -74,6 +76,8 @@ const sourceChanged = () => { sourceSequence++;for (const listener of sourceList
 const metrics = {metadata:0, prepare:0, mediaRequests:0, mediaFailures:0};
 const credentials = await new BilibiliCredentials(join(config.runtimeDirectory,'bilibili-account.dpapi.json'), 'bilibili:'+config.userSpace).open();
 const desktopPlayback = new DesktopPlayback(()=>JSON.stringify([credentials.revision,youtube?.currentGeneration]));
+const sourceGeneration=()=>JSON.stringify([credentials.revision,youtube?.currentGeneration]);
+const lineHistory=new PlaybackLineHistory(sourceGeneration);
 desktopPlayback.setFetch(async (u, o) => {
   const upstream = new URL(typeof u==='string'||u instanceof URL?u:u.url);
   if (/(^|\.)(youtube\.com|googlevideo\.com|ytimg\.com|youtubei\.googleapis\.com)$/.test(upstream.hostname)) {
@@ -125,6 +129,9 @@ const recommendationStore = new RecommendationStore(config.database+'.recommenda
 const recommendations = new MusicRecommendations(recommendationStore,()=>String(credentials.revision));
 const delivery = new PlaybackDelivery(host, {ttlMs:config.mediaLeaseTtlMs, maxReads:8, maxLeases:64});
 delivery.desktopContext=()=>!!desktopPlayback.current;
+delivery.ownerContext=()=>desktopPlayback.current?.owner;
+delivery.generation=sourceGeneration;
+delivery.policy=()=>lineHistory.policy();
 delivery.enabled=provider=>provider!=='youtube'||youtube.status().available;
 delivery.canPublish=playback=>playback.entry.ref.provider!=='youtube'||preparedGenerations.get(playback)===youtube.currentGeneration;
 const accounts = new BilibiliAccounts(api,credentials,ref=>delivery.revoke(ref));
@@ -137,7 +144,7 @@ const musicSearch=new MusicSearch(searchSettings,{
   const signal=AbortSignal.any([requestSignal,searchStop.signal,AbortSignal.timeout(20000)]);
   return searchCatalogue.json('/x/web-interface/view',{bvid:ref.id},{host,signal,scope:'public-search'});
 },()=>youtube.status().available,()=>JSON.stringify([credentials.revision,youtube.currentGeneration]),Date.now,
-  (entry,signal,audioSupport,accept)=>verifySearchPlayback(counted,host,entry.ref,{...(entry.ref.provider==='bilibili'?accounts.options():{}),signal},audioSupport,playback=>desktopPlayback.verified(playback),accept),
+  (entry,signal,audioSupport,accept,selection)=>verifySearchPlayback(counted,host,entry.ref,{...(entry.ref.provider==='bilibili'?accounts.options():{}),signal},audioSupport,playback=>desktopPlayback.verified(playback,selection),accept,desktopPlayback.current&&entry.ref.provider==='bilibili'?lineHistory.policy():undefined,selection),
   (identity,signal,task)=>desktopPlayback.share(identity,signal,task));
 const songSourceAccess: SongSourceAccess = {
   metadata: (ref, signal) => counted.metadata(ref, { signal }),
@@ -396,9 +403,15 @@ app.post('/api/playback/prefetch',async c=>{
   const input=await json(c.req.raw,4096);
   if(typeof input.discard==='string'){desktopPlayback.discard(input.discard);return c.json({ok:true});}
   const support=validateAudioSupport(input.audioSupport);if(!support)throw new LibraryError('invalid-input');
-  const playback=await desktopPlayback.prepare(counted,{ref:input.ref,media:'audio'},{...(input.ref?.provider==='bilibili'?accounts.options():{}),signal:c.req.raw.signal},support);
-  const preparationToken=(playback.delivery.expiresAt??Infinity)>Date.now()+12000?desktopPlayback.verified(playback):undefined;
-  return c.json({entry:{...playback.entry,...(preparationToken?{verifiedAudio:{ref:playback.entry.ref,format:playback.format,preparationToken}}:{})}});
+  const selection=audioSelection(input.audioSelection);
+  const playback=await desktopPlayback.prepare(counted,{ref:input.ref,media:'audio'},{...(input.ref?.provider==='bilibili'?accounts.options():{}),signal:c.req.raw.signal},support,undefined,selection);
+  const preparationToken=(playback.delivery.expiresAt??Infinity)>Date.now()+12000?desktopPlayback.verified(playback,selection):undefined;
+  return c.json({entry:{...playback.entry,...(preparationToken?{verifiedAudio:{ref:playback.entry.ref,format:playback.format,preparationToken,selection}}:{})}});
+});
+app.post('/api/playback/failure',async c=>{
+  const input=await json(c.req.raw,1024);
+  if(!input||typeof input!=='object'||Object.keys(input).some(key=>key!=='leaseId')||typeof input.leaseId!=='string'||!/^[\w-]{32}$/.test(input.leaseId))throw new LibraryError('invalid-input');
+  return c.json({failure:delivery.failure(input.leaseId,getCookie(c,'music_session')!)});
 });
 app.all('/v1/*',c=> {
   if(c.req.path.startsWith('/v1/call/') && !['metadata','discover','search','list','prepare','formats','shelf'].includes(c.req.path.split('/').at(-1)!)) return c.json({protocol:2,error:{code:'unsupported',retryable:false}},400);
@@ -408,7 +421,9 @@ app.all('/v1/*',c=> {
       let support;try{support=validateAudioSupport(JSON.parse(c.req.header('X-SlowTune-Audio-Support')!));}catch{throw new MusicSourceError({code:'invalid-input',retryable:false});}
       const token=c.req.header('X-SlowTune-Preparation');
       if(!support||token!==undefined&&!/^[\w-]{32}$/.test(token))throw new MusicSourceError({code:'invalid-input',retryable:false});
-      return desktopPlayback.prepare(target,input,options,support,token);
+      const header=c.req.header('X-SlowTune-Audio-Selection');let selection;
+      try{if(header&&header.length>512)throw Error();selection=audioSelection(header===undefined?undefined:JSON.parse(header));}catch{throw new MusicSourceError({code:'invalid-input',retryable:false});}
+      return desktopPlayback.prepare(target,input,options,support,token,selection);
     };
     const value=Reflect.get(target,property);return typeof value==='function'?value.bind(target):value;
   }}):counted;

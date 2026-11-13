@@ -138,10 +138,11 @@ export type SongPlaybackSelection =
 
 export interface SongSavedPlayback {
   version: 3;
-  items: { instanceId: string; selection: SongPlaybackSelection; title: string; artists?: string[]; partsGroupId?: string }[];
+  items: { instanceId: string; selection: SongPlaybackSelection; title: string; artists?: string[]; partsGroupId?: string; partsGroupTitle?: string }[];
   current?: string;
   order: 'sequential' | 'shuffle';
   repeat: 'off' | 'one' | 'all';
+  shuffleGroups?: boolean;
   volume: number;
   rate: number;
   muted: boolean;

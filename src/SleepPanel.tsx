@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import { MoonIcon, TimerIcon, CheckIcon, MusicNotesIcon } from '@phosphor-icons/react';
 import type { SleepTimerController, SleepTimerRule, SleepTimerSnapshot, SleepTimerTrigger } from '@studio/player/sleep-timer';
@@ -56,8 +57,8 @@ export function SleepPanel({ timer, desktop = false }: { timer: SleepTimerContro
     </div>
     <section className="sleep-quick" aria-label="快捷倒计时">
       <div className="sleep-section-heading"><TimerIcon size={17} /><span>快捷设置</span><small>{desktop ? '点击立即生效 · 到时暂停' : '到时暂停'}</small></div>
-      <div className="sleep-presets">{presets.map(minutes => <button key={minutes} type="button" className={'sleep-preset ' + (presetActive(minutes) ? 'selected' : '')} disabled={unavailable} aria-pressed={!!presetActive(minutes)} onClick={() => start({ trigger: { type: 'duration', durationMs: minutes * 60000 } })}><strong>{minutes}</strong><span>分钟</span>{presetActive(minutes) && <CheckIcon size={12} />}</button>)}</div>
-      <button type="button" className="btn sleep-current" disabled={unavailable} aria-pressed={!!(running && snapshot.trigger?.type === 'current' && snapshot.action === 'pause')} onClick={() => start({ trigger: { type: 'current' } })}><MusicNotesIcon size={18} /><span>播完当前曲</span><span className="muted">自然结束后暂停</span></button>
+      <div className="sleep-presets">{presets.map(minutes => <Button variant="plain" key={minutes} type="button" className={'sleep-preset ' + (presetActive(minutes) ? 'selected' : '')} disabled={unavailable} aria-pressed={!!presetActive(minutes)} onClick={() => start({ trigger: { type: 'duration', durationMs: minutes * 60000 } })}><strong>{minutes}</strong><span>分钟</span>{presetActive(minutes) && <CheckIcon size={12} />}</Button>)}</div>
+      <Button type="button" className="sleep-current" disabled={unavailable} aria-pressed={!!(running && snapshot.trigger?.type === 'current' && snapshot.action === 'pause')} onClick={() => start({ trigger: { type: 'current' } })}><MusicNotesIcon size={18} /><span>播完当前曲</span><span className="muted">自然结束后暂停</span></Button>
     </section>
     <form className="sleep-form" aria-label="睡眠设置" onSubmit={event => {
       event.preventDefault();
@@ -73,7 +74,7 @@ export function SleepPanel({ timer, desktop = false }: { timer: SleepTimerContro
         </div>
         <p className="muted sleep-hint">{trigger === 'duration' ? '暂停播放时，倒计时也会继续。' : trigger === 'items' ? `${desktop ? '包含当前曲剩余部分；' : ''}仅自然播完才计数，手动切歌或快进到末尾不计数。` : '等待当前曲自然播完；切歌后会等待新的当前曲。'} {desktop && action === 'close' ? '停止播放并退出慢听。' : actionHints[action]}</p>
         {draftChanged && <p className="muted sleep-hint" role="status">修改尚未生效，点击“应用设置”后替换当前定时。</p>}
-        <div className="sleep-actions"><button type="submit" className="btn btn-primary" data-action="start-timer"><TimerIcon size={18} />{running ? desktop && draftChanged ? '应用设置' : '重新设置' : '开启定时'}</button><button type="button" className="btn btn-secondary" data-action="cancel-timer" disabled={!running && !snapshot?.actionPending && !(desktop && snapshot?.error)} onClick={() => { timer?.cancel(); setError(''); }}>取消定时</button></div>
+        <div className="sleep-actions"><Button variant="primary" type="submit"  data-action="start-timer"><TimerIcon size={18} />{running ? desktop && draftChanged ? '应用设置' : '重新设置' : '开启定时'}</Button><Button variant="secondary" type="button"  data-action="cancel-timer" disabled={!running && !snapshot?.actionPending && !(desktop && snapshot?.error)} onClick={() => { timer?.cancel(); setError(''); }}>取消定时</Button></div>
       </fieldset>
     </form>
     {(error || timerError) && <p className="error-text" role="alert">{error || timerError}</p>}

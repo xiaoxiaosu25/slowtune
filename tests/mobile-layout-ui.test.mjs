@@ -184,12 +184,12 @@ test('mobile Back skips replaced playback menus after lyrics settings close', {t
     else await settings.getByRole('button',{name:'返回上一级',exact:true}).click();
     await settings.waitFor({state:'detached'});
     assert.equal(await page.locator('.mobile-player').count(),1,'closing settings keeps the player open');
-    assert.equal(await page.locator('[popover]:popover-open').count(),0,'Back does not recreate the replaced menu');
+    assert.equal(await page.locator(':is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').count(),0,'Back does not recreate the replaced menu');
     await page.goBack();
     await page.getByRole('navigation',{name:'手机导航',exact:true}).waitFor();
     await page.goForward();
     await page.locator('.mobile-player').waitFor();
-    assert.equal(await page.locator('dialog[open],[popover]:popover-open').count(),0,'Forward restores the player without its closed layers');
+    assert.equal(await page.locator('dialog[open],:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').count(),0,'Forward restores the player without its closed layers');
     await context.close();
   }
 });
@@ -249,7 +249,7 @@ test('mobile song hierarchy keeps canonical metadata, source versions and queue 
   const queue=page.getByRole('dialog',{name:'播放队列',exact:true});await queue.waitFor();
   assert((await queue.locator('.queue-content').boundingBox()).height>=100,'short landscape keeps a usable scrollable queue');
   await queue.getByRole('button',{name:'队列操作 下一首 · 无封面测试',exact:true}).click();
-  await queue.locator('[popover]:popover-open').waitFor();
+  await queue.locator(':is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').waitFor();
   await page.waitForFunction(()=>document.querySelector('.queue-actions[data-open="true"]'));
   await page.screenshot({path:join(artifacts,'metadata-queue-menu.png')});
   await queue.getByRole('button',{name:'上移',exact:true}).click();

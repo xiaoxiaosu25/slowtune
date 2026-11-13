@@ -7,6 +7,7 @@ import {resolve,join,extname} from 'node:path';
 import { chromium } from './helpers/browser.mjs';
 import {resourceId} from '@studio/music-sources';
 import {openSourceDetails} from '../scripts/browser-ui.mjs';
+import {assertControlHitTarget,pressControlPoint} from './helpers/control-hit-target.mjs';
 
 test('multipart UI: shared actions, uninterrupted expansion, saved scopes and cover interactions',async t=>{
   const build=resolve(process.env.MUSIC_APP_TEST_BUILD??'.'),artifacts=resolve('local/verification/multipart-2026-10-14');mkdirSync(artifacts,{recursive:true});
@@ -71,18 +72,40 @@ test('multipart UI: shared actions, uninterrupted expansion, saved scopes and co
   const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3'))),close=async()=>{if(await dialog.count())await dialog.getByRole('button',{name:'关闭',exact:true}).click();};
   const playing=()=>page.waitForFunction(()=>{const audio=document.querySelector('audio');return audio&&!audio.paused&&audio.currentTime>0&&!document.querySelector('.play-toggle[aria-busy="true"]');});
   const openLink=async input=>{await close();await page.getByRole('button',{name:'粘贴链接',exact:true}).click();await page.getByLabel('视频或歌单链接').fill(input);await page.getByRole('button',{name:'读取真实元信息',exact:true}).click();await dialog.waitFor();};
+  await page.addInitScript(()=>{if(!localStorage.getItem('slow-listening:playback:v3'))localStorage.setItem('slow-listening:playback:v3',JSON.stringify({version:3,items:[],order:'shuffle',repeat:'off',shuffleGroups:true,volume:.5,rate:1,muted:false}));});
   await page.goto(base);await page.locator('.music-card').nth(3).waitFor();
+
+  await t.test('multipart details use the shared close target at every edge in desktop and mobile layouts',async()=>{
+    for(const viewport of [{width:1440,height:1000},{width:1000,height:640},{width:320,height:568},{width:568,height:320}]){
+      await page.setViewportSize(viewport);
+      for(const point of [[.5,.5],[.5,.02],[.02,.5],[.98,.5],[.5,.98]]){
+        await openSourceDetails(page,'三首合集');await dialog.waitFor();
+        const dismiss=dialog.getByRole('button',{name:'关闭',exact:true});
+        assert(await dismiss.evaluate(element=>element.matches('[data-ui-button].btn-dismiss')&&!!element.closest('.modal-header')));
+        await assertControlHitTarget(dismiss,viewport.width<=760?48:40);
+        await pressControlPoint(page,dismiss,point);
+        await dialog.waitFor({state:'detached'});
+      }
+    }
+    assert.equal(preparations.length,0);assert.equal(writes.length,0);
+    await page.setViewportSize({width:1440,height:1000});
+  });
 
   await t.test('default cid still prompts; expanding while playing retains progress, ID and other songs',async()=>{
     await page.getByRole('button',{name:'播放 三首合集',exact:true}).click();await dialog.getByRole('button',{name:'播放整组 3 首',exact:true}).waitFor();await playing();
     const before=await saved();assert.equal(before.items.length,1);const prepared=preparations.length;
     await page.evaluate(()=>{document.querySelector('audio').currentTime=7;});
     await dialog.getByRole('button',{name:'播放整组 3 首',exact:true}).click();await page.waitForFunction(()=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')).items.length===3);
-    const after=await saved();assert.equal(after.current,before.current);assert.deepEqual(after.items.slice(0,3).map(track=>track.selection.ref.part),group.map(track=>track.ref.part));assert.equal(preparations.length,prepared);assert(await page.locator('audio').evaluate(audio=>audio.currentTime>=7&&!audio.paused));assert.equal(after.order,'sequential');assert.equal(after.repeat,'off');assert(after.items.slice(0,3).every(track=>track.partsGroupId===after.items[0].partsGroupId));
+    const after=await saved();assert.equal(after.current,before.current);assert.deepEqual(after.items.slice(0,3).map(track=>track.selection.ref.part),group.map(track=>track.ref.part));assert.equal(preparations.length,prepared);assert(await page.locator('audio').evaluate(audio=>audio.currentTime>=7&&!audio.paused));assert.equal(after.order,'shuffle');assert.equal(after.repeat,'off');assert(after.items.slice(0,3).every(track=>track.partsGroupId===after.items[0].partsGroupId));
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('slow-listening:parts-preferences:v1')).BV0000000001),'all');
   });
   await t.test('native end advances to the next P and prepares only that song',async()=>{
     const prepared=preparations.length;await page.evaluate(()=>{const audio=document.querySelector('audio');audio.currentTime=audio.duration-.05;});await page.waitForFunction(()=>{const queue=JSON.parse(localStorage.getItem('slow-listening:playback:v3'));return queue.items.find(track=>track.instanceId===queue.current)?.selection.ref.part==='9002'&&!document.querySelector('audio').paused&&document.querySelector('audio').currentTime<2;});assert.equal(preparations.length,prepared+1);assert.equal(preparations.at(-1).part,'9002');
+  });
+  await t.test('remembered group playback leaves the list-loop mode selected',async()=>{
+    const mode=page.locator('.playbar .mode-control');await mode.click();
+    await page.getByRole('button',{name:'播放 三首合集',exact:true}).click();await playing();assert.equal((await saved()).order,'sequential');assert.equal((await saved()).repeat,'all');
+    await mode.click();await mode.click();await mode.click();assert.equal((await saved()).order,'shuffle');
   });
   await t.test('per-video preferences survive reload; restoration stays silent and repeat expansion is idempotent',async()=>{
     const prepared=preparations.length;await page.reload();await page.locator('.app').waitFor();assert.equal(preparations.length,prepared);assert(await page.locator('audio').evaluate(audio=>audio.paused&&!audio.getAttribute('src')));assert((await saved()).items[0].partsGroupId);
@@ -97,7 +120,7 @@ test('multipart UI: shared actions, uninterrupted expansion, saved scopes and co
   await t.test('link P3 selection and source-order expansion retain the current song',async()=>{
     await openLink('https://www.bilibili.com/video/BV0000000001?p=3');const selected=await dialog.locator('input[type=checkbox]').evaluateAll(inputs=>inputs.map(input=>input.checked));assert.deepEqual(selected,[false,false,true]);
     const before=await saved();await dialog.getByRole('button',{name:'播放 三首合集 / 第3首',exact:true}).click();await page.waitForFunction(()=>{const queue=JSON.parse(localStorage.getItem('slow-listening:playback:v3'));return queue.items.find(track=>track.instanceId===queue.current)?.selection.ref.part==='9003';});await playing();assert.equal((await saved()).items.length,before.items.length);await close();
-    await openSourceDetails(page,'三首合集');await dialog.getByRole('button',{name:'整组顺序播放',exact:true}).click();await close();
+    await openSourceDetails(page,'三首合集');await dialog.getByRole('button',{name:'整组播放',exact:true}).click();await close();
     await openLink('https://www.bilibili.com/video/BV0000000001?p=3');await dialog.getByRole('button',{name:'播放 三首合集 / 第3首',exact:true}).click();await playing();const queue=await saved(),current=queue.items.find(track=>track.instanceId===queue.current);assert.equal(current.selection.ref.part,'9003');assert.deepEqual(queue.items.filter(track=>track.partsGroupId===current.partsGroupId).map(track=>track.selection.ref.part),['9001','9002','9003']);await close();
   });
   await t.test('single favorite is one click; multipart favorite offers current, all and custom without playback',async()=>{
@@ -132,6 +155,20 @@ test('multipart UI: shared actions, uninterrupted expansion, saved scopes and co
   });
   await t.test('failed metadata can retry within the same dialog and late responses cannot reopen a closed dialog',async()=>{
     metadataFailure=cold[0].ref.id;await page.getByLabel('搜索歌曲或视频').fill('读取失败');await page.getByRole('button',{name:'开始搜索',exact:true}).click();const search=page.getByRole('dialog',{name:'搜索音乐',exact:true});await search.getByRole('button',{name:'显示全部',exact:true}).click();await openSourceDetails(page,'读取失败合集');await dialog.getByRole('button',{name:'重试读取歌曲',exact:true}).waitFor();assert(await dialog.getByRole('button',{name:'立即播放',exact:true}).isDisabled());metadataFailure='';await dialog.getByRole('button',{name:'重试读取歌曲',exact:true}).click();await dialog.getByRole('button',{name:'2 个分 P · 查看整组',exact:true}).waitFor();assert.equal(await dialog.getByRole('alert').count(),0);await close();await search.getByRole('button',{name:'关闭',exact:true}).click();
+  });
+  await t.test('folding live groups and changing shuffle scope retains the audio, position and queue identities',async()=>{
+    await page.getByRole('button',{name:'打开播放队列',exact:true}).click();const queue=page.locator('.queue-panel');await queue.locator('.queue-group-toggle').first().waitFor();
+    const before=await saved(),prepared=preparations.length;await page.evaluate(()=>{window.__groupAudio=document.querySelector('audio');window.__groupAudio.currentTime=8;});
+    await queue.locator('.queue-group-toggle').first().click();await queue.locator('.queue-group-toggle').first().click();await queue.getByLabel('随机播放方式').selectOption('tracks');await queue.getByLabel('随机播放方式').selectOption('groups');
+    assert.equal(preparations.length,prepared);assert(await page.locator('audio').evaluate(element=>element===window.__groupAudio&&!element.paused&&element.currentTime>=8));
+    assert.deepEqual((await saved()).items.map(item=>item.instanceId),before.items.map(item=>item.instanceId));assert.equal((await saved()).current,before.current);await queue.getByRole('button',{name:'关闭播放队列',exact:true}).click();
+  });
+  await t.test('moving one grouped occurrence to the tail keeps it detached when its deferred source loads',async()=>{
+    await page.getByRole('button',{name:'打开播放队列',exact:true}).click();const queue=page.locator('.queue-panel'),parent=queue.locator('.queue-group').last(),groupId=await parent.getAttribute('data-group-id');
+    const moved=(await saved()).items.filter(item=>item.partsGroupId===groupId)[1];await parent.locator('.queue-group-toggle').click();await queue.locator('.queue-group-member').nth(1).getByRole('button',{name:'队列操作 三首合集 / 第2首',exact:true}).click();await page.getByRole('menuitem',{name:'移到队尾',exact:true}).click();
+    assert.equal((await saved()).items.at(-1).instanceId,moved.instanceId);assert.equal((await saved()).items.at(-1).partsGroupId,undefined);
+    await queue.locator('.queue-track-main').last().click();await playing();await page.waitForFunction(id=>JSON.parse(localStorage.getItem('slow-listening:playback:v3')).current===id,moved.instanceId);
+    assert.equal((await saved()).items.find(item=>item.instanceId===moved.instanceId).partsGroupId,undefined);await queue.getByRole('button',{name:'关闭播放队列',exact:true}).click();
   });
   const measurements=[];
   await t.test('clean cover interactions and fixed mobile sheets render in both themes',async()=>{

@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Shelf } from '@studio/music-sources';
 import { DiscoveryShelf } from './DiscoveryShelf';
@@ -58,7 +59,7 @@ export function YoutubeDiscovery({ available, refreshToken, renderCovers, render
   useEffect(()=>{if(!recommendation?.updating||busy)return;const timer=setTimeout(()=>void load(),3000);return()=>clearTimeout(timer);},[current,recommendation?.updating,busy]);
 
   const shelf: Shelf = current?.shelf ?? { id: 'youtube-music-selection', title: 'YouTube 音乐精选', kind: 'recommendation' };
-  const retry = <button className="btn btn-secondary btn-sm" onClick={() => void load(true)}>重试音乐精选</button>;
+  const retry = <Button variant="secondary" compact  onClick={() => void load(true)}>重试音乐精选</Button>;
   return <DiscoveryShelf mobile={mobile} shelf={shelf} displayActive={displayActive} loading={busy} renderCovers={renderCovers} renderList={renderList}
     issue={failure??(!available?{code:'youtube-unavailable'}:undefined)} onCancel={()=>{active.current?.abort();setBusy(false);}}
     feedback={mobile&&<>{!available&&<p className="feedback" role="alert">YouTube 视频来源暂不可用，请在设置中检查取源工具。</p>}{!!failure&&<p className="feedback" role="alert">{errorText(failure)} {retry}</p>}{recommendation?.issue&&<p className="feedback" role="alert">{errorText({code:recommendation.issue})} {retry}</p>}{!!current?.warnings.length&&<p className="muted" role="status">部分歌单暂时无法读取，已展示可用歌曲。</p>}</>}
@@ -73,7 +74,7 @@ export function YoutubeDiscovery({ available, refreshToken, renderCovers, render
     </>}
     status={<>
       {current && <span>{message} · 获取于 {new Date(current.fetchedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
-      {mobile&&<>{busy && <span>正在获取 YouTube 音乐精选… <button className="btn btn-ghost btn-sm" onClick={() => { active.current?.abort(); setBusy(false); }}>取消</button></span>}
+      {mobile&&<>{busy && <span>正在获取 YouTube 音乐精选… <Button variant="ghost" compact  onClick={() => { active.current?.abort(); setBusy(false); }}>取消</Button></span>}
       {!available && <span className="error-text" role="alert">YouTube 视频来源暂不可用，请在设置中检查取源工具。</span>}
       {available && !!failure && <span className="error-text" role="alert">{errorText(failure)} {retry}</span>}
       {recommendation?.updating&&<span>启动时正在准备新推荐，先展示上次内容。</span>}

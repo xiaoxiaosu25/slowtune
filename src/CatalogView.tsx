@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { preferenceStorage } from './preference-storage';
 import { useEffect, useState } from 'react';
 import { ListBulletsIcon, SquaresFourIcon } from '@phosphor-icons/react';
@@ -19,7 +20,7 @@ export function useCatalogView(id: string, fallback: CatalogView) {
 }
 export function CatalogViewToggle({title, view, onChange}: {title: string; view: CatalogView; onChange: (view: CatalogView) => void}) {
   return <div className="segmented catalog-view" role="group" aria-label={title + '视图'}>
-    <button className={view === 'covers' ? 'selected' : ''} aria-label={title + '封面视图'} title="封面" aria-pressed={view === 'covers'} onClick={() => onChange('covers')}><SquaresFourIcon size={16}/></button>
-    <button className={view === 'list' ? 'selected' : ''} aria-label={title + '列表视图'} title="列表" aria-pressed={view === 'list'} onClick={() => onChange('list')}><ListBulletsIcon size={16}/></button>
+    <Button variant="plain" className={view === 'covers' ? 'selected' : ''} aria-label={title + '封面视图'} title="封面" aria-pressed={view === 'covers'} onClick={() => onChange('covers')}><SquaresFourIcon size={16}/></Button>
+    <Button variant="plain" className={view === 'list' ? 'selected' : ''} aria-label={title + '列表视图'} title="列表" aria-pressed={view === 'list'} onClick={() => onChange('list')}><ListBulletsIcon size={16}/></Button>
   </div>;
 }

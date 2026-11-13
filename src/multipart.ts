@@ -83,23 +83,24 @@ export class PartMetadataStore {
 }
 
 /** Validate the whole expansion before changing the live queue. Keep occurrence IDs, not just refs. */
-export function planPartExpansion(items: QueueTrack[], anchorId: string, input: Track[], newId: () => string) {
+export function planPartExpansion(items: QueueTrack[], anchorId: string, input: Track[], newId: () => string, title?: string) {
   const at = items.findIndex(item => item.resourceId === anchorId), anchor = items[at];
   if (at < 0 || !anchor || !('ref' in anchor) || anchor.ref.provider !== 'bilibili') throw { code: 'cancelled' };
   if (!input.length) throw { code: 'invalid-input' };
   const parts = selectMusicParts({ ...input[0], parts: input }, { mode: 'all' });
   if (parts[0].ref.id !== anchor.ref.id || !parts.some(part => part.ref.part === anchor.ref.part)) throw { code: 'not-found' };
   const groupId = anchor.partsGroupId ?? newId();
+  const partsGroupTitle = anchor.partsGroupTitle ?? title ?? '视频分曲';
   const members = items.filter((item): item is Track => 'ref' in item && (item.resourceId === anchorId || item.partsGroupId === groupId) && item.ref.provider === 'bilibili' && item.ref.id === anchor.ref.id);
   const existing = new Map(members.map(item => [item.ref.part, item]));
   const additions: Track[] = [];
   const group = parts.map(part => {
     const saved = existing.get(part.ref.part);
-    if (saved) return { ...saved, partsGroupId: groupId };
-    const value = { ...part, resourceId: newId(), partsGroupId: groupId }; additions.push(value); return value;
+    if (saved) return { ...saved, partsGroupId: groupId, partsGroupTitle };
+    const value = { ...part, resourceId: newId(), partsGroupId: groupId, partsGroupTitle }; additions.push(value); return value;
   });
   // Keep a previously queued P if an updated upstream snapshot no longer lists it.
-  group.push(...members.filter(item => !parts.some(part => part.ref.part === item.ref.part)).map(item => ({ ...item, partsGroupId: groupId })));
+  group.push(...members.filter(item => !parts.some(part => part.ref.part === item.ref.part)).map(item => ({ ...item, partsGroupId: groupId, partsGroupTitle })));
   if (items.length + additions.length > 500) throw { code: 'queue-limit' };
   const memberIds = new Set(members.map(item => item.resourceId));
   const before = items.slice(0, at).filter(item => !memberIds.has(item.resourceId)).length;

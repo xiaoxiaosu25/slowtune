@@ -9,13 +9,11 @@ import { desktopSurface } from './song-search';
 import { desktopLyricSearch } from './desktop-lyric-search';
 
 export const lyricsDisplayStorageKey = 'slow-listening:lyrics-display:v1';
-export type LyricMotion = 'system' | 'full' | 'reduced';
 function readDisplay() {
   try {
     const value = JSON.parse(preferenceStorage().getItem(lyricsDisplayStorageKey) ?? '{}');
-    const motion:LyricMotion=value?.motion==='full'||value?.motion==='reduced'?value.motion:'system';
-    return { bottom: value?.bottom !== false, translations: value?.translations !== false, motion };
-  } catch { return { bottom: true, translations: true, motion:'system' as LyricMotion }; }
+    return { bottom: value?.bottom !== false, translations: value?.translations !== false };
+  } catch { return { bottom: true, translations: true }; }
 }
 
 /** One current-source session, shared by both lyric surfaces and the settings dialog. */
@@ -163,7 +161,7 @@ export function useLyrics(track: Track | null, duration: number | undefined, ver
     title, setTitle, artist, setArtist, text, setText, offset, setOffset, results, preview, setPreview, previewTarget,previewBusy,previewError,cancelPreview,providerFilter, setProviderFilter,
     resetQuery:()=>{setTitle(seed.title.slice(0,300));setArtist(seed.artist.slice(0,300));},
     originalTitle: version?.facts.title ?? track?.sourceTitle ?? track?.title ?? '',
-    bottom: display.bottom, translations: display.translations, motion:display.motion, updateDisplay,
+    bottom: display.bottom, translations: display.translations, updateDisplay,
     run, cancel, load, resolve, search, inspect, accept, importText, saveOffset, clear,
   };
 }

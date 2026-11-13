@@ -34,7 +34,8 @@ test('real desktop enters its local profile without a code and restores a revoke
   const lyricFont = async () => {
     await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
     await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
-    return page.getByRole('slider', { name: '沉浸歌词字号', exact: true });
+    await page.getByRole('button', { name: '歌词设置', exact: true }).click();
+    return page.getByRole('dialog', { name: '歌词设置', exact: true }).getByRole('slider', { name: '沉浸歌词字号', exact: true });
   };
   const font = await lyricFont();
   assert.equal(await font.inputValue(), '40', 'saved lyric size is restored after asynchronous preference initialization');

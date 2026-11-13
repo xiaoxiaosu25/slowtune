@@ -5,6 +5,7 @@ import { prepareBestAudio, supportsAudioType, losslessAudio } from './audio-qual
 import { sameVideoPart } from './search-policy.js';
 import { DesktopInflight, requestIdentity } from './desktop-inflight.js';
 import { BilibiliResponseReuse } from '@studio/music-sources/bilibili';
+import {audioSelection,audioSelector,sameAudioSelection,type AudioSelection} from './audio-selection.js';
 
 export { desktopAudioCapability } from './audio-quality.js';
 export const desktopOperationTimeoutMs = 60000;
@@ -23,7 +24,7 @@ interface Work {
   responses:BilibiliResponseReuse;tickets:Set<string>;
 }
 interface Pending {provider:ProviderId;priority:Priority;signal:AbortSignal;start:()=>void;reject:(error:unknown)=>void;detach:()=>void}
-interface Ticket {owner:string;generation:string;until:number;playback:PreparedPlayback}
+interface Ticket {owner:string;generation:string;until:number;playback:PreparedPlayback;selection:AudioSelection}
 type Event = {id:string;operation:string;code:string;at:number;elapsedMs?:number;provider?:ProviderId;status?:number;errorCode?:string;sourceRequest?:string;attempt?:number};
 const cancelled = (signal:AbortSignal) => new MusicSourceError({code:signal.reason?.name==='TimeoutError'?'timeout':'cancelled',retryable:signal.reason?.name==='TimeoutError'});
 
@@ -111,23 +112,25 @@ export class DesktopPlayback {
   };
   private fetcher:typeof fetch=fetch;
   setFetch(fetcher:typeof fetch){this.fetcher=fetcher;}
-  verified(playback:PreparedPlayback):string|undefined{
+  verified(playback:PreparedPlayback,selection:AudioSelection=audioSelection()):string|undefined{
     const work=this.current;if(!work)return;
     this.check(work);this.prune();
     const until=Math.min(this.now()+15000,playback.delivery.expiresAt??Infinity);
     if(until-this.now()<1000)return;
     while(this.tickets.size>=32)this.tickets.delete(this.tickets.keys().next().value!);
-    const token=randomBytes(24).toString('base64url');this.tickets.set(token,{owner:work.owner,generation:work.generation,until,playback});work.tickets.add(token);return token;
+    const token=randomBytes(24).toString('base64url');this.tickets.set(token,{owner:work.owner,generation:work.generation,until,playback,selection:audioSelection(selection)});work.tickets.add(token);return token;
   }
-  async prepare(api:MusicApi,request:Parameters<MusicApi['prepare']>[0],options:CallOptions,support:string[],token?:string){
+  async prepare(api:MusicApi,request:Parameters<MusicApi['prepare']>[0],options:CallOptions,support:string[],token?:string,selection:AudioSelection=audioSelection()){
     const work=this.current;if(!work)throw new MusicSourceError({code:'invalid-input',retryable:false});
     this.check(work);this.prune();validateRef(request?.ref);
+    selection=audioSelection(selection);
+    if(selection.formatId){if(request.formatId&&request.formatId!==selection.formatId)throw new MusicSourceError({code:'invalid-input',retryable:false});request={...request,formatId:selection.formatId};}
     if(request.media!==undefined&&!['audio','video'].includes(request.media)||request.quality!==undefined&&!['highest','lowest','lossless'].includes(request.quality)||request.formatId!==undefined&&(typeof request.formatId!=='string'||!request.formatId||request.formatId.length>200)||request.codecs!==undefined&&(!Array.isArray(request.codecs)||request.codecs.length>20||request.codecs.some(codec=>typeof codec!=='string'||!codec||codec.length>80)))throw new MusicSourceError({code:'invalid-input',retryable:false});
     const ticket=token?this.tickets.get(token):undefined;
-    if(ticket&&ticket.owner===work.owner&&ticket.generation===work.generation&&sameVideoPart(ticket.playback.entry.ref,request.ref)&&request.media!=='video'&&request.quality!=='lowest'&&(request.quality!=='lossless'||losslessAudio(ticket.playback.format))&&(!request.formatId||request.formatId===ticket.playback.format.id)&&(!request.codecs||request.codecs.some(codec=>ticket.playback.format.codec.toLowerCase().startsWith(codec.toLowerCase())))&&supportsAudioType(support,ticket.playback.format)){
+    if(ticket&&sameAudioSelection(ticket.selection,selection)&&ticket.owner===work.owner&&ticket.generation===work.generation&&sameVideoPart(ticket.playback.entry.ref,request.ref)&&request.media!=='video'&&request.quality!=='lowest'&&(request.quality!=='lossless'||losslessAudio(ticket.playback.format))&&(!request.formatId||request.formatId===ticket.playback.format.id)&&(!request.codecs||request.codecs.some(codec=>ticket.playback.format.codec.toLowerCase().startsWith(codec.toLowerCase())))&&supportsAudioType(support,ticket.playback.format)){
       this.tickets.delete(token!);this.record({id:work.id,operation:'prepare',code:'verified-reuse',at:this.now(),provider:request.ref.provider});return ticket.playback;
     }
-    return this.share(['best-audio',request,support,{...options,signal:undefined}],options.signal??work.signal,signal=>prepareBestAudio(api,request,{...options,signal},format=>supportsAudioType(support,format)));
+    return this.share(['best-audio',request,support,selection,{...options,signal:undefined}],options.signal??work.signal,signal=>prepareBestAudio(api,request,{...options,signal},format=>supportsAudioType(support,format),audioSelector(selection)));
   }
   observe(event:SourceDiagnostic){const work=this.current;if(work||event.operation==='media')this.record({id:work?.id??event.requestId,sourceRequest:event.requestId,operation:event.operation,code:event.code,at:event.timestamp,...(event.attempt!==undefined?{attempt:event.attempt}:{}),...(event.elapsedMs!==undefined?{elapsedMs:event.elapsedMs}:{}),...(event.provider?{provider:event.provider}:{}),...(event.status?{status:event.status}:{}),...(event.errorCode?{errorCode:event.errorCode}:{})});}
   private prune(){for(const [token,ticket]of this.tickets)if(ticket.until<=this.now()||ticket.generation!==this.generation())this.tickets.delete(token);}

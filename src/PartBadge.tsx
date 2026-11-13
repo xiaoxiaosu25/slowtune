@@ -1,14 +1,16 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Track } from './api';
 import { PartMetadataStore } from './multipart';
+import { OPEN_DIALOG, topDialog } from './ui/layers';
 
 export function PartBadge({ track, store, active, onOpen, current = false, viewKey = '' }: { track: Track; store: PartMetadataStore; active: boolean; onOpen: () => void; current?: boolean; viewKey?: string }) {
   const element = useRef<HTMLSpanElement>(null);
   const entry = useSyncExternalStore(store.subscribe, () => store.peek(track.ref.id));
   useEffect(() => {
     if (!active || track.ref.provider !== 'bilibili') return;
-    const top = Array.from(document.querySelectorAll('dialog[open]')).at(-1);
-    if (top && element.current?.closest('dialog') !== top) return;
+    const top = topDialog();
+    if (top && element.current?.closest(OPEN_DIALOG) !== top) return;
     const controller = new AbortController();
     if (track.parts?.length) store.seed(track);
     const observer = new IntersectionObserver(records => {
@@ -20,5 +22,5 @@ export function PartBadge({ track, store, active, onOpen, current = false, viewK
   if (track.ref.provider !== 'bilibili') return null;
   const count = entry?.parts?.length ?? track.parts?.length ?? 0;
   const index = entry?.parts?.findIndex(part => part.ref.part === track.ref.part) ?? -1;
-  return <span ref={element} className="part-badge-slot">{count > 1 && <button type="button" className="part-badge" aria-label={'查看分 P · ' + track.title} onClick={onOpen}>{current && index >= 0 ? `P${index + 1} / ${count}` : `${count} 个分 P`}</button>}</span>;
+  return <span ref={element} className="part-badge-slot">{count > 1 && <Button variant="plain" type="button" className="part-badge" aria-label={'查看分 P · ' + track.title} onClick={onOpen}>{current && index >= 0 ? `P${index + 1} / ${count}` : `${count} 个分 P`}</Button>}</span>;
 }

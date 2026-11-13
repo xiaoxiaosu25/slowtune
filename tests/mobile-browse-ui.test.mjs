@@ -6,6 +6,7 @@ import { chromium } from './helpers/browser.mjs';
 import { createMobileFixture } from './helpers/mobile-fixture.mjs';
 import { developmentPaths } from '../scripts/workspace-paths.mjs';
 import { navigate, selectPlaylist, libraryAction } from '../scripts/browser-ui.mjs';
+import { OPEN_DIALOG } from '../src/ui/layers.ts';
 
 const artifacts=join(developmentPaths().artifacts,'mobile-browse');
 
@@ -58,7 +59,7 @@ test('mobile empty queue opens an interactive search page without retaining the 
     await search.getByRole('searchbox',{name:'搜索关键词',exact:true}).fill('风从远方来');
     await search.getByRole('button',{name:'搜索',exact:true}).click();
     await search.getByRole('button',{name:'播放 风从远方来',exact:true}).waitFor();
-    assert.equal(await page.locator('dialog[open]').count(),0,'search has no modal blocking its controls');
+    assert.equal(await page.locator(OPEN_DIALOG).count(),0,'search has no modal blocking its controls');
     await page.goBack();
     await page.locator('.mobile-player').waitFor();
     assert.equal(await drawer.count(),0,'Back does not reopen the replaced queue');
@@ -165,7 +166,7 @@ test('playlist rename drafts survive both layout transitions', {timeout:60000},a
   for(const viewport of [{width:390,height:844},{width:1280,height:800}]){
     await page.setViewportSize(viewport);
     await page.waitForFunction(mobile=>document.querySelector('.app')?.dataset.layout===(mobile?'mobile':'desktop')&&!!document.querySelector('.mobile-playlist-heading')===mobile,viewport.width<=760);
-    assert(await original.evaluate(element=>element.isConnected&&element.open),'the open editor survives without remounting');
+    assert(await original.evaluate((element,selector)=>element.isConnected&&element.matches(selector),OPEN_DIALOG),'the open editor survives without remounting');
     assert.equal(await input.inputValue(),'尚未保存的晚风歌单');
     assert.equal(await page.locator('input[aria-label="搜索歌单内音乐"]').inputValue(),'风');
   }

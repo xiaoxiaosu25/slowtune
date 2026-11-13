@@ -1,3 +1,4 @@
+import { Button, IconButton } from './ui/Button';
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { MusicNotesIcon, CaretUpIcon, CaretDownIcon } from '@phosphor-icons/react';
 import { activeLyricLine } from '../server/lyrics-format';
@@ -71,7 +72,7 @@ export function BottomLyrics({ lyrics, playback, compact = false, desktop = fals
       <p className="bottom-lyrics-current" title={current.text}><LyricText line={current} index={index} current={active >= 0}/></p>
       <p id={nextId} className="bottom-lyrics-next" hidden={!showNext}>{document.synced && active < 0 ? '前奏 · ' : ''}{lyrics.translations && current.translation ? current.translation : next?.text || (document.synced ? '♪' : '纯文本歌词')}</p>
     </div>}
-    {desktopDock && hasLyrics && <button type="button" className="btn btn-icon bottom-lyrics-expand" aria-label={expanded ? '收起歌词' : '展开歌词'} title={expanded ? '收起歌词' : '展开下一句或译文'} aria-expanded={expanded} aria-controls={nextId} onClick={() => setExpanded(value => !value)}>{expanded ? <CaretDownIcon size={16}/> : <CaretUpIcon size={16}/>}</button>}
+    {desktopDock && hasLyrics && <IconButton type="button" className="bottom-lyrics-expand" aria-label={expanded ? '收起歌词' : '展开歌词'} title={expanded ? '收起歌词' : '展开下一句或译文'} aria-expanded={expanded} aria-controls={nextId} onClick={() => setExpanded(value => !value)}>{expanded ? <CaretDownIcon size={16}/> : <CaretUpIcon size={16}/>}</IconButton>}
   </section>;
 }
 
@@ -109,17 +110,17 @@ export function LyricsView({ lyrics, playback, onSeek, recovery = false }: { lyr
   return <section ref={root} className="lyrics-panel" aria-label="当前版本歌词">
     {!document || document.instrumental || !document.lines.length ? <div className="lyrics-empty"><MusicNotesIcon size={32} weight="thin"/><p role="status">{recovery && !lyrics.track ? '播放音乐后查看歌词' : statusText(lyrics)}</p>
       {canRecover && <div className="lyrics-recovery-actions">
-        <button className="btn btn-secondary" onClick={lyrics.openSelector}>查找或导入歌词</button>
-        {lyrics.error && <button className="btn btn-ghost" onClick={() => void lyrics.resolve()}>重试读取歌词</button>}
+        <Button variant="secondary"  onClick={lyrics.openSelector}>查找或导入歌词</Button>
+        {lyrics.error && <Button variant="ghost"  onClick={() => void lyrics.resolve()}>重试读取歌词</Button>}
       </div>}
     </div> : <>
       <div className="lyrics-scroll" ref={scroll} tabIndex={0} aria-label="歌词正文" onWheel={browse} onTouchStart={browse} onTouchMove={browse} onKeyDown={event => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) { browse(); event.stopPropagation(); } }}>
         <ol>{document.lines.map((line, index) => <li key={index} aria-current={active === index ? 'true' : undefined} className={(line.startMs === null ? 'unsynced ' : '') + (index < active ? 'is-past' : '')}>
-          {line.startMs === null ? <span>{line.text}</span> : <button type="button" title={'跳转到 ' + time(Math.max(0, (line.startMs + lyrics.offsetMs) / 1000))} onClick={() => { resume(); onSeek(Math.max(0, (line.startMs! + lyrics.offsetMs) / 1000)); }}><LyricText line={line} index={index} current={active === index}/></button>}
+          {line.startMs === null ? <span>{line.text}</span> : <Button variant="plain" type="button" title={'跳转到 ' + time(Math.max(0, (line.startMs + lyrics.offsetMs) / 1000))} onClick={() => { resume(); onSeek(Math.max(0, (line.startMs! + lyrics.offsetMs) / 1000)); }}><LyricText line={line} index={index} current={active === index}/></Button>}
           {lyrics.translations && line.translation && <small>{line.translation}</small>}
         </li>)}</ol>
       </div>
-      {!follow && <button className="btn btn-ghost lyrics-resume" onClick={resume}>回到当前行</button>}
+      {!follow && <Button variant="ghost" className="lyrics-resume" onClick={resume}>回到当前行</Button>}
       {document.synced && active < 0 && <span className="lyrics-intro">前奏 · 等待歌词</span>}
     </>}
   </section>;

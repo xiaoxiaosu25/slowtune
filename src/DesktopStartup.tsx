@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useState, type CSSProperties } from 'react';
 import type { WelcomeSettings } from '../server/startup-types';
 import { useDesktopWindowMode } from './desktop-chrome';
@@ -24,7 +25,7 @@ export function DesktopStartup({ settings, message, error, onRetry }: { settings
     <footer className="startup-footer">
       <div className="startup-loader" aria-hidden="true"><span/></div>
       <div className="startup-status" role={error ? 'alert' : 'status'} aria-live="polite">{message}</div>
-      {error && <div className="startup-actions"><button onClick={onRetry}>重试</button><button className="secondary" onClick={() => void window.slowTuneDesktop?.openDirectory('logs')}>打开日志文件夹</button><button className="quiet" onClick={() => window.slowTuneDesktop?.quit()}>退出</button></div>}
+      {error && <div className="startup-actions"><Button variant="plain" onClick={onRetry}>重试</Button><Button variant="plain" className="secondary" onClick={() => void window.slowTuneDesktop?.openDirectory('logs')}>打开日志文件夹</Button><Button variant="plain" className="quiet" onClick={() => window.slowTuneDesktop?.quit()}>退出</Button></div>}
       <p className="startup-caption">你的个人音乐空间</p>
     </footer>
   </div>;

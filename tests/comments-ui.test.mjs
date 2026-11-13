@@ -57,17 +57,14 @@ test('desktop player and read-only comments: sort, pagination, replies, failures
     await page.screenshot({ path: join(artifacts, `player-${width}x${height}.png`) });
     const options = page.locator('.listening-stage .player-options');
     await options.getByRole('button', { name: '更多播放选项', exact: true }).click();
-    const menu = options.locator('.control-popover-panel:popover-open'); await menu.waitFor();
+    const menu = options.locator('.control-popover-panel:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])'); await menu.waitFor();
     await page.waitForFunction(() => document.querySelector('.listening-stage .player-options button').getAttribute('aria-expanded') === 'true');
     const menuBounds = await menu.evaluate(element => { const r = element.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight }; });
     assert(menuBounds.top >= 12 && menuBounds.bottom <= height - 12 + 1 && menuBounds.left >= 12 && menuBounds.right <= width - 12 + 1, 'playback options: ' + JSON.stringify({ width, height, ...menuBounds }));
     measurements.push({ ...bounds, options: menuBounds });
     if (height < 660) {
-      for (const control of [menu.getByRole('button', { name: '快退 10 秒', exact: true }), menu.getByRole('button', { name: '快进 10 秒', exact: true }), menu.getByRole('slider', { name: '音量', exact: true })]) {
-        await control.scrollIntoViewIfNeeded();
-        const reachable = await control.evaluate(element => { const r = element.getBoundingClientRect(), p = element.closest('.control-popover-panel').getBoundingClientRect(); return r.top >= p.top && r.bottom <= p.bottom && r.left >= p.left && r.right <= p.right; });
-        assert(reachable, 'compact playback control stays reachable: ' + await control.getAttribute('aria-label'));
-      }
+      const controls = page.locator('.stage-controls');
+      for (const name of ['快退 10 秒', '快进 10 秒']) assert(await controls.getByRole('button', { name, exact: true }).isVisible());
       await menu.getByRole('slider', { name: '音量', exact: true }).press('End');
       await page.waitForFunction(() => document.querySelector('.listening-stage .player-options .popover-volume input').getAttribute('aria-valuetext') === '100%');
       assert.equal(await menu.getByRole('slider', { name: '音量', exact: true }).inputValue(), '1');

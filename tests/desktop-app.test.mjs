@@ -11,7 +11,8 @@ import { alive, closeDesktop } from './helpers/desktop-process.mjs';
 import { captureDesktopWindow } from './helpers/desktop-capture.mjs';
 import { markOwnedFixture } from './helpers/desktop-owned-fixture.mjs';
 import { queueRecord } from './helpers/song-fixture.mjs';
-import { lyricWindowState } from './helpers/windows-window-state.mjs';
+import { lyricWindowState, windowsHitTargets } from './helpers/windows-window-state.mjs';
+import { assertControlHitTarget, clickControlPoint, pressControlPoint, controlPoints } from './helpers/control-hit-target.mjs';
 
 const root = resolve('.'), output = join(developmentPaths().testRuntime, 'desktop-tests'); mkdirSync(output, { recursive: true });
 const sleep = ms => new Promise(done => setTimeout(done, ms));
@@ -115,20 +116,61 @@ test('Windows integrated chrome, immersive and floating lyrics retain one player
   await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .2);
   await page.locator('.listening-transport .play-toggle').click();
   await page.locator('audio').evaluate(audio => { audio.currentTime = 7; audio.dispatchEvent(new Event('timeupdate')); });
+  await page.waitForFunction(() => document.documentElement.dataset.desktopMode === 'immersive');
+  assert.equal(await page.locator('.listening-header').evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
+  await page.locator('.listening-backdrop').evaluate(img => img.decode());
+  await captureDesktopWindow(application, page, join(directory, 'integrated-playing.png'));
   const preparations = fixture.preparations.length, source = await page.locator('audio').getAttribute('src');
   assert.equal(await page.locator('.bottom-lyrics,.has-bottom-lyrics').count(), 0);
+  const nativeHandle = await application.evaluate(({ BrowserWindow }) => {
+    const handle = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('http:')).getNativeWindowHandle();
+    return (handle.length === 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE())).toString();
+  });
+  await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
+  await page.getByRole('button', { name: '歌曲操作', exact: true }).click();
+  const partsDialog = page.getByRole('dialog', { name: '歌曲与分 P', exact: true });
+  const partsClose = partsDialog.getByRole('button', { name: '关闭', exact: true });
+  await assertControlHitTarget(partsClose, 40);
+  const partsCloseBox = await partsClose.boundingBox();
+  assert.deepEqual(await windowsHitTargets(nativeHandle, controlPoints.map(([x, y]) => [Math.round(partsCloseBox.x + partsCloseBox.width * x), Math.round(partsCloseBox.y + partsCloseBox.height * y)])), controlPoints.map(() => 1), 'multipart close target is native HTCLIENT at every sampled point');
+  await pressControlPoint(page, partsClose, [.98, .5]);
+  await partsDialog.waitFor({ state: 'detached' });
+  assert.equal(await page.locator('audio').getAttribute('src'), source); assert.equal(fixture.preparations.length, preparations);
   await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).click();
   await page.waitForFunction(() => document.documentElement.dataset.desktopMode === 'immersive' && navigator.windowControlsOverlay.getTitlebarAreaRect().height === 40);
   await page.locator('.desktop-lyrics-host').waitFor();
   assert.equal(await page.getByRole('button', { name: '应用菜单', exact: true }).count(), 0);
   assert.equal(await page.locator('.desktop-tools').isVisible(), false);
+  const closeBox = await page.locator('.desktop-lyrics-close').boundingBox();
+  assert.deepEqual(await windowsHitTargets(nativeHandle, [
+    ...controlPoints.map(([x, y]) => [Math.round(closeBox.x + closeBox.width * x), Math.round(closeBox.y + closeBox.height * y)]),
+    [400, 20],
+  ]), [...controlPoints.map(() => 1), 2], 'close points are native HTCLIENT; blank header remains HTCAPTION');
+  // The native drag strip used to cover the glyph and most of the close button.
+  // Click raw coordinates so locator retries cannot hide a partially blocked target.
+  for (const point of controlPoints) {
+    const close = page.getByRole('button', { name: '返回普通播放', exact: true });
+    await assertControlHitTarget(close, 40);
+    assert.equal(await close.evaluate(e => getComputedStyle(e).getPropertyValue('app-region')), 'no-drag');
+    await clickControlPoint(page, close, point);
+    await page.locator('.desktop-lyrics-view').waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: '打开沉浸歌词', exact: true }).click();
+    await page.locator('.desktop-lyrics-host').waitFor();
+  }
+  assert.equal(await page.locator('.desktop-window-drag').evaluate(e => getComputedStyle(e).getPropertyValue('app-region')), 'drag');
   await captureDesktopWindow(application, page, join(directory, 'integrated-immersive.png'));
   assert.equal(await page.locator('audio').getAttribute('src'), source); assert.equal(fixture.preparations.length, preparations);
+  await page.getByRole('region', { name: '沉浸歌词', exact: true }).getByRole('button', { name: '更多播放选项', exact: true }).click();
+  const immersiveOptions = page.locator('.desktop-lyrics-view .player-options .control-popover-panel');
+  assert.equal(await immersiveOptions.getByLabel('桌面悬浮歌词', { exact: true }).isChecked(), true);
+  await immersiveOptions.screenshot({ path: join(directory, 'immersive-playback-options.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '关闭沉浸歌词', exact: true }).click();
-  await page.waitForFunction(() => document.documentElement.dataset.desktopMode === 'standard');
+  await page.waitForFunction(() => document.documentElement.dataset.desktopMode === 'immersive');
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
   assert.equal(await page.getByLabel('桌面悬浮歌词', { exact: true }).isChecked(), true, 'floating lyrics enable without an extra action');
   assert.equal(await page.getByLabel('底部歌词', { exact: true }).count(), 0);
+  await page.locator('.listening-stage .player-options .control-popover-panel').screenshot({ path: join(directory, 'normal-playback-options.png'), animations: 'disabled' });
   const overlay = await windowAt(application, url => url.endsWith('/lyrics.html')); overlay.setDefaultTimeout(12000);
   const assertOverlayTopmost = async stage => {
     const detail = await lyricWindowState(application);

@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { desktopBuildDirectory, assertDesktopBuildDirectory } from './workspace-paths.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url)), target = desktopBuildDirectory(root);
 const run = (script, args = []) => execFileSync(process.execPath, [join(root, script), ...args], { cwd: root, stdio: 'inherit', windowsHide: true });
-run('scripts/check-docs.mjs'); run('scripts/generate-notices.mjs'); run('node_modules/typescript/bin/tsc', ['--noEmit']);
+run('scripts/check-docs.mjs'); run('scripts/check-styles.mjs'); run('scripts/generate-notices.mjs'); run('node_modules/typescript/bin/tsc', ['--noEmit']);
 assertDesktopBuildDirectory(target, root);
 mkdirSync(dirname(target), { recursive: true });
 assertDesktopBuildDirectory(target, root);

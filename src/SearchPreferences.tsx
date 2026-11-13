@@ -1,3 +1,4 @@
+import { Button, IconButton } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowCounterClockwiseIcon, PushPinIcon, TrashIcon } from '@phosphor-icons/react';
 import { request, cancelled, errorText, type Track } from './api';
@@ -54,18 +55,18 @@ export function SearchPreferencesSettings({onChanged}:{onChanged?:(state:SearchS
         <label className="field"><span className="field-label">搜索排除词</span><textarea className="textarea" aria-label="搜索排除词" rows={4} value={exclude} onChange={event=>{setExclude(event.target.value);settings.setMessage('');}}/><span className="muted">每行一个，按标题文字匹配。留空则不按关键词排除。</span></label>
       </fieldset>
       <div className="toolbar search-preference-actions">
-        <button className="btn btn-ghost" disabled={settings.busy} onClick={()=>{stage(settings.state!.defaults.config);setRestored(true);settings.setMessage('默认配置已载入，保存后生效。已指定的版本会保留。');}}><ArrowCounterClockwiseIcon size={18}/>恢复默认配置</button>
-        <button className="btn btn-secondary" disabled={settings.busy||!dirty&&!restored} onClick={()=>{stage(settings.state!.config);setRestored(false);settings.setMessage('');}}>取消修改</button>
-        <button className="btn btn-primary" disabled={settings.busy||!dirty&&!restored} onClick={()=>void settings.write({action:'config',config:currentDraft}).then(state=>{if(state){stage(state.config);setRestored(false);settings.setMessage('搜索偏好已保存。');}})}>保存搜索偏好</button>
+        <Button variant="ghost"  disabled={settings.busy} onClick={()=>{stage(settings.state!.defaults.config);setRestored(true);settings.setMessage('默认配置已载入，保存后生效。已指定的版本会保留。');}}><ArrowCounterClockwiseIcon size={18}/>恢复默认配置</Button>
+        <Button variant="secondary"  disabled={settings.busy||!dirty&&!restored} onClick={()=>{stage(settings.state!.config);setRestored(false);settings.setMessage('');}}>取消修改</Button>
+        <Button variant="primary"  disabled={settings.busy||!dirty&&!restored} onClick={()=>void settings.write({action:'config',config:currentDraft}).then(state=>{if(state){stage(state.config);setRestored(false);settings.setMessage('搜索偏好已保存。');}})}>保存搜索偏好</Button>
       </div>
       <p className="muted">{dirty?'有未保存的修改。':window.slowTuneDesktop?'保存在本桌面应用的 data 中，与服务版各自保存。':'同一服务的电脑和手机共用。'}{settings.state.defaultsVersion!==settings.state.defaults.version?' 有新版默认配置，可通过恢复默认载入。':''}</p>
       <details className="search-policy-details"><summary>自动匹配的优先结果（{settings.state.preferred.length}）</summary>
         {!settings.state.preferred.length&&<p className="muted">在搜索结果的更多操作里选择“自动匹配时优先选此结果”。</p>}
-        <ul className="preferred-song-list">{settings.state.preferred.map(item=><li key={item.key}><div><strong>{item.song.title}{item.song.artists?.length?' · '+item.song.artists.join(' / '):''}</strong><span>{item.entry.title} · {item.entry.uploader?.name??(item.entry.ref.provider==='bilibili'?'B站':'YouTube')}</span></div><button className="btn btn-icon" aria-label={'取消指定版本 '+item.song.title} disabled={settings.busy} onClick={()=>void settings.write({action:'remove',key:item.key}).then(state=>{if(state)settings.setMessage('已取消指定版本。');})}><TrashIcon size={18}/></button></li>)}</ul>
+        <ul className="preferred-song-list">{settings.state.preferred.map(item=><li key={item.key}><div><strong>{item.song.title}{item.song.artists?.length?' · '+item.song.artists.join(' / '):''}</strong><span>{item.entry.title} · {item.entry.uploader?.name??(item.entry.ref.provider==='bilibili'?'B站':'YouTube')}</span></div><IconButton  aria-label={'取消指定版本 '+item.song.title} disabled={settings.busy} onClick={()=>void settings.write({action:'remove',key:item.key}).then(state=>{if(state)settings.setMessage('已取消指定版本。');})}><TrashIcon size={18}/></IconButton></li>)}</ul>
       </details>
     </>}
     {settings.message&&<p className="notice" role="status">{settings.message}</p>}
-    {!settings.state&&settings.message&&<button className="btn btn-secondary" disabled={settings.busy} onClick={()=>void settings.read().then(state=>{if(state)stage(state.config);})}>重试读取搜索偏好</button>}
+    {!settings.state&&settings.message&&<Button variant="secondary"  disabled={settings.busy} onClick={()=>void settings.read().then(state=>{if(state)stage(state.config);})}>重试读取搜索偏好</Button>}
   </section>;
 }
 export function PreferSongAction({song,track,onChanged}:{song:SongQuery;track:Track;onChanged:(state:SearchSettings)=>void}){
@@ -73,14 +74,14 @@ export function PreferSongAction({song,track,onChanged}:{song:SongQuery;track:Tr
   const target:SongQuery={title:title.trim(),...(artists.trim()?{artists:artists.split(/\s*\/\s*|[，,、]/).map(value=>value.trim()).filter(Boolean)}:{})};
   const saved=settings.state?preferredSong(settings.state.preferred,target):undefined;
   return <div className="prefer-song-action">
-    <button className="btn btn-secondary" aria-expanded={expanded} onClick={()=>{setExpanded(value=>!value);if(!expanded)void settings.read();}}><PushPinIcon size={18}/>自动匹配时优先选此结果</button>
+    <Button variant="secondary"  aria-expanded={expanded} onClick={()=>{setExpanded(value=>!value);if(!expanded)void settings.read();}}><PushPinIcon size={18}/>自动匹配时优先选此结果</Button>
     {expanded&&<form className="field-stack preferred-song-form" onSubmit={event=>{event.preventDefault();void settings.write({action:'prefer',song:target,ref:track.ref}).then(state=>{if(state)settings.setMessage('已保存，自动匹配时优先选择此结果；歌曲默认与歌单固定版本继续优先。');});}}>
       <label className="field"><span className="field-label">适用歌名／搜索词</span><input className="input" aria-label="优先版本适用名称" value={title} maxLength={512} required onChange={event=>setTitle(event.target.value)}/></label>
       <label className="field"><span className="field-label">歌手（可选）</span><input className="input" aria-label="优先版本歌手" value={artists} maxLength={1000} onChange={event=>setArtists(event.target.value)} placeholder="留空则适用于所有同名搜索"/></label>
       <p className="muted">仅用于没有明确播放版本时的自动匹配。要改变已保存歌曲的常用版本，请在歌曲窗口中设置默认版本。</p>
       <p className="muted">{artists.trim()?'只用于此歌名和歌手。':'未指定歌手，将用于所有同名搜索；歌名和歌手均匹配的指定版本优先。'} {track.ref.part?'保存当前这一 P。':'多 P 视频默认保存第一 P，可先在分 P 列表中选择。'}</p>
       {saved&&<p className="muted">当前指定：{saved.entry.title}</p>}
-      <div className="toolbar"><button className="btn btn-primary" disabled={settings.busy||!settings.state||!target.title}>保存匹配偏好</button>{saved&&<button type="button" className="btn btn-ghost" disabled={settings.busy} onClick={()=>void settings.write({action:'remove',key:saved.key}).then(state=>{if(state)settings.setMessage('已取消指定版本。');})}>取消指定版本</button>}</div>
+      <div className="toolbar"><Button variant="primary" type="submit"  disabled={settings.busy||!settings.state||!target.title}>保存匹配偏好</Button>{saved&&<Button variant="ghost" type="button"  disabled={settings.busy} onClick={()=>void settings.write({action:'remove',key:saved.key}).then(state=>{if(state)settings.setMessage('已取消指定版本。');})}>取消指定版本</Button>}</div>
       {settings.message&&<p className="notice" role="status">{settings.message}</p>}
     </form>}
   </div>;

@@ -15,7 +15,7 @@ async function openVersions(page, surface = page) {
   await source.getByRole('button', { name: '选择播放版本', exact: true }).click();
   await source.waitFor({ state: 'hidden' });
 }
-async function openLyricsSettings(page){await page.getByRole('button',{name:'更多播放选项',exact:true}).click();await page.getByRole('button',{name:'歌词管理',exact:true}).click();return page.getByRole('dialog',{name:'歌词设置',exact:true});}
+async function openLyricsSettings(page){await page.getByRole('button',{name:'更多播放选项',exact:true}).click();await page.getByRole('button',{name:'歌词设置',exact:true}).click();return page.getByRole('dialog',{name:'歌词设置',exact:true});}
 async function openOffset(settings){const details=settings.locator('.lyrics-offset');if(await details.getAttribute('open')===null)await details.locator('summary').click();}
 
 test('desktop versions, source facts, in-place audition and per-source lyric management', { timeout: 120000 }, async t => {
@@ -124,15 +124,15 @@ test('desktop versions, source facts, in-place audition and per-source lyric man
   await openVersions(page, page.locator('.desktop-lyrics-view'));
   assert.equal(await panel.getByRole('tab').count(),0);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '校准时间', exact: true }).click(); await page.locator('.lyric-offset-popover [popover]:popover-open').getByLabel('歌词延后秒数', { exact: true }).waitFor();
-  await page.keyboard.press('Escape'); assert.equal(await page.locator('.lyric-offset-popover [popover]:popover-open').count(), 0); assert.equal(await panel.count(), 0); assert.equal(await page.locator('.desktop-lyrics-view').isVisible(), true);
+  await page.getByRole('button', { name: '校准时间', exact: true }).click(); await page.locator('.lyric-offset-popover :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByLabel('歌词延后秒数', { exact: true }).waitFor();
+  await page.keyboard.press('Escape'); assert.equal(await page.locator('.lyric-offset-popover :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').count(), 0); assert.equal(await panel.count(), 0); assert.equal(await page.locator('.desktop-lyrics-view').isVisible(), true);
   await page.getByRole('button', { name: '更换歌词', exact: true }).click(); await picker.getByRole('button', { name: '查找歌词', exact: true }).waitFor();
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await page.screenshot({ path: join(artifacts, 'playing-desktop.png'), animations: 'disabled' });
   assert.deepEqual(errors, []);
 });
 
-test('unowned source auditions replace the current occurrence and never create library records', { timeout: 45000 }, async t => {
+test('unowned source auditions preserve the queue and can be grouped from the version dialog', { timeout: 45000 }, async t => {
   const fixture = await startSongManagementFixture(); t.after(fixture.close);
   const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] }); t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } }); page.setDefaultTimeout(8000);
@@ -150,8 +150,25 @@ test('unowned source auditions replace the current occurrence and never create l
   await page.waitForFunction(() => document.querySelector('audio')?.currentSrc.includes('BV0000000007'));
   const after = await page.evaluate(() => JSON.parse(localStorage.getItem('slow-listening:playback:v3')));
   assert.equal(after.current, 'unowned'); assert.equal(after.items.length, 1); assert.equal(after.items[0].selection.ref.id, other.ref.id); assert.deepEqual(fixture.library.read(), before);
-  await panel.getByRole('button', { name: '保存版本', exact: true }).click();
-  await page.getByRole('dialog', { name: '归入歌曲', exact: true }).waitFor(); assert.deepEqual(fixture.library.read(), before);
+  const saveVersion = panel.getByRole('button', { name: '保存版本', exact: true });
+  const group = page.getByRole('dialog', { name: '归入歌曲', exact: true });
+  await saveVersion.click();
+  await group.getByRole('textbox', { name: '归组歌名' }).waitFor();
+  await page.keyboard.press('Escape');
+  await group.waitFor({ state: 'detached' });
+  await saveVersion.waitFor();
+  await page.waitForFunction(() => document.activeElement?.textContent?.trim() === '保存版本');
+  assert.deepEqual(fixture.library.read(), before);
+
+  await saveVersion.click();
+  await group.getByRole('textbox', { name: '归组歌名' }).fill('保存的现场歌曲');
+  await group.getByRole('button', { name: '保存歌曲与版本', exact: true }).click();
+  await group.waitFor({ state: 'detached' });
+  await panel.waitFor();
+  const { songs, versions } = fixture.library.read().snapshot;
+  const song = songs.find(song => song.title === '保存的现场歌曲');
+  assert(song);
+  assert.equal(versions.find(version => version.id === song.defaultVersionId)?.ref.id, other.ref.id);
 });
 
 for (const action of ['select', 'import']) test(`closing lyric management during ${action} keeps it closed after saving`, { timeout: 30000 }, async t => {
@@ -179,7 +196,7 @@ for (const action of ['select', 'import']) test(`closing lyric management during
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   const source = await page.locator('audio').getAttribute('src');
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
-  await page.getByRole('button', { name: '歌词管理', exact: true }).click();
+  await page.getByRole('button', { name: '歌词设置', exact: true }).click();
   const settings=page.getByRole('dialog',{name:'歌词设置',exact:true});
   await settings.getByRole('button', { name: '更换或导入歌词', exact: true }).click();
   const panel=page.getByRole('dialog',{name:'选择歌词',exact:true});
@@ -199,6 +216,6 @@ for (const action of ['select', 'import']) test(`closing lyric management during
   assert.equal(await page.locator('audio').getAttribute('src'), source);
   assert.equal(await page.locator('audio').evaluate(audio => audio.paused), false);
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
-  await page.getByRole('button', { name: '歌词管理', exact: true }).click();
+  await page.getByRole('button', { name: '歌词设置', exact: true }).click();
   await settings.locator('.lyrics-source').filter({ hasText: '保存后的歌词' }).waitFor();
 });

@@ -1,5 +1,6 @@
+import { Button, DismissButton, IconButton } from './ui/Button';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { CaretDownIcon, ClockClockwiseIcon, MusicNotesIcon, TextAlignLeftIcon } from '@phosphor-icons/react';
+import { ClockClockwiseIcon, MusicNotesIcon, TextAlignLeftIcon } from '@phosphor-icons/react';
 import type { LyricsController } from './useLyrics';
 import type { LyricPlayback } from './LyricsView';
 import { desktopLyricLines, desktopLyricTime } from './desktop-lyric-data';
@@ -11,24 +12,17 @@ import { DesktopImmersiveChrome } from './desktop-chrome';
 import { useDesktopLyricSize } from './DesktopLyricFont';
 import { ControlPopover } from './ControlPopover';
 import { LyricOffsetControls } from './LyricOffsetControls';
+import { useArtworkLayers } from './use-artwork-layers';
+import { OPEN_LAYER } from './ui/layers';
 
 export function LyricsToggle({ active, onClick }: { active: boolean; onClick: () => void }) {
   const label = active ? '关闭沉浸歌词' : '打开沉浸歌词';
-  return <button type="button" className={'btn btn-icon desktop-lyrics-toggle' + (active ? ' saved' : '')} aria-label={label} title={label} aria-pressed={active} onClick={onClick}><span aria-hidden="true">词</span></button>;
+  return <IconButton type="button" className={' desktop-lyrics-toggle' + (active ? ' saved' : '')} aria-label={label} title={label} aria-pressed={active} onClick={onClick}><span aria-hidden="true">词</span></IconButton>;
 }
 
 function LyricBackdrop({ artwork }: { artwork?: string }) {
-  const [layers, setLayers] = useState<{ url: string; key: number }[]>([]);
-  const sequence = useRef(0);
-  useEffect(() => {
-    let cancelled = false;
-    if (!artwork) { setLayers([]); return; }
-    const img = new Image(); img.referrerPolicy = 'no-referrer';
-    img.onload = () => { if (!cancelled) setLayers(old => [...old.slice(-1), { url: artwork, key: ++sequence.current }]); };
-    img.onerror = () => { if (!cancelled) setLayers([]); }; img.src = artwork;
-    return () => { cancelled = true; img.onload = img.onerror = null; };
-  }, [artwork]);
-  return <div className="desktop-lyrics-backdrop" aria-hidden="true">{layers.map(layer => <img key={layer.key} src={layer.url} alt="" referrerPolicy="no-referrer" onAnimationEnd={() => setLayers(old => old.at(-1)?.key === layer.key ? [layer] : old)}/>)}</div>;
+  const { layers, settle } = useArtworkLayers(artwork);
+  return <div className="desktop-lyrics-backdrop" aria-hidden="true">{layers.map(layer => <img key={layer.key} src={layer.url} alt="" referrerPolicy="no-referrer" onAnimationEnd={() => settle(layer.key)}/>)}</div>;
 }
 
 export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo, controls, onSeek, onClose, onChooseLyrics }: { lyrics: LyricsController; playback: LyricPlayback; artwork?: string; visual: ReactNode; songInfo: ReactNode; controls: ReactNode; onSeek: (seconds: number) => void; onClose: () => void; onChooseLyrics: () => void }) {
@@ -36,7 +30,7 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
   const host = useRef<HTMLDivElement>(null), reading = useRef<HTMLDivElement>(null);
   const engine = useRef<ReturnType<typeof mountDesktopLyricEngine> | null>(null);
   const wake = useRef<(seek?: boolean) => void>(() => {});
-  const live = useRef({ playback, offset: lyrics.offsetMs, motion:lyrics.motion, onSeek }); live.current = { playback, offset: lyrics.offsetMs, motion:lyrics.motion, onSeek };
+  const live = useRef({ playback, offset: lyrics.offsetMs, onSeek }); live.current = { playback, offset: lyrics.offsetMs, onSeek };
   const [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0), [browsing, setBrowsing] = useState(false);
   const browseTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const surface=useRef<HTMLElement>(null),idleTimer=useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -47,7 +41,7 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
     if(!window.matchMedia('(hover:hover) and (pointer:fine)').matches||!idleState.current.playing)return;
     idleTimer.current=setTimeout(()=>{
       const current=idleState.current,focused=window.document.activeElement;
-      if(!current.playing||current.browsing||current.settings||window.document.querySelector(':popover-open,dialog[open]')||focused&&surface.current?.contains(focused)&&focused!==reading.current)return;
+      if(!current.playing||current.browsing||current.settings||window.document.querySelector(OPEN_LAYER)||focused&&surface.current?.contains(focused)&&focused!==reading.current)return;
       setToolsVisible(false);
     },3000);
   };
@@ -60,8 +54,6 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
     setFailed(false); setBrowsing(false); clearTimeout(browseTimer.current);
     if (!synced || !document || !host.current) return;
     let cancelled = false, frame = 0, settlingUntil = 0, previous = 0;
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const reduced=()=>live.current.motion==='reduced'||live.current.motion==='system'&&motion.matches;
     const fail = () => {
       cancelAnimationFrame(frame); frame = 0;
       engine.current?.dispose(); engine.current = null;
@@ -72,18 +64,17 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
       frame = 0;
       if (cancelled || window.document.hidden || !engine.current) return;
       const current = live.current;
-      try { engine.current.sync(desktopLyricTime(current.playback.readPosition(), current.offset), current.playback.playing, reduced(), seek, previous ? Math.min(now - previous, 64) : 0); }
+      try { engine.current.sync(desktopLyricTime(current.playback.readPosition(), current.offset), current.playback.playing, seek, previous ? Math.min(now - previous, 64) : 0); }
       catch { fail(); return; }
       previous = now;
       if (current.playback.playing || now < settlingUntil) frame = requestAnimationFrame(tick);
     };
     // Even a static paused view needs a few frames to commit the renderer's
     // asynchronous row measurements; this does not enable motion or a new clock.
-    const restart = (seek = false) => { cancelAnimationFrame(frame); previous = 0; settlingUntil = performance.now() + (reduced() ? 120 : 1200); tick(performance.now(), seek); };
+    const restart = (seek = false) => { cancelAnimationFrame(frame); previous = 0; settlingUntil = performance.now() + 1200; tick(performance.now(), seek); };
     wake.current = restart;
     const visibility = () => { if (window.document.hidden) { cancelAnimationFrame(frame); frame = 0; } else restart(true); };
-    const changed = () => restart(true);
-    window.document.addEventListener('visibilitychange', visibility); motion.addEventListener('change', changed);
+    window.document.addEventListener('visibilitychange', visibility);
     const resize = new ResizeObserver(() => restart(true)); resize.observe(host.current);
     const url = new URL(engineUrl, window.location.href);
     if (attempt) url.searchParams.set('retry', String(attempt));
@@ -100,12 +91,11 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
     }).catch(() => { if (!cancelled) fail(); });
     return () => {
       cancelled = true; cancelAnimationFrame(frame); clearTimeout(browseTimer.current); resize.disconnect();
-      window.document.removeEventListener('visibilitychange', visibility); motion.removeEventListener('change', changed);
+      window.document.removeEventListener('visibilitychange', visibility);
       engine.current?.dispose(); engine.current = null; wake.current = () => {};
     };
   }, [document, synced, lyrics.translations, playback.duration, attempt]);
   useEffect(() => { wake.current(); }, [playback.playing, playback.position, lyrics.offsetMs, fontSize]);
-  useEffect(() => { wake.current(true); }, [lyrics.motion]);
   useEffect(() => playback.subscribePosition?.(() => { if (!live.current.playback.playing) wake.current(true); }), [playback.subscribePosition]);
   const browse = () => {
     if (!synced || failed) return;
@@ -117,7 +107,7 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
   return <section ref={surface} className="desktop-lyrics-view" aria-label="沉浸歌词" data-tools-hidden={!toolsVisible||undefined} onPointerMove={showTools} onPointerDownCapture={showTools} onFocusCapture={showTools} onKeyDownCapture={showTools} style={{ '--desktop-lyric-size': fontSize + 'px' } as CSSProperties}>
     <DesktopImmersiveChrome/>
     <LyricBackdrop artwork={artwork}/>
-    <button type="button" className="btn btn-icon desktop-lyrics-close" aria-label="返回普通播放" title="收起歌词模式" onClick={onClose}><CaretDownIcon size={24}/></button>
+    <DismissButton action="collapse" type="button" className="desktop-lyrics-close" aria-label="返回普通播放" title="收起歌词模式" onClick={onClose}/>
     <div className="desktop-lyrics-stage">
     <aside className="desktop-lyrics-track" aria-label="当前歌曲">{visual}<div className="desktop-lyrics-song">{songInfo}</div></aside>
     <div className="desktop-lyrics-column">
@@ -129,14 +119,14 @@ export function DesktopLyricsView({ lyrics, playback, artwork, visual, songInfo,
     }}>
       {hasLines && synced && <div ref={host} className="desktop-lyrics-host" hidden={failed}/>}
       {hasLines ? (!synced || failed) && <div className="desktop-lyrics-fallback">
-        {failed && <div className="desktop-lyrics-retry" role="status">歌词动效暂不可用<button className="btn btn-ghost" onClick={() => setAttempt(value => value + 1)}>重试动效</button></div>}
-        {document.lines.map((line, index) => <div className="desktop-lyrics-plain-line" key={index}>{line.startMs === null ? <span>{line.text}</span> : <button onClick={() => onSeek(Math.max(0, (line.startMs! + lyrics.offsetMs) / 1000))}>{line.text || '♪'}</button>}{lyrics.translations && line.translation && <small>{line.translation}</small>}</div>)}
-      </div> : <div className="desktop-lyrics-empty" role="status"><MusicNotesIcon size={32} weight="thin"/><p>{status}</p>{lyrics.error && <button className="btn btn-ghost" onClick={() => void lyrics.resolve()}>重试读取</button>}</div>}
+        {failed && <div className="desktop-lyrics-retry" role="status">歌词动效暂不可用<Button variant="ghost"  onClick={() => setAttempt(value => value + 1)}>重试动效</Button></div>}
+        {document.lines.map((line, index) => <div className="desktop-lyrics-plain-line" key={index}>{line.startMs === null ? <span>{line.text}</span> : <Button variant="plain" onClick={() => onSeek(Math.max(0, (line.startMs! + lyrics.offsetMs) / 1000))}>{line.text || '♪'}</Button>}{lyrics.translations && line.translation && <small>{line.translation}</small>}</div>)}
+      </div> : <div className="desktop-lyrics-empty" role="status"><MusicNotesIcon size={32} weight="thin"/><p>{status}</p>{lyrics.error && <Button variant="ghost"  onClick={() => void lyrics.resolve()}>重试读取</Button>}</div>}
     </div>
-    {browsing && <button className="btn btn-secondary desktop-lyrics-resume" onClick={resume}>回到当前行</button>}
+    {browsing && <Button variant="secondary" className="desktop-lyrics-resume" onClick={resume}>回到当前行</Button>}
     </div>
     </div>
-    <div className="desktop-lyrics-management-tools" role="group" aria-label="歌词快捷工具"><button className="btn btn-icon" aria-label="更换歌词" title="更换歌词" onClick={onChooseLyrics}><TextAlignLeftIcon size={21}/></button>{document?.synced&&<ControlPopover key={lyrics.sourceKey} label="校准时间" icon={<ClockClockwiseIcon size={21}/>} className="lyric-offset-popover" side="left" closeOnAction={false} onOpenChange={open=>{showTools();if(!open)lyrics.setOffset(String((lyrics.state?.offsetMs??0)/1000));}}><LyricOffsetControls lyrics={lyrics} compact/>{lyrics.error&&<div className="feedback" role="alert"><p>{lyrics.error}</p>{lyrics.stale&&<button className="btn btn-secondary" onClick={()=>void lyrics.load(true)}>重读当前歌词</button>}</div>}</ControlPopover>}</div>
+    <div className="desktop-lyrics-management-tools" role="group" aria-label="歌词快捷工具"><IconButton  aria-label="更换歌词" title="更换歌词" onClick={onChooseLyrics}><TextAlignLeftIcon size={21}/></IconButton>{document?.synced&&<ControlPopover key={lyrics.sourceKey} label="校准时间" icon={<ClockClockwiseIcon size={21}/>} className="lyric-offset-popover" side="left" closeOnAction={false} onOpenChange={open=>{showTools();if(!open)lyrics.setOffset(String((lyrics.state?.offsetMs??0)/1000));}}><LyricOffsetControls lyrics={lyrics} compact/>{lyrics.error&&<div className="feedback" role="alert"><p>{lyrics.error}</p>{lyrics.stale&&<Button variant="secondary"  onClick={()=>void lyrics.load(true)}>重读当前歌词</Button>}</div>}</ControlPopover>}</div>
     <footer className="desktop-lyrics-footer" aria-label="沉浸播放控制"><div className="desktop-lyrics-controls">{controls}</div></footer>
   </section>;
 }

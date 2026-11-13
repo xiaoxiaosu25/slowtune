@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeftIcon, MagnifyingGlassIcon, PlayIcon, PlusIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState, SongPlaybackSelection, SongVersion } from '../server/song-library-types';
@@ -17,7 +18,8 @@ type Props = {
 };
 
 export function PlaybackVersionsDialog(props: Props) {
-  return <Modal title="播放版本" className="playback-versions-dialog" onClose={props.onClose}><p className="playback-versions-title">{props.song?.title||props.current?.title||'等待音乐'}</p><div className="playback-versions-body"><PlaybackVersions {...props}/></div><footer className="playback-versions-footer"><div className="playback-versions-context">{props.playbackControl}<span>试听只切换当前播放，设为默认需单独操作。</span></div><button className="btn btn-secondary" onClick={props.onClose}>完成</button></footer></Modal>;
+  // Saving an unowned source can open the native song grouping dialog above this one.
+  return <Modal title="播放版本" className="playback-versions-dialog" onClose={props.onClose}><p className="playback-versions-title">{props.song?.title||props.current?.title||'等待音乐'}</p><div className="playback-versions-body"><PlaybackVersions {...props}/></div><footer className="playback-versions-footer"><div className="playback-versions-context">{props.playbackControl}<span>试听只切换当前播放，设为默认需单独操作。</span></div><Button variant="secondary"  onClick={props.onClose}>完成</Button></footer></Modal>;
 }
 
 function PlaybackVersions({ current, song, library, youtubeEnabled, preparing, saving, playbackError, onPlay, onSave, onDefault }: Props) {
@@ -47,8 +49,8 @@ function PlaybackVersions({ current, song, library, youtubeEnabled, preparing, s
   const play = (selection: SongPlaybackSelection) => void onPlay(selection, display);
   return <div className="playback-versions">
     {!searching ? <>
-      <button className="btn btn-secondary" onClick={() => setSearching(true)}><MagnifyingGlassIcon size={18}/>搜索其他版本</button>
-      {!song && <div className="playback-version-card"><strong>当前音源</strong><p>{current.sourceTitle ?? current.title}</p><small>{current.ref.provider === 'bilibili' ? 'B站' : 'YouTube'} · {current.uploader?.name || '作者未提供'} · {time(current.durationSeconds)}</small><button className="btn btn-secondary btn-sm" disabled={saving} onClick={() => void onSave(current)}><PlusIcon size={16}/>归入歌曲并保存版本</button></div>}
+      <Button variant="secondary"  onClick={() => setSearching(true)}><MagnifyingGlassIcon size={18}/>搜索其他版本</Button>
+      {!song && <div className="playback-version-card"><strong>当前音源</strong><p>{current.sourceTitle ?? current.title}</p><small>{current.ref.provider === 'bilibili' ? 'B站' : 'YouTube'} · {current.uploader?.name || '作者未提供'} · {time(current.durationSeconds)}</small><Button variant="secondary" compact  disabled={saving} onClick={() => void onSave(current)}><PlusIcon size={16}/>归入歌曲并保存版本</Button></div>}
       {song && !versions.length && <p className="muted">还没有保存播放版本，可以搜索后添加。</p>}
       {versions.map(version => <article className={'playback-version-card' + (key(version.ref) === key(current.ref) ? ' is-current' : '')} key={version.id}>
         <div className="playback-version-heading"><strong>{version.label || versionKinds[version.kind]}</strong><VersionStatus version={version}/></div>
@@ -56,17 +58,17 @@ function PlaybackVersions({ current, song, library, youtubeEnabled, preparing, s
         <p>{version.performers?.join(' / ') || version.facts.artists?.join(' / ') || song?.artists?.join(' / ') || '演唱者未提供'} · {time(version.facts.durationSeconds)}</p>
         <small>{version.ref.provider === 'bilibili' ? 'B站' : 'YouTube'} · {version.facts.uploader || '作者未提供'}</small>
         <details><summary>来源完整标题</summary><p>{version.facts.title}</p></details>
-        <div className="playback-version-actions"><button className="btn btn-secondary btn-sm" disabled={preparing || blocked(version.ref) || key(version.ref) === key(current.ref)} onClick={() => play({ kind: 'song', songId: version.songId, explicitVersionId: version.id })}><PlayIcon size={16}/>播放此版本</button><button className="btn btn-ghost btn-sm" disabled={saving || song?.defaultVersionId === version.id} onClick={() => song && void onDefault(song, version)}>设为默认</button></div>
+        <div className="playback-version-actions"><Button variant="secondary" compact  disabled={preparing || blocked(version.ref) || key(version.ref) === key(current.ref)} onClick={() => play({ kind: 'song', songId: version.songId, explicitVersionId: version.id })}><PlayIcon size={16}/>播放此版本</Button><Button variant="ghost" compact  disabled={saving || song?.defaultVersionId === version.id} onClick={() => song && void onDefault(song, version)}>设为默认</Button></div>
       </article>)}
     </> : <>
-      <button className="btn btn-ghost btn-sm" onClick={() => setSearching(false)}><ArrowLeftIcon size={16}/>返回已保存版本</button>
-      <form className="playback-version-search" onSubmit={event => { event.preventDefault(); void search(); }}><label className="field"><span className="field-label">搜索其他播放版本</span><input className="input" aria-label="版本搜索关键词" maxLength={512} value={query} onChange={event => setQuery(event.target.value)}/></label><div className="toolbar">{youtubeEnabled && <select className="select" aria-label="版本搜索来源" value={provider} onChange={event => { work.current?.abort(); setBusy(false); setResults([]); setCursor(undefined); setProvider(event.target.value as 'bilibili' | 'youtube'); }}><option value="bilibili">B站</option><option value="youtube">YouTube</option></select>}<button className="btn btn-primary" disabled={busy || !query.trim()}><MagnifyingGlassIcon size={17}/>搜索</button></div></form>
+      <Button variant="ghost" compact  onClick={() => setSearching(false)}><ArrowLeftIcon size={16}/>返回已保存版本</Button>
+      <form className="playback-version-search" onSubmit={event => { event.preventDefault(); void search(); }}><label className="field"><span className="field-label">搜索其他播放版本</span><input className="input" aria-label="版本搜索关键词" maxLength={512} value={query} onChange={event => setQuery(event.target.value)}/></label><div className="toolbar">{youtubeEnabled && <select className="select" aria-label="版本搜索来源" value={provider} onChange={event => { work.current?.abort(); setBusy(false); setResults([]); setCursor(undefined); setProvider(event.target.value as 'bilibili' | 'youtube'); }}><option value="bilibili">B站</option><option value="youtube">YouTube</option></select>}<Button variant="primary" type="submit"  disabled={busy || !query.trim()}><MagnifyingGlassIcon size={17}/>搜索</Button></div></form>
       <p className="muted">先试听，喜欢的再保存为歌曲版本。</p>
-      {results.map(track => { const saved = library?.snapshot.versions.find(version => key(version.ref) === key(track.ref)), isCurrent = key(current.ref) === key(track.ref); return <article className="playback-version-card" key={key(track.ref)}><strong>{track.title}</strong><p>{track.artists?.join(' / ') || '演唱者未提供'} · {time(track.durationSeconds)}</p><small>{track.ref.provider === 'bilibili' ? 'B站' : 'YouTube'} · {track.uploader?.name || '作者未提供'}{isCurrent ? ' · 正在播放' : ''}</small><div className="playback-version-actions"><button className="btn btn-secondary btn-sm" disabled={preparing || blocked(track.ref) || isCurrent} onClick={() => play({ kind: 'source', ref: track.ref as SongVersion['ref'], ...(song ? { songId: song.id } : {}) })}><PlayIcon size={16}/>试听</button><button className="btn btn-ghost btn-sm" disabled={saving || !!saved || blocked(track.ref)} onClick={() => void onSave(track, song)}><PlusIcon size={16}/>{saved ? '已保存版本' : '保存版本'}</button></div></article>; })}
+      {results.map(track => { const saved = library?.snapshot.versions.find(version => key(version.ref) === key(track.ref)), isCurrent = key(current.ref) === key(track.ref); return <article className="playback-version-card" key={key(track.ref)}><strong>{track.title}</strong><p>{track.artists?.join(' / ') || '演唱者未提供'} · {time(track.durationSeconds)}</p><small>{track.ref.provider === 'bilibili' ? 'B站' : 'YouTube'} · {track.uploader?.name || '作者未提供'}{isCurrent ? ' · 正在播放' : ''}</small><div className="playback-version-actions"><Button variant="secondary" compact  disabled={preparing || blocked(track.ref) || isCurrent} onClick={() => play({ kind: 'source', ref: track.ref as SongVersion['ref'], ...(song ? { songId: song.id } : {}) })}><PlayIcon size={16}/>试听</Button><Button variant="ghost" compact  disabled={saving || !!saved || blocked(track.ref)} onClick={() => void onSave(track, song)}><PlusIcon size={16}/>{saved ? '已保存版本' : '保存版本'}</Button></div></article>; })}
       {!busy && searched && !results.length && !error && <p role="status">没有找到版本，请调整关键词。</p>}
-      {cursor && <button className="btn btn-secondary" disabled={busy} onClick={() => void search(cursor)}>加载更多版本</button>}
+      {cursor && <Button variant="secondary"  disabled={busy} onClick={() => void search(cursor)}>加载更多版本</Button>}
     </>}
-    {busy && <p role="status">正在搜索版本… <button className="btn btn-ghost btn-sm" onClick={() => { work.current?.abort(); setBusy(false); }}>取消</button></p>}
+    {busy && <p role="status">正在搜索版本… <Button variant="ghost" compact  onClick={() => { work.current?.abort(); setBusy(false); }}>取消</Button></p>}
     {(error || playbackError) && <p className="feedback" data-tone="error" role="alert">{error || playbackError}</p>}
   </div>;
 }

@@ -61,7 +61,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
     const row=page.locator('.song-library-row').filter({has:page.getByRole('button',{name:title,exact:true})}).first();
     if(await row.locator('.song-row-menu').count()){
       await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
-      await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'编辑歌曲 '+title,exact:true}).click();return;
+      await page.locator('.song-row-menu :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem',{name:'编辑歌曲 '+title,exact:true}).click();return;
     }
     await row.getByRole('button',{name:'更多操作 '+title,exact:true}).click();
     await page.getByRole('dialog',{name:'歌曲操作',exact:true}).getByRole('button',{name:'编辑歌曲 '+title,exact:true}).click();
@@ -123,7 +123,7 @@ test('product uses one new library for songs, repeated playlist members, edits, 
   const pinnedRow=page.locator('.song-library-row').nth(1);
   assert.match(await pinnedRow.innerText(),/固定 ·/);
   await pinnedRow.getByRole('button',{name:'更多操作 人工新名',exact:true}).click();
-  await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'编辑歌曲 人工新名',exact:true}).click();
+  await page.locator('.song-row-menu :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem',{name:'编辑歌曲 人工新名',exact:true}).click();
   assert.equal(await page.getByRole('combobox', { name: '本条歌单记录播放版本',exact:true }).inputValue(), versionId);
   await page.keyboard.press('Escape');
   const snapshot = service.read().snapshot;

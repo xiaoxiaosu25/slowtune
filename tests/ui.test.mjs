@@ -385,7 +385,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
   await t.test('player shell choices preserve internal positions, remember the selection and keep full-height panels clear', async () => {
     const artifacts = join(root, 'test-results/player-styles');
     mkdirSync(artifacts, { recursive: true });
-    const dock = page.locator('.playbar'), menu = dock.locator('.player-options > .control-popover-panel');
+    const dock = page.locator('.playbar'), menu = dock.locator('.player-options .control-popover-panel');
     const choose = async (label, value) => {
       await dock.getByRole('button', { name: '更多播放选项', exact: true }).click();
       const choice = menu.getByRole('radio', { name: label, exact: true });
@@ -621,7 +621,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     const artifacts=join(root,'test-results/recommendation-preferences');mkdirSync(artifacts,{recursive:true});
     for(const theme of ['light','dark']) {
       await setViewport({width:1440,height:1000});
-      await page.locator('.settings-view').waitFor();
+      if (!await page.locator('.settings-view').isVisible()) await openSettings();
       await page.locator('.settings-nav').getByRole('button',{name:'外观',exact:true}).click();
       await page.locator('.theme-mode-options').getByRole('button',{name:theme==='light'?'白天':'黑夜',exact:true}).click();
       await page.locator('.settings-nav').getByRole('button',{name:'推荐偏好',exact:true}).click();
@@ -630,6 +630,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
         await setViewport({width,height:width<760?900:1100});
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,theme+' '+width+' fits the viewport');
         if(width<760) {
+          if (!await panel.isVisible()) await openSettings('推荐偏好');
           await panel.getByRole('button',{name:'预览效果',exact:true}).waitFor();
           assert(await panel.locator('.recommendation-actions button').evaluateAll(elements=>elements.every(el=>el.getBoundingClientRect().height>=44)),'phone actions keep their touch targets');
         }
@@ -638,7 +639,8 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       }
     }
     await setViewport({width:1440,height:1000});
-    await page.locator('.settings-nav').getByRole('button',{name:'推荐偏好',exact:true}).click();
+    if (await page.locator('.settings-view').isVisible()) await page.locator('.settings-nav').getByRole('button',{name:'推荐偏好',exact:true}).click();
+    else await openSettings('推荐偏好');
     // The two layouts mount separate forms; recreate the desktop draft before previewing it.
     await panel.getByLabel('偏好关键词').fill('现场');
     await panel.getByLabel('排除关键词').fill('伴奏');
@@ -673,13 +675,14 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     await page.waitForFunction(()=>document.querySelector('[aria-label="偏好关键词"]')?.value==='现场');
     assert.equal(await panel.getByLabel('排除关键词').inputValue(),'伴奏\n其他','the previously saved column remains independent');
     await setViewport({width:320,height:900});
-    await page.locator('.mobile-settings:not([hidden])').waitFor();
+    if (!await panel.isVisible()) await openSettings('推荐偏好');
     await panel.locator('.recommendation-advanced>summary').click();
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'expanded advanced fields also fit 320px');
     await page.evaluate(()=>scrollTo(0,0));
     await page.screenshot({path:join(artifacts,'advanced-320.png'),fullPage:true});
     await setViewport({width:1440,height:1000});
-    await closeSettings();await navigate(page,'发现');
+    if (await page.locator('.settings-view').isVisible()) await closeSettings();
+    await navigate(page,'发现');
   });
 
   await t.test('a fixed-batch shelf confirms everything it displays with the current batch token',async()=>{
@@ -735,7 +738,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
   });
 
   await t.test('acceptance helpers operate playlist menus, queue drawers and the independent player page', async () => {
-    await page.locator('.song-library-row').filter({hasText:part.title}).first().getByRole('button',{name:'更多操作 '+part.title,exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'编辑歌曲 '+part.title,exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与版本'});
+    await page.locator('.song-library-row').filter({hasText:part.title}).first().getByRole('button',{name:'更多操作 '+part.title,exact:true}).click();await page.locator('.song-row-menu :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem',{name:'编辑歌曲 '+part.title,exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与版本'});
     await menu.getByRole('tab', { name: '播放版本', exact: true }).waitFor();
     assert(await menu.getByRole('tab', { name: '播放版本', exact: true }).isVisible());
     await menu.getByRole('button', { name: '关闭', exact: true }).click();
@@ -746,7 +749,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     const firstActions = await queueTrackMenu(page, part.title);
     await firstActions.getByRole('menuitem', { name: '下移', exact: true }).click();
     const actions = await queueTrackMenu(page, second.title);
-    assert.equal(await page.locator('.queue-actions [popover]:popover-open').count(), 1);
+    assert.equal(await page.locator('.queue-actions :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').count(), 1);
     assert.equal(await page.locator('.queue-track-main strong').first().getAttribute('title'), second.title);
     await actions.getByRole('menuitem', { name: '从播放队列移除', exact: true }).click();
     assert.equal(await page.locator('.queue-track').count(), 1);
@@ -766,7 +769,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert(await drawer.isVisible(),'a phone queue is a modal drawer');
     const queued=await queueTrackMenu(page,part.title);
     await page.keyboard.press('Escape');
-    assert.equal(await queued.locator('[popover]').isVisible(),false,'Escape first dismisses the track popover');
+    assert.equal(await queued.locator(':is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').isVisible(),false,'Escape first dismisses the track popover');
     assert(await drawer.isVisible(),'dismissing the popover keeps the queue open');
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('.queue-panel').isVisible(), false);
@@ -800,20 +803,23 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'the dock fits '+width+'px');
       if(width>760){
-        assert(await page.locator('.playbar-tools').evaluate(element => [...element.children].filter(child => child.getClientRects().length).every(child => child.getBoundingClientRect().right <= innerWidth)), 'dock tools fit ' + width + 'px');
-        await page.locator('.playbar').getByRole('button',{name:'更多播放选项',exact:true}).click();
-        const options=page.locator('.playbar .player-options > .control-popover-panel');
-        assert.equal(await options.getByRole('button',{name:'播放速度',exact:true}).isVisible(), width<=1250);
-        assert.equal(await options.getByRole('button',{name:'睡眠定时器',exact:true}).isVisible(), width<=1250);
-        if(width<=1250){
-          await selectRate(options, 1.5);
-          assert(await options.isVisible(), 'choosing a speed keeps the parent options open');
-          await options.getByRole('button',{name:'播放速度',exact:true}).click();
-          await options.getByRole('menu',{name:'播放速度',exact:true}).waitFor();
-          await page.keyboard.press('Escape');
-          assert(await options.isVisible(), 'Escape dismisses the nested speed menu first');
-          await selectRate(options, 1);
+        const dock = page.locator('.playbar-tools');
+        assert(await dock.evaluate(element => {
+          const bounds = element.getBoundingClientRect();
+          const buttons = [...element.querySelectorAll('button')].filter(button => button.getClientRects().length).map(button => button.getBoundingClientRect());
+          return buttons.every((button, index) => button.left >= (buttons[index - 1]?.right ?? bounds.left) - 1 && button.right <= bounds.right + 1);
+        }), 'dock tools fit without overlap at ' + width + 'px');
+        for (const name of ['播放速度', '睡眠定时器']) {
+          const button = dock.getByRole('button', { name, exact: true });
+          assert(await button.isVisible());
+          assert.equal(await button.textContent(), '');
+          assert.equal(await button.evaluate(el => getComputedStyle(el).borderRadius), '50%');
         }
+        await selectRate(dock, 1.5);
+        await selectRate(dock, 1);
+        await dock.getByRole('button',{name:'更多播放选项',exact:true}).click();
+        const options=dock.locator('.player-options .control-popover-panel');
+        assert.equal(await options.getByRole('button',{name:/播放速度|睡眠定时器|快退|快进|停止/}).count(), 0);
         await page.keyboard.press('Escape');
         assert.equal(await options.isVisible(),false);
       }
@@ -1028,7 +1034,7 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
     assert.equal(await youtube.locator('.music-card').count(),12,'a failed batch keeps the displayed songs');
     youtubeFailure=false;
     await status.click();
-    await youtube.locator('.discovery-status-popover [popover]:popover-open').getByRole('button',{name:'重试更新',exact:true}).click();
+    await youtube.locator('.discovery-status-popover :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('button',{name:'重试更新',exact:true}).click();
     await status.waitFor({state:'detached'});
     assert.equal(youtubeCalls.at(-1).region,'JP','the shelf retry refetches the region chosen in the shelf');
     assert.equal(youtubeCalls.at(-1).refresh,'1');

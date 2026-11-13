@@ -3,6 +3,7 @@ import { SongLibraryError as LibraryError } from './song-library-errors.js';
 import { SearchSettingsStore, validateSong, validateSongSearch } from './search-settings.js';
 import { bilibiliSearchPartition, preferredSong, searchPreferredVersions, songKey, songMatchReasons, desktopSongMatchReasons, songSearchText, SearchCandidateMismatch, type SearchEntry, type SearchPage, type SongQuery } from './search-policy.js';
 import type { VerifiedAudio } from './audio-quality.js';
+import type {AudioSelection} from './audio-selection.js';
 
 export class MusicSearchError extends Error {constructor(public code:'no-match'|'preferred-unavailable'){super(code);}}
 export class MusicSearch {
@@ -11,7 +12,7 @@ export class MusicSearch {
   constructor(private store:SearchSettingsStore,private api:Pick<MusicApi,'search'|'metadata'>,
     private partition:(ref:EntryRef,signal:AbortSignal)=>Promise<Record<string,unknown>>,
     private youtubeAvailable:()=>boolean,private context:()=>string,private now=Date.now,
-    private verifyPlayback?:(entry:SearchEntry,signal:AbortSignal,audioSupport?:string[],accept?:(facts:MusicEntry)=>boolean)=>Promise<VerifiedAudio|void>,
+    private verifyPlayback?:(entry:SearchEntry,signal:AbortSignal,audioSupport?:string[],accept?:(facts:MusicEntry)=>boolean,selection?:AudioSelection)=>Promise<VerifiedAudio|void>,
     private share?:<T>(key:unknown,signal:AbortSignal,task:(signal:AbortSignal)=>Promise<T>)=>Promise<T>){}
   private async classify(entry:SearchEntry,signal:AbortSignal,checkContext=false):Promise<SearchEntry>{
     if(entry.ref.provider!=='bilibili')return entry;
@@ -63,14 +64,14 @@ export class MusicSearch {
     return this.share?this.share(['match',input,this.store.read().revision,this.context(),this.youtubeAvailable()],signal,s=>this.resolveOnce(input,s)):this.resolveOnce(input,signal);
   }
   private async resolveOnce(input:unknown,signal:AbortSignal):Promise<SearchEntry>{
-    const {song,searchMode,audioSupport}=validateSongSearch(input),state=this.store.read(),preferred=preferredSong(state.preferred,song);
+    const {song,searchMode,audioSupport,audioSelection}=validateSongSearch(input),state=this.store.read(),preferred=preferredSong(state.preferred,song);
     signal.throwIfAborted();
     if(preferred){
       if(preferred.entry.ref.provider==='youtube'&&!this.youtubeAvailable())throw new MusicSearchError('preferred-unavailable');
       try{const entry=await this.api.metadata(preferred.entry.ref,{signal});signal.throwIfAborted();if(this.store.read().revision!==state.revision)throw new LibraryError('conflict');return entry;}
       catch(error){signal.throwIfAborted();if(error instanceof MusicSourceError&&['not-found','restricted','unsupported'].includes(error.code))throw new MusicSearchError('preferred-unavailable');throw error;}
     }
-    const context=this.context(),key=JSON.stringify([state.revision,context,this.youtubeAvailable(),searchMode,searchMode==='title-artists'?audioSupport:undefined,songKey(song),song.durationSeconds]),cached=this.matches.get(key);
+    const context=this.context(),key=JSON.stringify([state.revision,context,this.youtubeAvailable(),searchMode,searchMode==='title-artists'?audioSupport:undefined,audioSelection,songKey(song),song.durationSeconds]),cached=this.matches.get(key);
     const matchReasons=searchMode==='title-artists'?desktopSongMatchReasons:songMatchReasons;
     const unavailable=new Set<string>(),candidateKey=(entry:SearchEntry)=>JSON.stringify([entry.ref.provider,entry.ref.id]);
     const checkCurrent=()=>{signal.throwIfAborted();if(this.store.read().revision!==state.revision||this.context()!==context)throw new LibraryError('conflict');};
@@ -78,7 +79,7 @@ export class MusicSearch {
       if(unavailable.has(candidateKey(entry)))return undefined;
       let verifiedAudio:VerifiedAudio|void=undefined;
       if(searchMode==='title-artists'&&this.verifyPlayback){
-        try{verifiedAudio=await this.verifyPlayback(entry,signal,audioSupport,facts=>!desktopSongMatchReasons({...entry,title:entry.title===facts.title?entry.title:entry.title+'\n'+facts.title,...(facts.artists?.length?{artists:facts.artists}:{}),...(facts.durationSeconds!==undefined?{durationSeconds:facts.durationSeconds}:{})},state.config,song).length);}
+        try{verifiedAudio=await this.verifyPlayback(entry,signal,audioSupport,facts=>!desktopSongMatchReasons({...entry,title:entry.title===facts.title?entry.title:entry.title+'\n'+facts.title,...(facts.artists?.length?{artists:facts.artists}:{}),...(facts.durationSeconds!==undefined?{durationSeconds:facts.durationSeconds}:{})},state.config,song).length,audioSelection);}
         catch(error){
           checkCurrent();
           if(error instanceof SearchCandidateMismatch){unavailable.add(candidateKey(entry));return undefined;}

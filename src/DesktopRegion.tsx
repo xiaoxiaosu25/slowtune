@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { Component, Suspense, lazy, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Modal } from './Modal';
 
@@ -17,8 +18,8 @@ export class DesktopRegion extends Component<Props, { failed: boolean; resetKey?
     const content = <div className="feedback" role="alert">
       <p>{label}暂时无法显示。可以重试或关闭后重新打开。</p>
       <p className="muted">已保存资料保留；此区域未保存的输入可能需要重新填写。</p>
-      <button className="btn btn-secondary" onClick={() => { this.props.onRetry?.(); this.setState({ failed: false }); }}>重试显示</button>
-      {onClose && <button className="btn btn-ghost" onClick={onClose}>关闭此区域</button>}
+      <Button variant="secondary"  onClick={() => { this.props.onRetry?.(); this.setState({ failed: false }); }}>重试显示</Button>
+      {onClose && <Button variant="ghost"  onClick={onClose}>关闭此区域</Button>}
     </div>;
     return dialog && onClose ? <Modal title={label + '暂不可用'} onClose={onClose}>{content}</Modal> : this.props.className ? <aside className={this.props.className}>{content}</aside> : content;
   }
@@ -58,7 +59,7 @@ export function desktopFeature<P extends { onClose: () => void }>(url: string, n
     const Feature = useMemo(() => ready ?? lazy(load), [attempt]);
     const loading = <p className="loading" role="status">正在打开{label}…</p>;
     return <DesktopRegion key={attempt} label={label} dialog={dialog} className={dialog ? undefined : 'playback-management'} onClose={props.onClose} onRetry={() => setAttempt(value => value + 1)}>
-      <Suspense fallback={dialog ? <Modal title={'正在打开' + label} onClose={props.onClose}>{loading}</Modal> : <aside className="playback-management">{loading}<button className="btn btn-ghost" onClick={props.onClose}>取消打开</button></aside>}><Feature {...props}/></Suspense>
+      <Suspense fallback={dialog ? <Modal title={'正在打开' + label} onClose={props.onClose}>{loading}</Modal> : <aside className="playback-management">{loading}<Button variant="ghost"  onClick={props.onClose}>取消打开</Button></aside>}><Feature {...props}/></Suspense>
     </DesktopRegion>;
   };
 }

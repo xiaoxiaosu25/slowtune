@@ -11,6 +11,7 @@ export function generateNotices(root = resolve(dirname(fileURLToPath(import.meta
   const purposes = {
     '@applemusic-like-lyrics/core': '桌面沉浸歌词渲染（按需加载）',
     '@hono/node-server': 'Node.js HTTP 服务', '@phosphor-icons/react': '界面图标',
+    '@radix-ui/react-dialog': '无障碍对话框基础组件',
     hono: '服务路由与媒体接口', qrcode: '在浏览器内生成登录二维码',
     react: '界面组件', 'react-dom': '浏览器界面渲染',
     'youtubei.js': 'YouTube 目录、搜索、作者内容与评论接入',

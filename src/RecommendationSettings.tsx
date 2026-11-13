@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useState } from 'react';
 import { ArrowRightIcon, CaretDownIcon, CheckCircleIcon, EyeIcon, HeartIcon, MinusCircleIcon, SlidersHorizontalIcon } from '@phosphor-icons/react';
 import type { RecommendedShelf } from '../server/recommendation';
@@ -22,7 +23,7 @@ function LegacyRules({ draft }: { draft: SelectionDraft }) {
           <label className="field field-inline"><span className="field-label">旧格式关键词关系</span><select className="select" aria-label="旧格式关键词关系" value={legacyForm.mode} onChange={e => draft.patchLegacy({ mode: toMode(e.target.value) })}><option value="any">任意满足</option><option value="all">全部满足</option></select></label>
           <label className="field field-inline"><span className="field-label">旧格式结果顺序</span><select className="select" aria-label="旧格式结果顺序" value={legacyForm.order} onChange={e => draft.patchLegacy({ order: toLegacyOrder(e.target.value) })}><option value="upstream">来源原顺序</option><option value="random">随机</option></select></label>
         </>}
-      <div className="toolbar"><button className="btn btn-primary" onClick={() => void draft.run('legacy')}>保存旧格式配置</button></div>
+      <div className="toolbar"><Button variant="primary"  onClick={() => void draft.run('legacy')}>保存旧格式配置</Button></div>
     </fieldset>
   </details>;
 }
@@ -69,7 +70,7 @@ export function RecommendationSettings({ onChanged, accountAuthenticated = false
     </div>
     {!state && !message && <p className="loading" role="status">正在读取推荐偏好…</p>}
     {state && <>
-      {state.entry === 0 && <div className="recommendation-mode-note"><div><strong>当前使用旧版规则</strong><p>下方新版偏好暂不生效。切换后可预览并保存。</p></div><button className="btn btn-secondary" disabled={busy} onClick={() => void draft.run('switch', 1)}>启用新版推荐</button></div>}
+      {state.entry === 0 && <div className="recommendation-mode-note"><div><strong>当前使用旧版规则</strong><p>下方新版偏好暂不生效。切换后可预览并保存。</p></div><Button variant="secondary"  disabled={busy} onClick={() => void draft.run('switch', 1)}>启用新版推荐</Button></div>}
       {rawMode && <div className="recommendation-mode-note"><div><strong>当前使用完整配置</strong><p>这份配置包含复杂规则，请在下方展开的完整配置编辑器中修改。</p></div></div>}
       <fieldset className="field-stack recommendation-main" disabled={rawMode || busy}>
         <div className="recommendation-keywords">
@@ -90,7 +91,7 @@ export function RecommendationSettings({ onChanged, accountAuthenticated = false
           <label className="field"><span className="field-label">推荐怎么排列</span><select className="select" aria-label="推荐顺序" value={form.order} onChange={e => { draft.patch({ order: toOrder(e.target.value) }); draft.change('order'); }}><option value="upstream">按平台推荐顺序</option><option value="score">关键词偏好优先</option><option value="random">随机排列</option><option value="time">最新发布优先</option></select></label>
           <p className="muted">{form.order === 'score' ? '偏好匹配的音乐靠前，同分时保留来源顺序。' : form.order === 'time' ? '按真实发布时间排列，缺少时间的音乐放在后面。' : form.order === 'random' ? '将当前候选打乱，保存后用于下一批推荐。' : '保留平台给出的顺序，优先展示最近未出现的音乐。'}</p>
         </div>
-        {form.preference.trim() && form.order !== 'score' && <div className="recommendation-order-hint"><p>已填写偏好关键词，选择“关键词偏好优先”后才会按偏好排列。</p><button className="btn btn-secondary btn-sm" onClick={() => { draft.patch({ order: 'score' }); draft.change('order'); }}>启用偏好排序<ArrowRightIcon size={16}/></button></div>}
+        {form.preference.trim() && form.order !== 'score' && <div className="recommendation-order-hint"><p>已填写偏好关键词，选择“关键词偏好优先”后才会按偏好排列。</p><Button variant="secondary" compact  onClick={() => { draft.patch({ order: 'score' }); draft.change('order'); }}>启用偏好排序<ArrowRightIcon size={16}/></Button></div>}
         <fieldset className="field-stack match-fields"><legend>关键词匹配位置</legend><div className="choice-row">{matchFields.map(field => <label className="choice" key={field}><input type="checkbox" checked={form.fields.includes(field)} onChange={e => { draft.patch({ fields: e.target.checked ? [...form.fields, field] : form.fields.filter(x => x !== field) }); draft.change('include', 'exclude', 'preferences'); }}/>{fieldLabels[field]}</label>)}</div><p className="recommendation-field-help">按平台提供的文字匹配，不分析音频。标签或分类可能缺失，建议优先使用标题。</p></fieldset>
       </fieldset>
       <details className="recommendation-advanced" open={advancedOpen} onToggle={e => setAdvancedOpen(e.currentTarget.open)}>
@@ -117,8 +118,8 @@ export function RecommendationSettings({ onChanged, accountAuthenticated = false
           <label className="choice"><input type="checkbox" disabled={busy} checked={rawMode} onChange={e => draft.toggleRaw(e.target.checked)}/>编辑完整个人覆盖</label>
           {rawMode && <label className="field"><span className="field-label">完整个人覆盖 JSON</span><textarea className="textarea recommendation-code" aria-label="完整个人覆盖 JSON" disabled={busy} value={draft.raw} onChange={e => draft.editRaw(e.target.value)}/></label>}
           <div className="toolbar">
-            <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void draft.run('switch', state.entry === 1 ? 0 : 1)}>{state.entry === 1 ? '切换到旧版入口' : '切换回新版规则'}</button>
-            <button className="btn btn-secondary btn-sm" disabled={busy} onClick={draft.stageLegacyDraft}>载入旧配置为新版草稿</button>
+            <Button variant="secondary" compact  disabled={busy} onClick={() => void draft.run('switch', state.entry === 1 ? 0 : 1)}>{state.entry === 1 ? '切换到旧版入口' : '切换回新版规则'}</Button>
+            <Button variant="secondary" compact  disabled={busy} onClick={draft.stageLegacyDraft}>载入旧配置为新版草稿</Button>
           </div>
           {state.entry === 0 && <LegacyRules draft={draft}/>}
           <p className="recommendation-revisions">当前：{state.entry === 1 ? '新版推荐' : '旧版规则'} · 预设 {state.document.preset.revision} · 个人修订 {state.sharedRevision} · 旧修订 {state.legacyRevision}</p>
@@ -128,12 +129,12 @@ export function RecommendationSettings({ onChanged, accountAuthenticated = false
       <div className="recommendation-actions">
         <div className="recommendation-save-status">{preview ? <CheckCircleIcon size={20}/> : <EyeIcon size={20}/>}<p>{preview ? '已预览，可以保存' : '先预览，再保存'}<span>{preview ? '继续修改后，需要重新预览。' : '预览不会修改当前推荐设置。'}</span></p></div>
         <div className="toolbar">
-          <button className="btn btn-ghost" disabled={busy} onClick={() => void draft.read()}>撤销修改</button>
-          <button className="btn btn-secondary" disabled={busy} onClick={() => void draft.run('preview')}><EyeIcon size={18}/>预览效果</button>
-          <button className="btn btn-primary" disabled={busy || !preview} onClick={() => void draft.run('save')}>保存偏好</button>
+          <Button variant="ghost"  disabled={busy} onClick={() => void draft.read()}>撤销修改</Button>
+          <Button variant="secondary"  disabled={busy} onClick={() => void draft.run('preview')}><EyeIcon size={18}/>预览效果</Button>
+          <Button variant="primary"  disabled={busy || !preview} onClick={() => void draft.run('save')}>保存偏好</Button>
         </div>
       </div>
-      {busy && <div className="recommendation-operation" role="status"><span>正在处理推荐设置…</span><button className="btn btn-ghost btn-sm" onClick={draft.cancel}>取消推荐操作</button></div>}
+      {busy && <div className="recommendation-operation" role="status"><span>正在处理推荐设置…</span><Button variant="ghost" compact  onClick={draft.cancel}>取消推荐操作</Button></div>}
       {preview && <Preview preview={preview}/>}
     </>}
     {message && <p className="notice" role="status">{message}</p>}

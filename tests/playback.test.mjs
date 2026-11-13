@@ -167,7 +167,7 @@ test('Song playback: fresh selections, live pause/resume and silent queue restor
     const before = await savedQueue(), count = preparations.length;
     await page.evaluate(() => { window.__styleAudio = document.querySelector('audio'); window.__styleProgress = document.querySelector('.playbar input[aria-label="播放进度"]'); window.__stylePosition = window.__styleAudio.currentTime; });
     await playbar.getByRole('button', { name: '更多播放选项', exact: true }).click();
-    const options = playbar.locator('.player-options > .control-popover-panel');
+    const options = playbar.locator('.player-options .control-popover-panel');
     await options.getByRole('radio', { name: '底部长条', exact: true }).check();
     await page.waitForFunction(() => document.querySelector('.app').dataset.playerStyle === 'bar');
     await options.getByRole('radio', { name: '悬浮播放岛', exact: true }).check();
@@ -360,14 +360,15 @@ test('Song playback: fresh selections, live pause/resume and silent queue restor
     await page.mouse.up();
     await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 12) < 0.5);
     await pauseSeek(4);
-    await playbar.getByRole('button', { name: '更多播放选项', exact: true }).click();
-    await playbar.getByRole('button', { name: '快进 10 秒', exact: true }).click();
+    await playbar.getByRole('button', { name: '打开正在播放', exact: true }).click();
+    await page.locator('.stage-controls').getByRole('button', { name: '快进 10 秒', exact: true }).click();
     await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 14) < 0.5);
+    await page.getByRole('button', { name: '返回浏览音乐', exact: true }).click();
     await pauseSeek(1);
     if (await page.locator('audio').evaluate(audio => audio.paused)) await playbar.getByRole('button', { name: '播放', exact: true }).click();
     await page.waitForFunction(() => { const audio = document.querySelector('audio'); return !audio.paused && audio.currentTime > 1; });
     await playbar.getByRole('button', { name: '睡眠定时器', exact: true }).click();
-    const sleep = page.locator('dialog.modal');
+    const sleep = page.getByRole('dialog', { name: '睡眠定时器', exact: true });
     await sleep.getByRole('button', { name: '30 分钟', exact: true }).click();
     await sleep.locator('.sleep-summary.is-running').waitFor();
     assert.equal(await sleep.locator('[data-field="duration"]').inputValue(), '30');
@@ -387,7 +388,7 @@ test('Song playback: fresh selections, live pause/resume and silent queue restor
     await sleep.waitFor({ state: 'detached' });
     assert.equal(await playbar.getByRole('button', { name: '睡眠定时器', exact: true }).getAttribute('aria-pressed'), 'false', 'an expired rule stops reporting a running countdown');
   });
-  await t.test('listening shortcuts work from focused controls and stop/reset preserves the queue',async()=>{
+  await t.test('listening shortcuts and seek icons preserve the queue',async()=>{
     await pauseSeek(4);
     const before=await savedQueue();
     await playbar.getByRole('button',{name:'打开正在播放',exact:true}).click();
@@ -396,11 +397,7 @@ test('Song playback: fresh selections, live pause/resume and silent queue restor
     await page.waitForFunction(()=>Math.abs(document.querySelector('audio').currentTime-9)<0.4);
     await stage.getByRole('button',{name:'播放',exact:true}).press('ArrowLeft');
     await page.waitForFunction(()=>Math.abs(document.querySelector('audio').currentTime-4)<0.4);
-    await stage.getByRole('button',{name:'更多播放选项',exact:true}).click();
-    await stage.getByRole('button',{name:'停止播放',exact:true}).click();
-    await stage.getByRole('status').filter({hasText:'已停止'}).waitFor();
-    await stage.getByRole('button',{name:'更多播放选项',exact:true}).click();
-    await stage.getByRole('button',{name:'停止并归零',exact:true}).click();
+    await stage.getByRole('button',{name:'快退 10 秒',exact:true}).click();
     await page.waitForFunction(()=>document.querySelector('audio').paused&&document.querySelector('audio').currentTime===0);
     assert.deepEqual((await savedQueue()).items,before.items,'transport operations keep the queue intact');
     await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();

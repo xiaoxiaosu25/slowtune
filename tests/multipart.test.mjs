@@ -48,8 +48,9 @@ test('part preferences accept only supported video choices and tolerate broken s
   assert.deepEqual(readPartPreferences({getItem:()=>'{'}),{});assert.deepEqual(readPartPreferences({getItem:()=>{throw Error('blocked');}}),{});
 });
 test('group identity round-trips in the v3 queue',()=>{
-  const entry=savedQueueEntry({...parts[0],partsGroupId:'group-1'});assert.equal(entry.partsGroupId,'group-1');
-  const value={version:3,items:[entry,savedQueueEntry(other)],current:entry.instanceId,order:'sequential',repeat:'off',volume:.5,rate:1,muted:false};
-  assert.equal(readSavedPlayback({getItem:key=>key===playbackStorageKey?JSON.stringify(value):null}).tracks[0].partsGroupId,'group-1');
+  const entry=savedQueueEntry({...parts[0],partsGroupId:'group-1',partsGroupTitle:'完整专辑'});assert.equal(entry.partsGroupId,'group-1');
+  const value={version:3,items:[entry,savedQueueEntry(other)],current:entry.instanceId,order:'sequential',repeat:'all',shuffleGroups:false,volume:.5,rate:1,muted:false};
+  const saved=readSavedPlayback({getItem:key=>key===playbackStorageKey?JSON.stringify(value):null});
+  assert.equal(saved.tracks[0].partsGroupId,'group-1');assert.equal(saved.tracks[0].partsGroupTitle,'完整专辑');assert.equal(saved.shuffleGroups,false);assert.equal(saved.repeat,'all');
   delete entry.partsGroupId;assert.equal(readSavedPlayback({getItem:()=>JSON.stringify(value)}).tracks.length,2);
 });

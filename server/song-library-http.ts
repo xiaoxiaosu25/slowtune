@@ -92,8 +92,8 @@ export function createSongLibraryRouter(service: SongLibraryService, identity: (
   });
   app.post('/playback', async c => {
     if (!sources) throw new SongLibraryError('not-found');
-    const input = await json(c.req.raw); object(input, ['selection', 'searchMode', 'audioSupport']);
-    return c.json(await sources.playback(input.selection, c.req.raw.signal, input.searchMode, input.audioSupport));
+    const input = await json(c.req.raw); object(input, ['selection', 'searchMode', 'audioSupport','audioSelection']);
+    return c.json(await sources.playback(input.selection, c.req.raw.signal, input.searchMode, input.audioSupport,input.audioSelection));
   });
   app.post('/edits', async c => {
     const input = await json(c.req.raw); object(input, ['revision', 'edits']);

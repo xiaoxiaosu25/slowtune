@@ -36,7 +36,7 @@ export interface ServerBuildState {startedAt:number;stale:boolean;changed:BuildA
 export interface ServerStatus {authenticationRequired?:boolean;version:string;node:string;providers:{bilibili:{available:boolean};youtube:{available:boolean;enabled?:boolean;checking?:boolean;toolVersion?:string;issue?:string}};sourceSettings?:import('../server/source-settings-types').SourceSettingsState;delivery:{leases:number;activeReads:number};tool:{active:number};build?:ServerBuildState}
 export interface ChartPeriod {id:number;number:number;publishedAt:number}
 export interface BilibiliChart {shelf:Shelf;periods:ChartPeriod[];period:ChartPeriod;sourceUrl:string;fetchedAt:number}
-export interface Track extends VerifiedMusicEntry {unavailable?:string; songId?:string; versionId?:string; chartContext?:import('../server/song-library-types').ChartSongContext; targetSongId?:string; selection?:import('../server/song-library-types').SongPlaybackSelection; partsGroupId?:string;searchPartition?:import('../server/search-policy').SearchPartition;
+export interface Track extends VerifiedMusicEntry {unavailable?:string; songId?:string; versionId?:string; chartContext?:import('../server/song-library-types').ChartSongContext; targetSongId?:string; selection?:import('../server/song-library-types').SongPlaybackSelection; partsGroupId?:string;partsGroupTitle?:string;searchPartition?:import('../server/search-policy').SearchPartition;
   /** Desktop projection keeps the source cover separately; null means the source has none. */
   sourceArtwork?:string|null;
   /** Original title before desktop song metadata is projected onto this source. */

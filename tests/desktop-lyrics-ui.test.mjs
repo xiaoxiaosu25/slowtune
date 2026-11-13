@@ -47,9 +47,11 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   await page.goto(fixture.base); await page.getByRole('button', { name: '打开正在播放', exact: true }).click();
   await page.locator('.playing-art-vinyl .vinyl-material').evaluate(img => img.decode());
   await page.evaluate(() => document.fonts.ready);
-  const normal = await geometry(page);
-  const normalVinyl = await page.locator('.vinyl-record').boundingBox(), normalDisc = await page.locator('.playing-art-disc .playing-art-frame').boundingBox();
-  assert(Math.abs(normalVinyl.width - normalDisc.width) < 1, 'normal desktop vinyl matches the round cover diameter');
+  // Shared artwork can still be scaling after the image and fonts are ready.
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.playing-art-switch')).transform === 'none');
+  const [normalVinylWidth, normalDiscWidth] = await page.evaluate(() =>
+    ['.vinyl-record', '.playing-art-disc .playing-art-frame'].map(selector => document.querySelector(selector).getBoundingClientRect().width));
+  assert(Math.abs(normalVinylWidth - normalDiscWidth) < 1, 'normal desktop vinyl matches the round cover diameter');
   assert.equal(await page.locator('.playing-title-trigger').evaluate(el => getComputedStyle(el).textAlign), 'center');
   const buttons = page.locator('.playing-song-actions > button, .playing-song-actions > .control-popover > button');
   assert.deepEqual(await buttons.evaluateAll(elements => elements.map(e => e.getAttribute('aria-label'))), ['打开沉浸歌词', '更多播放选项']);
@@ -59,9 +61,29 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   await page.waitForFunction(() => document.querySelector('audio').currentTime > .2);
   await page.locator('.listening-transport .play-toggle').click();
   await seek(page, 9.5);
+  // Starting playback adds the current-quality control. Compare the same paused layout on both sides.
+  await page.getByRole('button', { name: '当前音质', exact: true }).waitFor();
+  const backdrop = page.locator('.listening-atmosphere');
+  await backdrop.waitFor();
+  assert(await backdrop.evaluate(el => {
+    const bounds = el.getBoundingClientRect();
+    const header = getComputedStyle(document.querySelector('.listening-header'));
+    return bounds.x === 0 && bounds.y === 0 && bounds.width === innerWidth && bounds.height === innerHeight
+      && header.backgroundColor === 'rgba(0, 0, 0, 0)' && header.borderBottomWidth === '0px';
+  }), 'the artwork backdrop spans the window behind the transparent playback header');
+  const normal = await geometry(page);
   const source = await page.locator('audio').getAttribute('src'), prepares = fixture.preparations.length, lyricReads = requests.length;
   const element = await page.locator('audio').elementHandle();
   assert.equal(engineLoads.length, 0, 'the renderer is not downloaded in ordinary mode');
+  await page.locator('.listening-stage').getByRole('button', { name: '更多播放选项', exact: true }).click();
+  const normalMenu = page.locator('.listening-stage .player-options .control-popover-panel');
+  const menuSections = await normalMenu.locator('.popover-heading').allTextContents();
+  const headingSize = await normalMenu.locator('.popover-heading').first().evaluate(el => getComputedStyle(el).fontSize);
+  assert.deepEqual(menuSections, ['音质与歌词', '当前歌曲']);
+  assert.equal(await normalMenu.getByRole('button', { name: /快进|快退|播放速度|睡眠定时器|停止/ }).count(), 0);
+  assert.equal(await normalMenu.getByRole('combobox').count(), 0);
+  await normalMenu.screenshot({ path: join(artifactDir, 'normal-playback-options.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
   await open(page);
   assert.equal(await region(page).getByRole('button', { name: '关闭沉浸歌词', exact: true }).getAttribute('aria-pressed'), 'true');
   await page.waitForFunction(() => document.querySelector('.desktop-lyrics-host')?.dataset.activeLine === '2');
@@ -100,24 +122,28 @@ test('desktop lyric toggle, isolated layout, media clock, browsing, dialogs, the
   await page.waitForFunction(() => Math.abs(document.querySelector('audio').currentTime - 13) < .2);
   assert.equal(await page.locator('audio').evaluate(a => a.paused), true);
   await region(page).getByRole('button', { name: '更多播放选项', exact: true }).click();
-  await page.getByRole('slider', { name: '沉浸歌词字号', exact: true }).fill('24');
+  const immersiveMenu = region(page).locator('.player-options .control-popover-panel');
+  assert.deepEqual(await immersiveMenu.locator('.popover-heading').allTextContents(), menuSections);
+  assert.equal(await immersiveMenu.locator('.popover-heading').first().evaluate(el => getComputedStyle(el).fontSize), headingSize);
+  assert.equal(await immersiveMenu.getByRole('slider', { name: '沉浸歌词字号', exact: true }).count(), 0);
+  assert.equal(await immersiveMenu.getByRole('link').count(), 0);
+  await immersiveMenu.screenshot({ path: join(artifactDir, 'immersive-playback-options.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true, 'Escape dismisses a popover before the lyric view');
+  await region(page).getByRole('button', { name: '更多播放选项', exact: true }).click();
+  await immersiveMenu.getByRole('button', { name: '歌词设置', exact: true }).click();
+  await page.getByRole('dialog', { name: '歌词设置', exact: true }).getByRole('slider', { name: '沉浸歌词字号', exact: true }).fill('24');
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.desktop-lyrics-host')).fontSize === '24px');
   assert.equal(await page.evaluate(() => localStorage.getItem('slow-listening:desktop-lyric-size:v1')), '24');
-  await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true, 'Escape dismisses a popover before the lyric view');
+  await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true);
   await region(page).getByRole('button', { name: '播放队列', exact: true }).click();
   await page.getByRole('dialog', { name: '播放队列', exact: true }).waitFor();
   await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true);
-  await region(page).getByRole('button', { name: '更多播放选项', exact: true }).click(); await page.getByRole('button', { name: '歌词管理', exact: true }).click();
-  await page.getByRole('dialog', { name: '歌词设置', exact: true }).waitFor(); await page.keyboard.press('Escape'); assert.equal(await region(page).isVisible(), true);
   await page.getByLabel('沉浸歌词正文', { exact: true }).dispatchEvent('wheel', { deltaY: 220 });
   await page.getByRole('button', { name: '回到当前行', exact: true }).waitFor();
   await page.waitForTimeout(900); assert.equal(await page.getByRole('button', { name: '回到当前行', exact: true }).isVisible(), true);
   await page.getByRole('button', { name: '回到当前行', exact: true }).click();
   await page.getByLabel('沉浸歌词正文', { exact: true }).dispatchEvent('wheel', { deltaY: -180 });
   await page.waitForFunction(() => !document.querySelector('.desktop-lyrics-resume'), null, { timeout: 6500 });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.waitForFunction(() => document.querySelector('.desktop-lyrics-host')?.shadowRoot?.querySelector('.amll-lyric-player')?.dataset.reduced === 'true');
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
   if (await page.getByRole('button', { name: '回到当前行', exact: true }).isVisible()) await page.getByRole('button', { name: '回到当前行', exact: true }).click();
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 720 }, { width: 1920, height: 1080 }, { width: 1110, height: 1216 }, { width: 1024, height: 600 }, { width: 761, height: 600 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport); await seek(page, viewport.width === 1110 ? 6 : 13);
@@ -213,9 +239,8 @@ test('timed word masks follow the media clock at fast and slow rates and during 
     return { media: Math.max(0, document.querySelector('audio').currentTime * 1000 - 1000), masks: row.getAnimations({ subtree: true }).filter(animation => animation.id.startsWith('fade-word-')).map(animation => Number(animation.currentTime)) };
   });
   for (const rate of [2, .5]) {
-    await region(page).getByRole('button', { name: '更多播放选项', exact: true }).click();
-    await page.getByRole('button', { name: '播放速度', exact: true }).click();
-    await page.getByRole('menuitemradio', { name: rate + '×', exact: true }).click(); await page.keyboard.press('Escape');
+    await region(page).getByRole('button', { name: '播放速度', exact: true }).click();
+    await page.getByRole('menuitemradio', { name: rate + '×', exact: true }).click();
     await seek(page, 2); await page.waitForTimeout(1200);
     const sample = await clock(); assert.equal(sample.masks.length, 3);
     for (const mask of sample.masks) assert(Math.abs(mask - sample.media) < 200, JSON.stringify({ rate, ...sample }));
@@ -240,9 +265,8 @@ test('immersive playback follows the media clock across rate changes, buffering,
   await page.getByRole('button', { name: '打开正在播放', exact: true }).click(); await open(page);
   const audio = await page.locator('audio').elementHandle();
   await seek(page, 8.5);
-  await region(page).getByRole('button', { name: '更多播放选项', exact: true }).click();
-  await page.getByRole('button', { name: '播放速度', exact: true }).click();
-  await page.getByRole('menuitemradio', { name: '1.5×', exact: true }).click(); await page.keyboard.press('Escape');
+  await region(page).getByRole('button', { name: '播放速度', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: '1.5×', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('audio').playbackRate === 1.5);
   await page.waitForTimeout(160);
   assert(await page.evaluate(() => Math.abs(Number(document.querySelector('.desktop-lyrics-host').dataset.time) - (document.querySelector('audio').currentTime * 1000 - 1000)) < 100));

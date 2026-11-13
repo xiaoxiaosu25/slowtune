@@ -1,8 +1,11 @@
+import { Button } from './ui/Button';
 import { preferenceStorage } from './preference-storage';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { ArrowClockwiseIcon, MusicNotesIcon } from '@phosphor-icons/react';
 import type { PlaybackAudioAnalysis } from './audio-analysis';
 import { PlayingSpectrum } from './PlayingSpectrum';
+import { listeningArtworkId, listeningArtworkSpring } from './app/components/listening-motion';
 
 export type PlayingVisualMode = 'vinyl' | 'square' | 'disc' | 'spectrum' | 'halo' | 'lyrics';
 export const playingVisualStorageKey = 'slow-listening:playing-visual:v1';
@@ -27,9 +30,10 @@ function VinylLabel() {
   </>;
 }
 
-export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allowLyrics = true, suspended = false, desktop = false, visualMode, interactive = true }: {
-  artwork?: string; playing: boolean; muted: boolean; analysis: PlaybackAudioAnalysis | null; lyrics?: ReactNode; allowLyrics?: boolean; suspended?: boolean; desktop?: boolean; visualMode?: PlayingVisualMode; interactive?: boolean;
+export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allowLyrics = true, suspended = false, desktop = false, visualMode, interactive = true, sharedArtwork = false }: {
+  artwork?: string; playing: boolean; muted: boolean; analysis: PlaybackAudioAnalysis | null; lyrics?: ReactNode; allowLyrics?: boolean; suspended?: boolean; desktop?: boolean; visualMode?: PlayingVisualMode; interactive?: boolean; sharedArtwork?: boolean;
 }) {
+  const reducedMotion = useReducedMotion();
   const [storedMode, setMode] = useState<PlayingVisualMode>(readMode);
   const selectedMode = visualMode ?? storedMode;
   const mode = !allowLyrics && selectedMode === 'lyrics' ? 'vinyl' : selectedMode;
@@ -62,12 +66,16 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
   const image = () => hasArtwork ? <img className="playing-art" src={artwork} alt="" referrerPolicy="no-referrer" draggable={false}
     onError={() => setFailed(artwork)}/> : <span className="playing-art unknown-cover"><MusicNotesIcon size={60}/></span>;
   const message = state === 'unavailable' ? '当前环境暂不支持实时音波' : state !== 'ready' ? '点击播放后显示实时音波' : '';
+  const layout = sharedArtwork && hasArtwork && !reducedMotion
+    ? { layoutId: listeningArtworkId, transition: { layout: listeningArtworkSpring } }
+    : {};
+  const Switch = sharedArtwork ? motion.button : 'button';
   if (mode === 'lyrics') return <div className="playing-art-slot playing-lyrics-slot">
     <div className="playing-art-lyrics">{lyrics ?? <p className="muted">播放音乐后自动显示歌词</p>}</div>
-    <button type="button" className="btn btn-ghost playing-art-switch lyrics-style-switch" data-visual-mode={mode} aria-label="封面样式：歌词，点击切换为唱片" onClick={cycle}><ArrowClockwiseIcon size={15}/>歌词 · 切换样式</button>
+    <Button variant="ghost" type="button" className="playing-art-switch lyrics-style-switch" data-visual-mode={mode} aria-label="封面样式：歌词，点击切换为唱片" onClick={cycle}><ArrowClockwiseIcon size={15}/>歌词 · 切换样式</Button>
   </div>;
   return <div className="playing-art-slot">
-    <button type="button" className="playing-art-switch" data-visual-mode={mode} data-analysis-state={state}
+    <Switch {...layout} type="button" className="playing-art-switch" data-visual-mode={mode} data-analysis-state={state}
       disabled={!interactive} aria-label={interactive?`封面样式：${names[mode]}，点击切换为${names[next]}`:`封面样式：${names[mode]}`} onClick={interactive?cycle:undefined}>
       <span className={'playing-art-layer playing-art-vinyl' + (mode === 'vinyl' ? ' is-active' : '') + (mode === 'vinyl' && playing && visible ? ' is-playing' : '')} aria-hidden="true">
         <span className="vinyl-record"><span className="vinyl-rotor">
@@ -86,6 +94,6 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
       </span>
       {interactive&&<span className="playing-art-hint" aria-hidden="true">{names[mode]}<span className="playing-art-hint-cue"> · 点击切换</span><ArrowClockwiseIcon size={14}/></span>}
       {(mode === 'spectrum' || mode === 'halo') && message && <span className="playing-spectrum-status" role="status">{message}</span>}
-    </button>
+    </Switch>
   </div>;
 }

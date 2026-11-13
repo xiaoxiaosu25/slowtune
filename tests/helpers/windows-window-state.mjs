@@ -29,6 +29,35 @@ $taskbarHandle = [SlowTuneWindowProbe]::FindWindow('Shell_TrayWnd', $null)
   return JSON.parse(stdout.trim());
 }
 
+// WM_NCHITTEST checks Electron's actual native drag regions, which CDP mouse
+// events alone cannot prove. Coordinates are client pixels at the test's 1x scale.
+export async function windowsHitTargets(handle, points) {
+  if (!/^\d+$/.test(handle) || points.some(point => point.some(value => !Number.isSafeInteger(value)))) throw new Error('Invalid native hit-test input');
+  const source = `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class SlowTuneHitProbe {
+  [StructLayout(LayoutKind.Sequential)] public struct Point { public int X; public int Y; }
+  [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr hwnd, ref Point point);
+  [DllImport("user32.dll")] public static extern IntPtr SendMessageW(IntPtr hwnd, uint message, IntPtr wparam, IntPtr lparam);
+}
+'@
+$windowHandle = [IntPtr]::new([long]${handle})
+$samples = '${JSON.stringify(points)}' | ConvertFrom-Json
+$results = @(foreach ($sample in $samples) {
+  $point = [SlowTuneHitProbe+Point]::new()
+  $point.X = $sample[0]; $point.Y = $sample[1]
+  if (-not [SlowTuneHitProbe]::ClientToScreen($windowHandle, [ref]$point)) { throw 'ClientToScreen failed' }
+  $location = (([long]$point.Y -band 65535) -shl 16) -bor ([long]$point.X -band 65535)
+  [SlowTuneHitProbe]::SendMessageW($windowHandle, 132, [IntPtr]::Zero, [IntPtr]::new($location)).ToInt64()
+})
+ConvertTo-Json -InputObject $results -Compress
+`;
+  const { stdout } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', source], { windowsHide: true, timeout: 15000 });
+  return JSON.parse(stdout.trim());
+}
+
 export async function lyricWindowState(application) {
   const electron = await application.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find(w => w.getTitle() === '慢听 · 桌面歌词');

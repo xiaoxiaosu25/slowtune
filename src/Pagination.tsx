@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { preferenceStorage } from './preference-storage';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CaretDoubleLeftIcon, CaretDoubleRightIcon, CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
@@ -63,16 +64,16 @@ export function Pagination({ label, page, size, total, busy = false, knownPages 
     </select></label>
     <div className="pagination-navigation">
       <div className="pagination-pair">
-        <button type="button" className="btn btn-ghost btn-sm pagination-edge" title="首页" aria-label={label + '首页'} disabled={busy || page <= 1} onClick={() => onPage(1)}><CaretDoubleLeftIcon size={16}/></button>
-        <button type="button" className="btn btn-secondary btn-sm pagination-step" aria-label={label + '上一页'} disabled={busy || page <= 1} onClick={() => onPage(page - 1)}><CaretLeftIcon size={16}/><span>上一页</span></button>
+        <Button variant="ghost" compact type="button" className="pagination-edge" title="首页" aria-label={label + '首页'} disabled={busy || page <= 1} onClick={() => onPage(1)}><CaretDoubleLeftIcon size={16}/></Button>
+        <Button variant="secondary" compact type="button" className="pagination-step" aria-label={label + '上一页'} disabled={busy || page <= 1} onClick={() => onPage(page - 1)}><CaretLeftIcon size={16}/><span>上一页</span></Button>
       </div>
       <div className="pagination-position">
         <label><span>第</span><input className="input input-sm pagination-input" aria-label={label + '页码'} title={last === undefined ? '可跳转已读取的页码；更多内容请用下一页读取' : '输入页码后按回车跳转'} type="text" inputMode="numeric" enterKeyHint="go" autoComplete="off" value={draft} disabled={busy} onChange={event => setDraft(event.target.value)} onBlur={jump} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); jump(); } else if (event.key === 'Escape') { event.preventDefault(); setDraft(String(page)); } }}/></label>
         <span className="pagination-total" aria-live="polite">/ {last ?? '…'} 页</span>
       </div>
       <div className="pagination-pair">
-        <button type="button" className="btn btn-secondary btn-sm pagination-step" aria-label={label + '下一页'} disabled={busy || (last === undefined ? !hasNext : page >= last)} onClick={() => onPage(page + 1)}><span>下一页</span><CaretRightIcon size={16}/></button>
-        <button type="button" className="btn btn-ghost btn-sm pagination-edge" title={last === undefined ? '来源尚未提供总页数' : '尾页'} aria-label={label + '尾页'} disabled={busy || last === undefined || page >= last} onClick={() => last !== undefined && onPage(last)}><CaretDoubleRightIcon size={16}/></button>
+        <Button variant="secondary" compact type="button" className="pagination-step" aria-label={label + '下一页'} disabled={busy || (last === undefined ? !hasNext : page >= last)} onClick={() => onPage(page + 1)}><span>下一页</span><CaretRightIcon size={16}/></Button>
+        <Button variant="ghost" compact type="button" className="pagination-edge" title={last === undefined ? '来源尚未提供总页数' : '尾页'} aria-label={label + '尾页'} disabled={busy || last === undefined || page >= last} onClick={() => last !== undefined && onPage(last)}><CaretDoubleRightIcon size={16}/></Button>
       </div>
     </div>
   </nav>;

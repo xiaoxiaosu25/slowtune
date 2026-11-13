@@ -3,6 +3,7 @@ import { mobileSettingsSection } from './mobile-settings';
 import { mobilePlaylistId } from './mobile-library';
 import { readMobileFollowView } from './mobile-follow';
 import { mobilePageSuspended, suspendMobilePages } from './mobile-pages';
+import { closeLayer, openLayers } from './ui/layers';
 
 type Entry = { session: string; id: number; key: string; page: string; layers: number[]; scroll: number; suspendedReaders?: number[]; readers?: string[] };
 const stateKey = 'slowTuneMobileNavigation';
@@ -32,10 +33,9 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
     let pendingClose: string | undefined, pendingNavigationKey: string | undefined, frame = 0;
     let stopRestoring = () => {};
     const entries: Entry[] = []; let index = 0;
-    const layers = () => Array.from(document.querySelectorAll<HTMLElement>('dialog[open],[popover]:popover-open'));
     const identity = (element: Element) => { if (!tokens.has(element)) tokens.set(element, ++token); return tokens.get(element)!; };
     const snapshot = (): Entry => {
-      const open = layers().map(identity), currentPage = latest.current.page;
+      const open = openLayers().map(identity), currentPage = latest.current.page;
       const readerElements=Array.from(document.querySelectorAll<HTMLElement>('dialog.mobile-page[open]')),suspendedReaders=readerElements.filter(mobilePageSuspended).map(identity),readers=readerElements.map(element=>element.dataset.mobilePage!);
       return { session, id: ++serial, key: JSON.stringify([currentPage, open, suspendedReaders]), page: currentPage, layers: open, scroll: window.scrollY, suspendedReaders, readers };
     };
@@ -88,20 +88,19 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
         pendingClose = undefined; write({ ...target, id: ++serial }, true); commit(); return;
       }
       pendingClose = undefined; restoring = true;
-      suspendMobilePages(true,layers().filter(element=>target.suspendedReaders?.includes(identity(element))));
-      for (const element of layers().reverse()) {
+      suspendMobilePages(true,openLayers().filter(element=>target.suspendedReaders?.includes(identity(element))));
+      for (const element of openLayers().reverse()) {
         if (target.layers.includes(identity(element))) continue;
-        if (element instanceof HTMLDialogElement) element.dispatchEvent(new Event('cancel', { cancelable: true }));
-        else element.hidePopover();
+        closeLayer(element);
       }
       if (latest.current.page !== target.page) latest.current.onRestore(target.page);
-      const retainedLayers = layers().map(identity).filter(id => target.layers.includes(id));
+      const retainedLayers = openLayers().map(identity).filter(id => target.layers.includes(id));
       const base = { ...target, id: ++serial, layers: retainedLayers, key: JSON.stringify([target.page, retainedLayers, target.suspendedReaders??[]]) };
       cancelAnimationFrame(frame);
       const finish = () => {
         if (disposed) return;
         // Closed dialogs are intentionally not recreated by browser Forward.
-        if (!layers().length) window.scrollTo(0, target.scroll);
+        if (!openLayers().length) window.scrollTo(0, target.scroll);
         const next = snapshot();
         write(next.key === base.key ? next : base, true); restoring = false; commit();
       };
@@ -117,7 +116,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
         const loading = Array.from(document.querySelectorAll('.main-content .loading')).some(element => element.getClientRects().length);
         readyFrames = !loading && height - innerHeight >= target.scroll - 1 && height === previousHeight ? readyFrames + 1 : 0;
         previousHeight = height;
-        if (layers().length || readyFrames >= 2) {cleanup();finish();}
+        if (openLayers().length || readyFrames >= 2) {cleanup();finish();}
         else frame = requestAnimationFrame(attempt);
       };
       stopRestoring=cleanup;
@@ -150,7 +149,7 @@ export function useMobileNavigationHistory(enabled: boolean, page: string, onRes
       } else fallback();
     };
     const observer = new MutationObserver(commit);
-    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open','hidden'] });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['open','hidden','data-state'] });
     window.addEventListener('popstate', pop);
     window.addEventListener('scroll', scroll, { passive: true });
     document.addEventListener('toggle', commit, true);

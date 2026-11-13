@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { PlayAllButton, RefreshButton, AddToPlaylistButton } from './ListActions';
 import type { Shelf } from '@studio/music-sources';
@@ -51,6 +52,6 @@ function DiscoveryShelfContent(props:DiscoveryShelfProps) {
     {(order||status)&&<div className="catalog-meta"><div className={'muted catalog-status'+(order?' recommendation-order':'')} role="status">{order&&<span>{order}</span>}{status}</div></div>}
     {saveFailed&&<p className="muted catalog-status" role="status">当前浏览器无法保存显示设置。</p>}
     {fixed&&shelf.page&&visibleItems.length<discoverySize&&(!!items.length||!loading&&!issue)&&<p className="muted catalog-status" role="status">符合当前规则的可用歌曲只有 {visibleItems.length} 首，已保留 {discoverySize} 个位置。可换一批或调整个人设置。</p>}
-    {!fixed&&shelf.error?props.renderError(shelf.error):fixed&&!items.length&&loading?<div className="loading" role="status">正在获取推荐…{props.onCancel&&<button className="btn btn-ghost" onClick={props.onCancel}>取消</button>}</div>:fixed&&!items.length&&issue?<DiscoveryUnavailable issue={issue} onRetry={onRefresh}/>:items.length||fixed&&shelf.page?view==='covers'?renderCovers(visibleItems,shelf.id==='follow-updates',fixed?discoverySize:undefined):<>{visibleItems.length?renderList(visibleItems):null}{fixed&&Array.from({length:discoverySize-visibleItems.length},(_,i)=><div className="catalog-empty-row" key={i} aria-hidden="true">暂无符合规则的歌曲</div>)}</>:!loading&&(empty??<p className="muted">栏目暂没有内容。</p>)}
+    {!fixed&&shelf.error?props.renderError(shelf.error):fixed&&!items.length&&loading?<div className="loading" role="status">正在获取推荐…{props.onCancel&&<Button variant="ghost"  onClick={props.onCancel}>取消</Button>}</div>:fixed&&!items.length&&issue?<DiscoveryUnavailable issue={issue} onRetry={onRefresh}/>:items.length||fixed&&shelf.page?view==='covers'?renderCovers(visibleItems,shelf.id==='follow-updates',fixed?discoverySize:undefined):<>{visibleItems.length?renderList(visibleItems):null}{fixed&&Array.from({length:discoverySize-visibleItems.length},(_,i)=><div className="catalog-empty-row" key={i} aria-hidden="true">暂无符合规则的歌曲</div>)}</>:!loading&&(empty??<p className="muted">栏目暂没有内容。</p>)}
   </section>;
 }

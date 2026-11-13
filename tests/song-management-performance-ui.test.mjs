@@ -32,14 +32,24 @@ test('large desktop song management stays responsive during media clock updates'
     window.slowTuneRenderCounts={};
     new PerformanceObserver(list => window.managementLongTasks.push(...list.getEntries().map(entry => Math.round(entry.duration)))).observe({ type: 'longtask' });
   });
-  await page.goto(fixture.origin); await navigate(page, '歌单');
+  await page.goto(fixture.origin);
+  await navigate(page, '歌单').catch(async error => {
+    t.diagnostic(JSON.stringify({ errors, status: (await page.locator('body').innerText()).slice(0, 300) }));
+    throw error;
+  });
   const cdp = await page.context().newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   const opens = [], searches = [];
   const manager = page.getByRole('dialog', { name: '歌曲管理', exact: true });
   for (let run = 0; run < 5; run++) {
     // Measure actual click-to-paint latency; exclude Playwright's accessibility lookup cost.
-    opens.push(await page.evaluate(async () => {
-      const start = performance.now(); document.querySelector('.page-actions>button').click();
+    const direct = page.getByRole('button', { name: '歌曲管理', exact: true });
+    let action = direct;
+    if (!await direct.isVisible()) {
+      await page.getByRole('button', { name: '歌单管理', exact: true }).click();
+      action = page.getByRole('menuitem', { name: '歌曲管理', exact: true });
+    }
+    opens.push(await action.evaluate(async button => {
+      const start = performance.now(); button.click();
       await new Promise(resolve => { const ready = () => document.querySelector('dialog[open] .song-manager-row') ? requestAnimationFrame(resolve) : requestAnimationFrame(ready); requestAnimationFrame(ready); });
       return performance.now() - start;
     }));
@@ -53,9 +63,12 @@ test('large desktop song management stays responsive during media clock updates'
       return performance.now() - start;
     }));
     await page.keyboard.press('Escape');
+    await manager.waitFor({ state: 'hidden' });
   }
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   await page.getByRole('button', { name: '播放 晴天', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('audio')?.currentTime > .2);
+  await page.waitForFunction(() => document.querySelector('audio[data-product-media]')?.currentTime > .2);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   await libraryAction(page, '歌曲管理'); await manager.waitFor();
   await page.waitForTimeout(300); await page.evaluate(() => { window.managementLongTasks = [];window.slowTuneRenderCounts={}; });
   await page.waitForTimeout(1800);

@@ -1,7 +1,8 @@
+import { Button } from './ui/Button';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { CaretDownIcon, CheckIcon, GaugeIcon } from '@phosphor-icons/react';
 
-export function RateControl({ value, onChange, labeled = false }: { value: number; onChange: (rate: number) => void; labeled?: boolean }) {
+export function RateControl({ value, onChange, labeled = false, iconOnly = false }: { value: number; onChange: (rate: number) => void; labeled?: boolean; iconOnly?: boolean }) {
   const id = useId(), trigger = useRef<HTMLButtonElement>(null), panel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const rates = [...new Set([.5, .75, 1, 1.25, 1.5, 1.75, 2, value])].sort((a, b) => a - b);
@@ -60,21 +61,24 @@ export function RateControl({ value, onChange, labeled = false }: { value: numbe
     options[next]?.focus();
   };
   return <div className={'rate-control ' + (labeled ? 'labeled' : '')}>
-    <button ref={trigger} type="button" className={'player-setting rate-trigger ' + (value !== 1 ? 'saved' : '')} aria-label="播放速度" aria-description={'当前 ' + value + ' 倍速'} title={'播放速度 · ' + value + '×'} aria-haspopup="menu" aria-expanded={open} aria-controls={id} popoverTarget={id} onKeyDown={event => {
+    <Button variant={iconOnly ? 'icon' : 'plain'} ref={trigger} className={'rate-trigger ' + (iconOnly ? 'player-setting-icon ' : 'player-setting ') + (value !== 1 || (iconOnly && open) ? 'saved' : '')} aria-label="播放速度" aria-description={'当前 ' + value + ' 倍速'} title={'播放速度 · ' + value + '×'} aria-haspopup="menu" aria-expanded={open} aria-controls={id} popoverTarget={id} onKeyDown={event => {
       if (event.key === 'Tab' && panel.current?.matches(':popover-open')) { panel.current.hidePopover(); return; }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault(); panel.current?.showPopover();
         panel.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus({ preventScroll: true });
       }
     }}>
-      <span className="setting-icon"><GaugeIcon size={19} /></span>{labeled && <span className="setting-label">倍速</span>}
-      <span className="rate-value"><span className="setting-value">{value}×</span><CaretDownIcon size={12} aria-hidden="true" /></span>
-    </button>
+      <span className="setting-icon"><GaugeIcon size={20} /></span>
+      {!iconOnly && <>
+        {labeled && <span className="setting-label">倍速</span>}
+        <span className="rate-value"><span className="setting-value">{value}×</span><CaretDownIcon size={12} aria-hidden="true" /></span>
+      </>}
+    </Button>
     <div ref={panel} id={id} popover="auto" role="menu" aria-label="播放速度" className="rate-menu" onKeyDown={navigate} onClick={event => event.stopPropagation()}>
       <p className="rate-menu-heading" aria-hidden="true">播放速度</p>
-      {rates.map(rate => <button key={rate} type="button" role="menuitemradio" aria-label={rate + '×'} aria-checked={rate === value} tabIndex={-1} className="rate-option" onClick={() => {
+      {rates.map(rate => <Button variant="plain" key={rate} type="button" role="menuitemradio" aria-label={rate + '×'} aria-checked={rate === value} tabIndex={-1} className="rate-option" onClick={() => {
         onChange(rate); panel.current?.hidePopover(); trigger.current?.focus({ preventScroll: true });
-      }}><span>{rate}×</span>{rate === 1 && <small>正常速度</small>}{rate === value && <CheckIcon size={16} weight="bold" aria-hidden="true" />}</button>)}
+      }}><span>{rate}×</span>{rate === 1 && <small>正常速度</small>}{rate === value && <CheckIcon size={16} weight="bold" aria-hidden="true" />}</Button>)}
     </div>
   </div>;
 }

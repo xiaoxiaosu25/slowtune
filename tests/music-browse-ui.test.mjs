@@ -70,7 +70,7 @@ test('music browsing: discovery, four chart tabs, search dialogs and the default
     assert.equal(await page.locator('select[aria-label$="展示数量"]').count(),0);
     const y=youtubeCalls,f=feedCalls;await page.getByRole('button',{name:'B站推荐换一批',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[data-shelf-id="music-recommendation"] .shelf-refresh').disabled);assert.equal(youtubeCalls,y);assert.equal(feedCalls,f);
     assert(confirmations.length&&confirmations.every(x=>x.ids.length===12));assert.equal(chartCalls.length,0);
-    await page.locator('[data-shelf-id="music-recommendation"] .card-menu').first().click();await page.locator('.context-menu:popover-open').getByRole('menuitem',{name:'歌曲详情与分 P…',exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与分 P',exact:true});await menu.getByRole('button',{name:'取消关注 测试作者',exact:true}).click();await menu.getByRole('button',{name:'关注 测试作者',exact:true}).waitFor();assert.equal(await page.locator('[data-shelf-id="follow-updates"] .track-row').count(),0);
+    await page.locator('[data-shelf-id="music-recommendation"] .card-menu').first().click();await page.locator('.context-menu:is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem',{name:'歌曲详情与分 P…',exact:true}).click();const menu=page.getByRole('dialog',{name:'歌曲与分 P',exact:true});await menu.getByRole('button',{name:'取消关注 测试作者',exact:true}).click();await menu.getByRole('button',{name:'关注 测试作者',exact:true}).waitFor();assert.equal(await page.locator('[data-shelf-id="follow-updates"] .track-row').count(),0);
     await menu.getByRole('button',{name:'关注 测试作者',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('[data-shelf-id="follow-updates"] .track-row').length===12);await menu.getByRole('button',{name:'关闭',exact:true}).click();
     await page.locator('.page-heading .source-tabs').getByRole('button',{name:'B站',exact:true}).click();assert.equal(await page.locator('.discovery-shelf').count(),2);await page.locator('.page-heading .source-tabs').getByRole('button',{name:'全部',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.discovery-shelf .music-card').length===24);
     await page.screenshot({path:join(artifacts,'discovery-desktop.png'),fullPage:true});
@@ -106,12 +106,12 @@ test('music browsing: discovery, four chart tabs, search dialogs and the default
     await page.getByLabel('网易云榜单').selectOption('new');await page.waitForFunction(()=>document.querySelector('.chart-page-controls select')?.value==='new'&&!document.querySelector('.charts-page .loading'));
     const chartTabs=page.getByRole('tablist',{name:'榜单平台'});
     await chartTabs.getByRole('tab',{name:'网易云',exact:true}).press('ArrowRight');
-    assert.equal(await chartTabs.getByRole('tab',{name:'QQ',exact:true}).getAttribute('aria-selected'),'true');
+    await chartTabs.getByRole('tab',{name:'QQ',exact:true,selected:true}).waitFor();
     assert.equal(await chartTabs.getByRole('tab',{name:'QQ',exact:true}).evaluate(el=>el===document.activeElement),true);
     await chartTabs.getByRole('tab',{name:'QQ',exact:true}).press('End');
-    assert.equal(await chartTabs.getByRole('tab',{name:'Apple Music',exact:true}).getAttribute('aria-selected'),'true');
+    await chartTabs.getByRole('tab',{name:'Apple Music',exact:true,selected:true}).waitFor();
     await chartTabs.getByRole('tab',{name:'Apple Music',exact:true}).press('Home');
-    assert.equal(await chartTabs.getByRole('tab',{name:'网易云',exact:true}).getAttribute('aria-selected'),'true');
+    await chartTabs.getByRole('tab',{name:'网易云',exact:true,selected:true}).waitFor();
     assert.equal(await chartTabs.locator('[tabindex="0"]').count(),1);
     for(const [name,id] of [['QQ','qq'],['Apple Music','apple'],['B站','bilibili']]){await page.getByRole('tab',{name,exact:true}).click();await page.getByRole('tabpanel',{name:id+'榜单',exact:true}).waitFor();assert.equal(await page.locator('.chart-song').count(),30);}
     const period=page.getByLabel('B站热歌榜期次');await period.selectOption('437');await page.getByText('历史歌曲 1',{exact:true}).waitFor();
@@ -140,7 +140,7 @@ test('music browsing: discovery, four chart tabs, search dialogs and the default
   await t.test('existing favorites become a protected playlist with ordering, filtering and removal',async()=>{
     await nav('歌单');assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(),'我的收藏');assert.equal(await page.getByRole('button',{name:'删除歌单',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'改名',exact:true}).count(),0);
     const rows=page.locator('.main-content .song-library-row');assert.equal(await rows.count(),libraryFixture.library.read().snapshot.favorites.length);assert((await rows.locator('.track-name').allTextContents()).includes('旧收藏甲'));
-    await rows.first().getByRole('button',{name:'更多操作 旧收藏甲',exact:true}).click();await page.locator('.song-row-menu [popover]:popover-open').getByRole('menuitem',{name:'下移 旧收藏甲',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.song-library-row .track-name')?.textContent==='旧收藏乙');
+    await rows.first().getByRole('button',{name:'更多操作 旧收藏甲',exact:true}).click();await page.locator('.song-row-menu :is([popover]:popover-open,[data-layer=menu][data-state=open],[data-layer=popover][data-state=open])').getByRole('menuitem',{name:'下移 旧收藏甲',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.song-library-row .track-name')?.textContent==='旧收藏乙');
     await page.getByLabel('搜索歌单内音乐').fill('旧收藏甲');assert.equal(await rows.count(),1);await rows.getByRole('button',{name:'取消收藏 旧收藏甲',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.main-content .song-library-row'));assert(!libraryFixture.library.read().snapshot.favorites.some(f=>f.songId==='song-0'));
     await page.getByLabel('搜索歌单内音乐').fill('');await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'自建歌单'}).first().click();await nav('关注');await nav('歌单');assert.equal(await page.locator('.playlist-copy :is(h1,h2)').textContent(),'自建歌单');
     await page.locator('.sidebar-playlist:visible,.playlist-switcher button:visible').filter({hasText:'我的收藏'}).first().click();await page.screenshot({path:join(artifacts,'favorites-desktop.png'),fullPage:true});
