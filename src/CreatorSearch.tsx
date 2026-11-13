@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import type { CreatorSearchItem, CreatorSearchPage, CreatorSearchRequest } from '@studio/music-sources/creators';
 import { request, cancelled, errorText, type FollowState, type CreatorProfile } from './api';
@@ -38,9 +39,9 @@ function CreatorSearchCard({creator,state,onChange,onOpen}:{creator:CreatorSearc
     finally{if(work.current===controller){work.current=null;setBusy(false);}}
   };
   return <article className="creator-search-card" aria-label={creator.name}>
-    <button type="button" className="creator-search-profile" onClick={()=>onOpen(creator)} aria-label={'查看用户 '+creator.name}><Avatar artwork={creator.artwork} name={creator.name}/><span><strong>{creator.name}</strong>{creator.verification&&<small className="creator-search-verification">{creator.verification}</small>}{creator.followers!==undefined&&<small>{new Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:1}).format(creator.followers)} 粉丝</small>}</span></button>
+    <Button variant="plain" type="button" className="creator-search-profile" onClick={()=>onOpen(creator)} aria-label={'查看用户 '+creator.name}><Avatar artwork={creator.artwork} name={creator.name}/><span><strong>{creator.name}</strong>{creator.verification&&<small className="creator-search-verification">{creator.verification}</small>}{creator.followers!==undefined&&<small>{new Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:1}).format(creator.followers)} 粉丝</small>}</span></Button>
     <p className="creator-search-description">{creator.description||'这位用户还没有填写简介。'}</p>
-    <div className="creator-search-actions"><button type="button" className="btn btn-ghost" onClick={()=>onOpen(creator)}>查看投稿</button><button type="button" className={'btn '+(followed?'btn-secondary':'btn-primary')} aria-label={(followed?'取消关注 ':'关注到慢听 ')+creator.name} aria-pressed={followed} disabled={busy||!state} onClick={()=>void toggle()}>{busy?'保存中…':followed?'已关注':'关注到慢听'}</button></div>
+    <div className="creator-search-actions"><Button variant="ghost" type="button"  onClick={()=>onOpen(creator)}>查看投稿</Button><Button type="button" className={' '+(followed?'btn-secondary':'btn-primary')} aria-label={(followed?'取消关注 ':'关注到慢听 ')+creator.name} aria-pressed={followed} disabled={busy||!state} onClick={()=>void toggle()}>{busy?'保存中…':followed?'已关注':'关注到慢听'}</Button></div>
     {error&&<p className="feedback" role="alert">{error}</p>}
   </article>;
 }
@@ -55,9 +56,9 @@ export function CreatorSearchResults({search,query,order,state,onChange,onOpen}:
   const read=(page:number,size=result?.pageSize??30)=>{void search.search(query,page,order,size);if(body.current&&body.current.getBoundingClientRect().top<0)body.current.scrollIntoView({block:'start'});};
   return <div className="creator-search-results paged-list" aria-busy={busy} ref={body}>
     <p className="muted">搜索 B站用户，关注只保存在慢听，不修改 B站关注。</p>
-    {followError&&<div className="feedback" role="alert"><p>{followError}</p><button className="btn btn-secondary" onClick={()=>void loadFollows()}>重读关注状态</button></div>}
-    {busy&&<div className="loading" role="status">正在搜索用户… <button className="btn btn-ghost" onClick={search.cancel}>取消搜索</button></div>}
-    {error&&<div className="feedback" role="alert"><p>{error}</p><button className="btn btn-secondary" onClick={()=>void search.retry()}>重试用户搜索</button></div>}
+    {followError&&<div className="feedback" role="alert"><p>{followError}</p><Button variant="secondary"  onClick={()=>void loadFollows()}>重读关注状态</Button></div>}
+    {busy&&<div className="loading" role="status">正在搜索用户… <Button variant="ghost"  onClick={search.cancel}>取消搜索</Button></div>}
+    {error&&<div className="feedback" role="alert"><p>{error}</p><Button variant="secondary"  onClick={()=>void search.retry()}>重试用户搜索</Button></div>}
     {result&&<><div className="creator-search-grid">{result.items.map(creator=><CreatorSearchCard key={creator.provider+':'+creator.id} creator={creator} state={followReady?state:null} onChange={onChange} onOpen={onOpen}/>)}</div>{!result.items.length&&!busy&&<div className="empty"><h3>没有找到用户</h3><p>换一个昵称或关键词试试。</p></div>}{(result.items.length>0||result.hasMore)&&<Pagination label="用户搜索" page={result.page} size={result.pageSize} total={result.total} hasNext={result.hasMore} busy={busy} onPage={page=>read(page)} onSize={size=>read(1,size)}/>}</>}
     {!result&&!busy&&!error&&<div className="empty"><h3>找一位喜欢的作者</h3><p>输入昵称，查看投稿并关注到慢听。</p></div>}
   </div>;

@@ -1,6 +1,5 @@
 /* All playback page changes are desktop-only. The mobile player stays intact. */
 @media (min-width:761px) {
-  .immersive .listening-stage { border-radius:0; box-shadow:none; background:transparent; }
   .immersive .playing-title>h2 { height:auto; margin-bottom:10px; }
   .playing-title .desktop-playing-meta { display:grid; grid-template-columns:88px minmax(0,1fr) 88px; gap:0; }
   .desktop-playing-meta>.playing-song-copy { grid-column:2; min-width:0; }
@@ -17,7 +16,6 @@
   .playback-source-actions { display:flex; gap:8px; flex-wrap:wrap; }
   .playback-source-version { margin-top:12px; padding-top:8px; border-top:1px solid var(--border-subtle); }
   .playback-source-version>.btn { width:100%; justify-content:space-between; font-size:var(--fs-body); }
-  .immersive .stage-controls { padding:5px 0; border:0; border-radius:0; background:transparent; }
   .desktop-lyrics-song>.playing-song-copy { margin-top:10px; }
   .desktop-lyrics-management-tools { position:absolute; right:16px; bottom:156px; display:flex; flex-direction:column; gap:10px; z-index:var(--z-base); }
   .desktop-lyrics-management-tools>.btn,.desktop-lyrics-management-tools>.control-popover>.btn { width:44px; height:44px; border-radius:50%; color:var(--muted); background:color-mix(in srgb,var(--surface) 72%,transparent); border:1px solid var(--border-subtle); }

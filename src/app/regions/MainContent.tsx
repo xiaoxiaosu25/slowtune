@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import { useLayoutEffect, useRef } from 'react';
 import { useReducedMotion } from 'motion/react';
 import { SourceTabs } from '../components/WorkspaceControls';
@@ -130,42 +131,42 @@ export function MobileBanners() {
       {!desktop && authorBusy && !popup && (
         <div className="feedback" role="status">
           <p>正在读取 UP / 博主信息…</p>
-          <button
-            className="btn btn-ghost"
+          <Button variant="ghost"
+
             onClick={() => {
               authorWork.current?.abort();
               setAuthorBusy(false);
             }}
           >
             取消
-          </button>
+          </Button>
         </div>
       )}
       {!desktop && error && !popup && !searchOpen && (
         <div className="feedback" data-tone="error" role="alert">
           <p>{error}</p>
           <div className="toolbar">
-            <button className="btn btn-ghost" onClick={() => void reload()}>
+            <Button variant="ghost"  onClick={() => void reload()}>
               重读资料 / 检查服务
-            </button>
+            </Button>
             {pending && (
-              <button className="btn btn-ghost" disabled={saving} onClick={retryWrite}>
+              <Button variant="ghost"  disabled={saving} onClick={retryWrite}>
                 重试保留编辑
-              </button>
+              </Button>
             )}
-            <button className="btn btn-ghost" onClick={() => setError('')}>
+            <Button variant="ghost"  onClick={() => setError('')}>
               关闭提示
-            </button>
+            </Button>
             {error.includes('会话') && (
-              <button
-                className="btn btn-ghost"
+              <Button variant="ghost"
+
                 onClick={async () => {
                   await playback.release();
                   onLogout();
                 }}
               >
                 重新连接
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -179,24 +180,24 @@ export function MobileBanners() {
             <div className="toolbar">
               {playback.error &&
                 (playback.chartSearchTitle ? (
-                  <button
-                    className="btn btn-ghost"
+                  <Button variant="ghost"
+
                     onClick={() => searchForTitle(playback.chartSearchSong ?? playback.chartSearchTitle)}
                   >
                     去搜索
-                  </button>
+                  </Button>
                 ) : (
-                  <button className="btn btn-ghost" onClick={() => void playback.retry()}>
+                  <Button variant="ghost"  onClick={() => void playback.retry()}>
                     重试播放
-                  </button>
+                  </Button>
                 ))}
-              <button className="btn btn-ghost" onClick={playback.cancel}>
+              <Button variant="ghost"  onClick={playback.cancel}>
                 取消并停止
-              </button>
+              </Button>
               {playback.error && (
-                <button className="btn btn-ghost" onClick={playback.dismiss}>
+                <Button variant="ghost"  onClick={playback.dismiss}>
                   关闭提示
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -204,15 +205,15 @@ export function MobileBanners() {
       {!desktop && actionBusy && !popup && !playback.preparing && !snapshot.loading && (
         <div className="feedback" role="status">
           <p>正在读取歌曲信息…</p>
-          <button
-            className="btn btn-ghost"
+          <Button variant="ghost"
+
             onClick={() => {
               actionWork.current?.abort();
               setActionBusy(false);
             }}
           >
             取消读取
-          </button>
+          </Button>
         </div>
       )}
       {!desktop && !!playback.chartFailures.length && (
@@ -227,9 +228,9 @@ export function MobileBanners() {
               ))}
             </ul>
           </details>
-          <button className="btn btn-ghost" onClick={playback.dismissChartFailures}>
+          <Button variant="ghost"  onClick={playback.dismissChartFailures}>
             关闭提示
-          </button>
+          </Button>
         </div>
       )}
     </>

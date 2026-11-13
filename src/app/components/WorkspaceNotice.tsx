@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import { useEffect, useId } from 'react';
 import { Toaster, toast } from 'sonner';
 
@@ -11,7 +12,7 @@ export function WorkspaceNotice({ text, action, desktop }: {
     const toastId = toast.custom(() => (
       <div className="toast-copy" role="status">
         {text}
-        {action && <button type="button" className="btn btn-ghost btn-sm" onClick={action.run}>{action.label}</button>}
+        {action && <Button variant="ghost" compact type="button"  onClick={action.run}>{action.label}</Button>}
       </div>
     ), { toasterId: id, duration: Infinity, dismissible: false });
     return () => { toast.dismiss(toastId); };

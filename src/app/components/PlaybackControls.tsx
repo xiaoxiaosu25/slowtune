@@ -1,3 +1,4 @@
+import { Button, IconButton } from '../../ui/Button';
 import {
   SkipBackIcon,
   SkipForwardIcon,
@@ -21,30 +22,30 @@ import { PlaybackFeedback } from '../../DesktopFeedback';
 import { useWorkspace } from '../workspace-context';
 import { PlayGlyph } from './PlayGlyph';
 
-export function PlaybackRate({ labeled = false }: { labeled?: boolean } = {}) {
+export function PlaybackRate({ labeled = false, iconOnly = false }: { labeled?: boolean; iconOnly?: boolean } = {}) {
   const { snapshot, playback } = useWorkspace();
-  return <RateControl value={snapshot.rate} onChange={playback.rate} labeled={labeled} />;
+  return <RateControl value={snapshot.rate} onChange={playback.rate} labeled={labeled} iconOnly={iconOnly} />;
 }
 
-export function SleepButton({ labeled = false }: { labeled?: boolean } = {}) {
+export function SleepButton({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const { sleepRunning, sleepBadge, open } = useWorkspace();
   return (
-    <button
-      type="button"
+    <Button
+      variant={iconOnly ? 'icon' : 'default'}
       className={
-        'btn sleep-control player-setting ' + (labeled ? 'labeled ' : '') + (sleepRunning ? 'saved' : '')
+        'sleep-control ' + (iconOnly ? 'player-setting-icon ' : 'player-setting ') + (sleepRunning ? 'saved' : '')
       }
       title={sleepRunning ? '睡眠定时器 · 剩余 ' + sleepBadge : '睡眠定时器'}
       aria-label="睡眠定时器"
+      aria-description={sleepRunning ? '剩余 ' + sleepBadge : '未开启'}
       aria-pressed={sleepRunning}
       onClick={() => open({ type: 'sleep' })}
     >
       <span className="setting-icon">
-        <MoonIcon size={19} />
+        <MoonIcon size={20} />
       </span>
-      {labeled && <span className="setting-label">定时</span>}
-      <span className="setting-value">{sleepRunning ? sleepBadge : labeled ? '未开启' : '定时'}</span>
-    </button>
+      {!iconOnly && <span className="setting-value">{sleepRunning ? sleepBadge : '定时'}</span>}
+    </Button>
   );
 }
 
@@ -52,16 +53,16 @@ export function Transport({ large = false }: { large?: boolean } = {}) {
   const { snapshot, preparingPlayback, startPlayback, cancelPlayback, playback } = useWorkspace();
   return (
     <div className={'transport ' + (large ? 'large' : '')}>
-      <button
-        className="btn btn-icon"
+      <IconButton
+
         title="上一首"
         aria-label="上一首"
         onClick={() => void startPlayback(() => playback.previous(), false)}
         disabled={!snapshot.canPrevious}
       >
         <SkipBackIcon size={23} weight="fill" />
-      </button>
-      <button
+      </IconButton>
+      <Button variant="plain"
         className="play-toggle"
         title={preparingPlayback ? '取消播放准备' : snapshot.playing ? '暂停 · 空格' : '播放 · 空格'}
         aria-label={preparingPlayback ? '取消播放准备' : snapshot.playing ? '暂停' : '播放'}
@@ -76,16 +77,16 @@ export function Transport({ large = false }: { large?: boolean } = {}) {
         ) : (
           <PlayGlyph playing={snapshot.playing} />
         )}
-      </button>
-      <button
-        className="btn btn-icon"
+      </Button>
+      <IconButton
+
         title="下一首"
         aria-label="下一首"
         onClick={() => void startPlayback(() => playback.next(), false)}
         disabled={!snapshot.canNext}
       >
         <SkipForwardIcon size={23} weight="fill" />
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -175,10 +176,10 @@ export function PlaybackMode({
     one: RepeatOnceIcon,
   }[mode];
   return (
-    <button
+    <IconButton
       type="button"
       className={
-        'btn btn-icon mode-control ' +
+        ' mode-control ' +
         (mode !== 'sequential' ? 'saved ' : '') +
         (showLabel ? 'mode-control-labeled' : '')
       }
@@ -194,19 +195,19 @@ export function PlaybackMode({
           {current?.partsGroupId && mode === 'sequential' ? '按分 P 顺序播放' : modeLabel}
         </span>
       )}
-    </button>
+    </IconButton>
   );
 }
-export function SeekButtons({ compact = false }: { compact?: boolean } = {}) {
+export function SeekButtons({ iconOnly = false }: { iconOnly?: boolean } = {}) {
   const { snapshot, playback, current } = useWorkspace();
   return [-10, 10].map((delta) => {
     const Icon = delta < 0 ? RewindIcon : FastForwardIcon,
       label = delta < 0 ? '快退' : '快进';
     return (
-      <button
+      <Button
         key={delta}
         type="button"
-        className={'btn seek-button' + (compact ? ' seek-button-compact' : '')}
+        className={' ' + (iconOnly ? 'btn-icon' : 'seek-button')}
         aria-label={label + ' 10 秒'}
         title={label + ' 10 秒 · ' + (delta < 0 ? 'J' : 'L')}
         disabled={
@@ -214,17 +215,13 @@ export function SeekButtons({ compact = false }: { compact?: boolean } = {}) {
         }
         onClick={() => void playback.skip(delta)}
       >
-        <Icon size={compact ? 20 : 18} />
-        {compact ? (
-          <span className="seek-value" aria-hidden="true">
-            10
-          </span>
-        ) : (
+        <Icon size={iconOnly ? 20 : 18} />
+        {!iconOnly && (
           <span>
             {label} <span className="seek-value">10 秒</span>
           </span>
         )}
-      </button>
+      </Button>
     );
   });
 }
@@ -233,9 +230,9 @@ export function Volume() {
   const { desktop, snapshot, playback } = useWorkspace();
   return (
     <div className="volume-control">
-      <button
+      <IconButton
         type="button"
-        className={'btn btn-icon ' + (snapshot.muted ? 'saved' : '')}
+        className={' ' + (snapshot.muted ? 'saved' : '')}
         title={snapshot.muted ? '取消静音' : '静音'}
         aria-label={snapshot.muted ? '取消静音' : '静音'}
         aria-pressed={snapshot.muted}
@@ -246,7 +243,7 @@ export function Volume() {
         ) : (
           <SpeakerHighIcon size={20} />
         )}
-      </button>
+      </IconButton>
       {desktop ? (
         <div className="scrubber volume-scrubber" style={{ '--fill': (snapshot.muted ? 0 : snapshot.volume * 100) + '%' } as React.CSSProperties}>
           <span className="scrubber-rail" aria-hidden="true"><span className="scrubber-fill" /></span>
@@ -301,8 +298,8 @@ export function DesktopSongMeta() {
 export function DialogPlaybackControl() {
   const { snapshot, preparingPlayback, cancelPlayback, startPlayback, playback } = useWorkspace();
   return (
-    <button
-      className="btn btn-icon"
+    <IconButton
+
       aria-label={preparingPlayback ? '取消播放准备' : snapshot.playing ? '暂停当前播放' : '继续当前播放'}
       title={snapshot.playing ? '暂停当前播放' : '继续当前播放'}
       disabled={!snapshot.items.length && !preparingPlayback}
@@ -315,7 +312,7 @@ export function DialogPlaybackControl() {
       ) : (
         <PlayGlyph playing={snapshot.playing} size={20} />
       )}
-    </button>
+    </IconButton>
   );
 }
 
@@ -328,8 +325,8 @@ export function CurrentFavoriteButton() {
   const { current, isFavorite, favoritePending, saving, lib, favorite } = useWorkspace();
   return (
     current && (
-      <button
-        className={'btn btn-icon ' + (isFavorite(current) ? 'saved' : '')}
+      <IconButton
+        className={' ' + (isFavorite(current) ? 'saved' : '')}
         title={isFavorite(current) ? '取消收藏当前歌曲' : '收藏当前歌曲'}
         aria-label="收藏当前歌曲"
         aria-pressed={isFavorite(current)}
@@ -342,7 +339,7 @@ export function CurrentFavoriteButton() {
         ) : (
           <HeartIcon size={24} weight={isFavorite(current) ? 'fill' : 'regular'} />
         )}
-      </button>
+      </IconButton>
     )
   );
 }

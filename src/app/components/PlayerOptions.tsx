@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import {
   DotsThreeIcon,
   XIcon,
@@ -8,17 +9,16 @@ import {
   MusicNotesIcon,
   UsersIcon,
   ListBulletsIcon,
-  QueueIcon,
+  SlidersHorizontalIcon,
+  SubtitlesIcon,
 } from '@phosphor-icons/react';
 import { MobilePlayerOptions } from '../../MobilePlayerOptions';
 import { AudioPreferenceSelect } from '../../AudioQualityOptions';
 import { ControlPopover } from '../../ControlPopover';
 import { closeLayer, OPEN_LAYER } from '../../ui/layers';
-import { DesktopLyricFont } from '../../DesktopLyricFont';
-import { DesktopLyricMotion } from '../../DesktopLyricMotion';
 import { mobileVisuals, type MobileVisual } from '../useMobileVisual';
 import { useWorkspace } from '../workspace-context';
-import { PlaybackRate, SleepButton, SeekButtons, Volume } from './PlaybackControls';
+import { PlaybackRate, SeekButtons, Volume } from './PlaybackControls';
 
 export function PlayerOptions({ dock = false }: { dock?: boolean }) {
   const {
@@ -42,11 +42,6 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
     playerStyle,
     selectPlayerStyle,
     lyrics,
-    page,
-    desktopLyricsOpen,
-    queueVisible,
-    toggleQueue,
-    startPlayback,
   } = useWorkspace();
   return !desktop ? (
     <MobilePlayerOptions>
@@ -89,7 +84,7 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
             </label>
           )}
           <div className="mobile-action-list">
-            <button
+            <Button variant="plain"
               disabled={!current}
               onClick={() => {
                 close();
@@ -98,9 +93,9 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
             >
               <MusicNotesIcon size={22} />
               <span>音质与音轨</span>
-            </button>
+            </Button>
             {preparingPlayback && (
-              <button
+              <Button variant="plain"
                 onClick={() => {
                   close();
                   cancelPlayback();
@@ -108,9 +103,9 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
               >
                 <XIcon size={22} />
                 <span>取消播放准备</span>
-              </button>
+              </Button>
             )}
-            <button
+            <Button variant="plain"
               onClick={() => {
                 close();
                 openLyricsManagement();
@@ -118,9 +113,9 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
             >
               <MusicNotesIcon size={22} />
               <span>歌词设置</span>
-            </button>
+            </Button>
             {current && (
-              <button
+              <Button variant="plain"
                 onClick={() => {
                   close();
                   open({ type: 'track', track: current, entryContext: 'part', intent: 'playlist' });
@@ -128,10 +123,10 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
               >
                 <ListBulletsIcon size={22} />
                 <span>加入歌单</span>
-              </button>
+              </Button>
             )}
             {currentSong && (
-              <button
+              <Button variant="plain"
                 onClick={() => {
                   close();
                   setMobileSongId(currentSong.id);
@@ -139,10 +134,10 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
               >
                 <MusicNotesIcon size={22} />
                 <span>歌曲与版本</span>
-              </button>
+              </Button>
             )}
             {current && (
-              <button
+              <Button variant="plain"
                 disabled={authorBusy}
                 onClick={() => {
                   close();
@@ -151,10 +146,10 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
               >
                 <UsersIcon size={22} />
                 <span>查看 UP / 博主</span>
-              </button>
+              </Button>
             )}
             {current && (
-              <button
+              <Button variant="plain"
                 onClick={() => {
                   close();
                   groupSource(current);
@@ -162,7 +157,7 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
               >
                 <PlusIcon size={22} />
                 <span>归入歌曲</span>
-              </button>
+              </Button>
             )}
             {current && (
               <a
@@ -180,7 +175,7 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
                 <span>查看来源</span>
               </a>
             )}
-            <button
+            <Button variant="plain"
               disabled={!current || snapshot.state === 'idle' || snapshot.state === 'stopped'}
               onClick={() => {
                 close();
@@ -189,8 +184,8 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
             >
               <StopIcon size={22} />
               <span>停止播放</span>
-            </button>
-            <button
+            </Button>
+            <Button variant="plain"
               disabled={!current || snapshot.state === 'idle'}
               onClick={() => {
                 close();
@@ -199,15 +194,89 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
             >
               <ArrowCounterClockwiseIcon size={22} />
               <span>停止并归零</span>
-            </button>
+            </Button>
           </div>
         </>
       )}
     </MobilePlayerOptions>
   ) : (
     <ControlPopover className="player-options" label="更多播放选项" icon={<DotsThreeIcon size={25} />}>
+      {!dock && <div className="popover-volume popover-listening-extras"><Volume /></div>}
+      {preparingPlayback && (
+        <div className="player-options-section">
+          <Button variant="plain" onClick={cancelPlayback}>
+            <XIcon size={19} />
+            取消播放准备
+          </Button>
+        </div>
+      )}
+      <div className="player-options-section">
+        <p className="popover-heading">音质与歌词</p>
+        <Button variant="plain"
+          onClick={(event) => {
+            const popover = event.currentTarget.closest<HTMLElement>(OPEN_LAYER);
+            if (popover) closeLayer(popover);
+            popover
+              ?.closest('.control-popover')
+              ?.querySelector<HTMLButtonElement>(':scope > button')
+              ?.focus();
+            setAudioQualityOpen(true);
+          }}
+        >
+          <SlidersHorizontalIcon size={19} />
+          音质与音轨
+        </Button>
+        <Button variant="plain"
+          onClick={(event) => {
+            event.currentTarget
+              .closest('.control-popover')
+              ?.querySelector<HTMLButtonElement>(':scope > button')
+              ?.focus();
+            openLyricsManagement();
+          }}
+        >
+          <SubtitlesIcon size={19} />
+          歌词设置
+        </Button>
+        <label className="choice popover-lyrics-choice">
+          <input
+            type="checkbox"
+            checked={desktopHost.available ? desktopHost.visible : lyrics.bottom}
+            onChange={desktopHost.available ? desktopHost.toggle : (event) => lyrics.updateDisplay({ bottom: event.target.checked })}
+          />
+          {desktopHost.available ? '桌面悬浮歌词' : '底部歌词'}
+        </label>
+      </div>
+      {current && (
+        <div className="player-options-section">
+          <p className="popover-heading">当前歌曲</p>
+          <Button variant="plain" onClick={() => open({ type: 'track', track: current, entryContext: 'part' })}>
+            <MusicNotesIcon size={19} />
+            歌曲操作
+          </Button>
+          <Button variant="plain" onClick={() => groupSource(current)}>
+            <PlusIcon size={19} />
+            归入歌曲
+          </Button>
+          {dock && (
+            <a
+              href={
+                current.url ||
+                (current.ref.provider === 'bilibili'
+                  ? 'https://www.bilibili.com/video/' + current.ref.id
+                  : 'https://www.youtube.com/watch?v=' + current.ref.id)
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              <LinkIcon size={19} />
+              查看来源
+            </a>
+          )}
+        </div>
+      )}
       {dock && (
-        <div className="popover-player-style" role="radiogroup" aria-label="底栏样式">
+        <div className="player-options-section" role="radiogroup" aria-label="底栏样式">
           <p className="popover-heading">底栏样式</p>
           <label className="player-style-option">
             <input
@@ -231,172 +300,6 @@ export function PlayerOptions({ dock = false }: { dock?: boolean }) {
           </label>
         </div>
       )}
-      <p className="popover-heading">播放选项</p>
-      {preparingPlayback && (
-        <button onClick={cancelPlayback}>
-          <XIcon size={19} />
-          取消播放准备
-        </button>
-      )}
-      {dock && (
-        <>
-          <div className="popover-settings">
-            <PlaybackRate labeled />
-            <SleepButton labeled />
-          </div>
-          <div className="popover-seek">
-            <SeekButtons />
-          </div>
-        </>
-      )}
-      <AudioPreferenceSelect playback={playback} />
-      <button
-        disabled={!current}
-        onClick={(event) => {
-          const popover = event.currentTarget.closest<HTMLElement>(OPEN_LAYER);
-          if (popover) closeLayer(popover);
-          popover
-            ?.closest('.control-popover')
-            ?.querySelector<HTMLButtonElement>(':scope > button')
-            ?.focus();
-          setAudioQualityOpen(true);
-        }}
-      >
-        <MusicNotesIcon size={19} />
-        音质与音轨
-      </button>
-      {desktop && !desktopHost.available && (
-        <label className="choice popover-lyrics-choice">
-          <input
-            type="checkbox"
-            checked={lyrics.bottom}
-            onChange={(event) => lyrics.updateDisplay({ bottom: event.target.checked })}
-          />
-          底部歌词
-        </label>
-      )}
-      {desktopHost.available && (
-        <label className="choice popover-lyrics-choice">
-          <input type="checkbox" checked={desktopHost.visible} onChange={desktopHost.toggle} />
-          桌面悬浮歌词
-        </label>
-      )}
-      <button
-        onClick={(event) => {
-          event.currentTarget
-            .closest('.control-popover')
-            ?.querySelector<HTMLButtonElement>(':scope > button')
-            ?.focus();
-          openLyricsManagement();
-        }}
-      >
-        <MusicNotesIcon size={19} />
-        {desktop && page === 'playing' ? '歌词管理' : '歌词设置'}
-      </button>
-      {desktop && page === 'playing' && (
-        <>
-          <DesktopLyricFont />
-          <DesktopLyricMotion lyrics={lyrics} />
-        </>
-      )}
-      {desktopLyricsOpen && (
-        <>
-          <label className="choice popover-lyrics-choice">
-            <input
-              type="checkbox"
-              checked={lyrics.translations}
-              onChange={(event) => lyrics.updateDisplay({ translations: event.target.checked })}
-            />
-            显示翻译
-          </label>
-          <a href="/legal/desktop-lyrics-source.tar.gz" download="slowtune-desktop-lyrics-source.tar.gz">
-            下载当前构建对应源码
-          </a>
-          <a href="/legal/THIRD-PARTY-NOTICES.txt" download>
-            下载第三方许可全文
-          </a>
-        </>
-      )}
-      {!dock && page === 'playing' && (
-        <div className="popover-listening-extras">
-          <div className="popover-seek">
-            <SeekButtons />
-          </div>
-          <div className="popover-volume">
-            <Volume />
-          </div>
-        </div>
-      )}
-      {!dock && page === 'playing' && (
-        <div className="popover-short-settings">
-          <PlaybackRate labeled />
-          <SleepButton labeled />
-          <button
-            className="btn btn-ghost"
-            aria-label="播放队列"
-            aria-expanded={queueVisible}
-            onClick={toggleQueue}
-          >
-            <QueueIcon size={19} />
-            播放队列
-          </button>
-        </div>
-      )}
-      {current && (
-        <button onClick={() => open({ type: 'track', track: current, entryContext: 'part' })}>
-          <MusicNotesIcon size={19} />
-          歌曲操作
-        </button>
-      )}
-      {current && (
-        <button onClick={() => groupSource(current)}>
-          <PlusIcon size={19} />
-          归入歌曲
-        </button>
-      )}
-      {current && (
-        <a
-          href={
-            current.url ||
-            (current.ref.provider === 'bilibili'
-              ? 'https://www.bilibili.com/video/' + current.ref.id
-              : 'https://www.youtube.com/watch?v=' + current.ref.id)
-          }
-          target="_blank"
-          rel="noreferrer"
-        >
-          <LinkIcon size={19} />
-          查看来源
-        </a>
-      )}
-      {!dock && page === 'playing' && (
-        <div className="player-help">
-          {snapshot.state === 'idle' && snapshot.items.length > 0 && (
-            <p className="restore-hint">队列已恢复，播放将从头开始。</p>
-          )}
-          <p className="player-shortcuts">
-            <kbd>空格</kbd> 播放 / 暂停
-          </p>
-          <p className="player-shortcuts">
-            <kbd>←</kbd>
-            <kbd>→</kbd> 跳转 5 秒
-          </p>
-        </div>
-      )}
-      <button
-        disabled={!current || snapshot.state === 'idle' || snapshot.state === 'stopped'}
-        onClick={() => void startPlayback(() => playback.stop(), false)}
-      >
-        <StopIcon size={19} />
-        停止播放
-      </button>
-      <button
-        disabled={!current || snapshot.state === 'idle'}
-        onClick={() => void startPlayback(() => playback.reset(), false)}
-      >
-        <ArrowCounterClockwiseIcon size={19} />
-        停止并归零
-      </button>
     </ControlPopover>
   );
 }

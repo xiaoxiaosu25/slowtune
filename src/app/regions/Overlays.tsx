@@ -1,3 +1,4 @@
+import { Button, IconButton } from '../../ui/Button';
 import { ListeningSidePanel, WorkspaceQueue } from '../components/WorkspaceControls';
 import { WorkspaceNotice } from '../components/WorkspaceNotice';
 import {
@@ -7,6 +8,8 @@ import {
   PlaybackProgress,
   Volume,
   PlaybackMode,
+  PlaybackRate,
+  SleepButton,
   DesktopSongMeta,
   DesktopPlaybackFeedback,
 } from '../components/PlaybackControls';
@@ -99,21 +102,23 @@ export function LyricsLayers() {
               <div className="desktop-lyrics-tools">
                 <PlaybackMode />
                 <Volume />
+                <PlaybackRate iconOnly />
+                <SleepButton iconOnly />
               </div>
               <Transport large />
               <div className="desktop-lyrics-tools">
-                <button
-                  className="btn btn-icon"
+                <IconButton
+
                   aria-label="播放队列"
                   title="播放队列"
                   aria-expanded={queueVisible}
                   onClick={toggleQueue}
                 >
                   <QueueIcon size={24} />
-                </button>
+                </IconButton>
                 {current && (
-                  <button
-                    className={'btn btn-icon ' + (isFavorite(current) ? 'saved' : '')}
+                  <IconButton
+                    className={' ' + (isFavorite(current) ? 'saved' : '')}
                     title={isFavorite(current) ? '取消收藏当前歌曲' : '收藏当前歌曲'}
                     aria-label="收藏当前歌曲"
                     aria-pressed={isFavorite(current)}
@@ -126,10 +131,10 @@ export function LyricsLayers() {
                     ) : (
                       <HeartIcon size={24} weight={isFavorite(current) ? 'fill' : 'regular'} />
                     )}
-                  </button>
+                  </IconButton>
                 )}
                 <LyricsToggle active onClick={toggleDesktopLyrics} />
-                <PlayerOptions dock />
+                <PlayerOptions />
               </div>
             </>
           }
@@ -263,24 +268,24 @@ export function WorkspaceDialogs() {
           offline={!online}
           onDismiss={() => setError('')}
         >
-          <button className="btn btn-ghost" onClick={() => void reload()}>
+          <Button variant="ghost"  onClick={() => void reload()}>
             重读资料 / 检查服务
-          </button>
+          </Button>
           {pending && (
-            <button className="btn btn-ghost" disabled={saving} onClick={retryWrite}>
+            <Button variant="ghost"  disabled={saving} onClick={retryWrite}>
               重试保留编辑
-            </button>
+            </Button>
           )}
           {error.includes('会话') && (
-            <button
-              className="btn btn-ghost"
+            <Button variant="ghost"
+
               onClick={async () => {
                 await playback.release();
                 onLogout();
               }}
             >
               重新连接
-            </button>
+            </Button>
           )}
         </DesktopOperationFeedback>
       )}

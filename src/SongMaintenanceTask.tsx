@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeftIcon, MagnifyingGlassIcon } from '@phosphor-icons/react';
 import type { SongLibraryState, SongVersion } from '../server/song-library-types';
@@ -70,7 +71,7 @@ export function SongMaintenanceTask({ task, library, onChange, onBack, onComplet
   const confirmLabel = task.type === 'merge-songs' ? `合并到《${targetSong?.title}》` : task.type === 'move-version' ? `移到《${targetSong?.title}》` : task.type === 'delete-song' ? '删除此歌曲及全部版本' : task.type === 'clean-unavailable' ? `清理 ${ids.length} 个失效版本` : '删除此版本';
   const playlists = library.snapshot.playlists.filter(p => p.entries.some(e => e.songId === song?.id || e.pinnedVersionId && ids.includes(e.pinnedVersionId)));
   return <div className="song-task">
-    <button type="button" className="btn btn-ghost btn-sm" disabled={operation.busy} onClick={onBack}><ArrowLeftIcon size={18}/>返回</button>
+    <Button variant="ghost" compact type="button"  disabled={operation.busy} onClick={onBack}><ArrowLeftIcon size={18}/>返回</Button>
     <h3 ref={heading} tabIndex={-1}>{titles[task.type]}</h3>
     <p className="muted">{task.type === 'merge-songs' ? '同一首歌保存了两次？选定要保留的歌曲，把所有版本和歌单记录合并过去。目标歌曲的歌名、歌手和默认版本会保留。' : task.type === 'move-version' ? '这个版本放错了歌曲？将它移到正确的歌曲，原歌曲继续保留。' : task.type === 'delete-song' ? '这会删除歌曲资料及其全部版本，并移除收藏和歌单中的记录。仅想从歌单移除，请返回歌单操作。' : task.type === 'clean-unavailable' ? '仅清理已确认来源不存在的版本。网络、登录或限流问题不会作为失效版本清理。' : '这会从歌曲中删除此版本。歌曲资料及其他版本继续保留。'}</p>
     {song && <div className="song-task-identity"><SongCover song={song}/><div><strong>{song.title}</strong><p className="muted">{song.artists?.join(' / ') || '歌手未填写'} · {library.snapshot.versions.filter(v => v.songId === song.id).length} 个版本</p></div><span className="muted">{requiresTarget ? '移出' : '删除对象'}</span></div>}
@@ -79,7 +80,7 @@ export function SongMaintenanceTask({ task, library, onChange, onBack, onComplet
       <div className="song-target-list" role="radiogroup" aria-label="目标歌曲">{candidates.map(s => <label className={'song-target-option' + (s.id === target ? ' selected' : '')} key={s.id}><input type="radio" name="maintenance-target" checked={target === s.id} disabled={operation.busy} onChange={() => { setTarget(s.id); setPreview(undefined); }}/><span><strong>{s.title}</strong><small>{s.artists?.join(' / ') || '歌手未填写'}</small></span><small>{library.snapshot.versions.filter(v => v.songId === s.id).length} 个版本</small></label>)}{!candidates.length && <p className="muted">没有匹配的目标歌曲。</p>}</div>
       {targetSong && <p role="status">{task.type === 'merge-songs' ? '合并到' : '移到'}：{targetSong.title} · {targetSong.artists?.join(' / ') || '歌手未填写'}</p>}
     </section>}
-    <div className="toolbar"><button className="btn btn-secondary" disabled={operation.busy || !valid} onClick={() => void prepare()}>{preview ? '重新预览影响' : '预览影响'}</button>{operation.busy && <button className="btn btn-ghost" onClick={operation.cancel}>取消处理</button>}</div>
+    <div className="toolbar"><Button variant="secondary"  disabled={operation.busy || !valid} onClick={() => void prepare()}>{preview ? '重新预览影响' : '预览影响'}</Button>{operation.busy && <Button variant="ghost"  onClick={operation.cancel}>取消处理</Button>}</div>
     {preview && <section className="song-impact" aria-label="操作影响预览"><h4>确认前，请核对影响</h4>
       <ul><li>{task.type === 'merge-songs' ? `将《${song?.title}》的 ${preview.impact.versions} 个版本归入《${targetSong?.title}》，歌单中的重复记录继续保留。` : task.type === 'move-version' ? `将 ${affected.length} 个版本移到《${targetSong?.title}》。` : task.type === 'delete-song' ? `删除《${song?.title}》及其 ${preview.impact.versions} 个版本。` : task.type === 'delete-version' ? `删除「${affected[0] ? versionName(affected[0]) : '所选版本'}」，歌曲资料和其他版本继续保留。` : `清理所选 ${preview.impact.versions} 个已确认失效版本。`}</li>
         {!!preview.impact.favorites && <li>减少 {preview.impact.favorites} 条收藏记录。</li>}
@@ -91,10 +92,10 @@ export function SongMaintenanceTask({ task, library, onChange, onBack, onComplet
       </ul>
       {!!preview.impact.remoteRemovals.length && <div className="song-remote-impact"><strong>会从关联的 B站收藏夹移除 {preview.impact.remoteRemovals.length} 个视频</strong><ul>{preview.impact.remoteRemovals.map(item => <li key={item.linkId + item.bvid}><a href={'https://www.bilibili.com/video/' + item.bvid} target="_blank" rel="noreferrer">{item.bvid}</a></li>)}</ul></div>}
       {preview.revision !== library.revision && <p role="alert">资料已变化，请重新预览后再确认。</p>}{expired && <p role="alert">预览已到期，请重新预览。</p>}
-      <div className="modal-actions"><button className="btn btn-ghost" disabled={operation.busy} onClick={onBack}>取消</button><button className="btn btn-danger" disabled={operation.busy || !valid || expired || preview.expiresAt <= Date.now() || preview.revision !== library.revision} onClick={() => void operation.run(async signal => {
+      <div className="modal-actions"><Button variant="ghost"  disabled={operation.busy} onClick={onBack}>取消</Button><Button variant="danger"  disabled={operation.busy || !valid || expired || preview.expiresAt <= Date.now() || preview.revision !== library.revision} onClick={() => void operation.run(async signal => {
         const saved = await request<SongLibraryState>('/api/song-library/maintenance/commit', { revision: preview.revision, token: preview.token }, signal);
         if (!signal.aborted) { onChange(saved); onComplete(saved); }
-      })}>{operation.busy ? '处理中…' : confirmLabel}</button></div>
+      })}>{operation.busy ? '处理中…' : confirmLabel}</Button></div>
     </section>}
     {operation.error && <p className="feedback" role="alert">{operation.error}</p>}
   </div>;

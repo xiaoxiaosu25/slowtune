@@ -5,6 +5,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { controlViolations } from './check-controls.mjs';
 
 const tokenFile = 'src/styles/tokens.css';
 const sizedProperty = /^(font|font-size|border(-[a-z]+)*-radius)$/;
@@ -80,7 +81,8 @@ export function styleViolations(root) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const errors = styleViolations(fileURLToPath(new URL('..', import.meta.url)));
-  if (errors.length) { console.error(errors.join('\n') + `\n共 ${errors.length} 处问题；请改用 ${tokenFile} 中的变量。`); process.exitCode = 1; }
-  else console.log('样式变量检查通过。');
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const errors = [...styleViolations(root), ...controlViolations(root)];
+  if (errors.length) { console.error(errors.join('\n') + `\n共 ${errors.length} 处问题；请使用设计变量及公共按钮／标题栏组件。`); process.exitCode = 1; }
+  else console.log('样式变量与按钮组件检查通过。');
 }

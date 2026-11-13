@@ -1,5 +1,6 @@
+import { Button, DismissButton } from '../../ui/Button';
 import { PlayerOptions } from '../components/PlayerOptions';
-import { ArrowLeftIcon, MagnifyingGlassIcon, ArrowRightIcon } from '@phosphor-icons/react';
+import { MagnifyingGlassIcon, ArrowRightIcon } from '@phosphor-icons/react';
 import { MobileHeader } from '../../MobileChrome';
 import { nav } from '../shared';
 import { useWorkspace } from '../workspace-context';
@@ -36,14 +37,7 @@ export function TopBar() {
         >
           {page === 'playing' ? (
             <>
-              <button
-                className="btn btn-icon"
-                aria-label="返回浏览音乐"
-                title="返回浏览音乐"
-                onClick={() => navigate(listeningReturnPage)}
-              >
-                <ArrowLeftIcon size={23} />
-              </button>
+              <DismissButton action="back" aria-label="返回浏览音乐" title="返回浏览音乐" onClick={() => navigate(listeningReturnPage)}/>
               <div className="listening-header-title">
                 <h1>正在播放</h1>
                 <span>
@@ -53,18 +47,18 @@ export function TopBar() {
             </>
           ) : (
             <>
-              <button className="brand" onClick={() => navigate('discover')}>
+              <Button variant="plain" className="brand" onClick={() => navigate('discover')}>
                 慢听
-              </button>
+              </Button>
               <nav className="desktop-nav" aria-label="主导航">
                 {nav.map((n) => (
-                  <button
+                  <Button variant="plain"
                     key={n.id}
                     className={page === n.id ? 'active' : ''}
                     onClick={() => navigate(n.id)}
                   >
                     {n.label}
-                  </button>
+                  </Button>
                 ))}
               </nav>
               <form
@@ -81,9 +75,9 @@ export function TopBar() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
-                <button aria-label="开始搜索" title="开始搜索" type="submit">
+                <Button variant="plain" aria-label="开始搜索" title="开始搜索" type="submit">
                   <ArrowRightIcon size={19} />
-                </button>
+                </Button>
               </form>
             </>
           )}

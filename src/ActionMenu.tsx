@@ -1,3 +1,4 @@
+import { Button, type ButtonProps } from './ui/Button';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as Menu from '@radix-ui/react-menu';
 import { DotsThreeIcon } from '@phosphor-icons/react';
@@ -6,8 +7,8 @@ import './action-menu.css';
 
 export type MenuAction = { id: string; label: string; ariaLabel?: string; icon?: ReactNode; disabled?: boolean; hint?: string; danger?: boolean; onSelect?: () => void; href?: string } | { separator: true };
 
-export function ActionMenu({ label, title, subtitle, target, actions, className = '', buttonClassName = 'btn-icon', trigger = <DotsThreeIcon size={24}/> }: {
-  label: string; title?: string; subtitle?: string; target: string; actions: MenuAction[]; className?: string; buttonClassName?: string; trigger?: ReactNode;
+export function ActionMenu({ label, title, subtitle, target, actions, className = '', buttonVariant = 'icon', trigger = <DotsThreeIcon size={24}/> }: {
+  label: string; title?: string; subtitle?: string; target: string; actions: MenuAction[]; className?: string; buttonVariant?: ButtonProps['variant']; trigger?: ReactNode;
 }) {
   const id = useId();
   const host = useRef<HTMLDivElement>(null);
@@ -82,11 +83,11 @@ export function ActionMenu({ label, title, subtitle, target, actions, className 
       <div ref={host} className={'control-popover action-menu ' + className} data-open={open || undefined}>
         <Menu.Anchor virtualRef={anchor} />
         {trigger !== null && (
-          <button ref={button} type="button" className={'btn ' + buttonClassName + (open ? ' saved' : '')}
+          <Button ref={button} variant={buttonVariant} className={open ? 'saved' : undefined}
             aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
             onClick={() => { if (open) close(true); else { returnTo.current = button.current; setPoint(null); setOpen(true); } }}>
             {trigger}
-          </button>
+          </Button>
         )}
         <Menu.Content ref={panel} id={id} className="control-popover-panel context-menu floating-menu"
           data-layer="menu" aria-label={label} side="bottom" align={point ? 'start' : 'end'} sideOffset={point ? 0 : 6}
@@ -113,7 +114,7 @@ export function ActionMenu({ label, title, subtitle, target, actions, className 
               }}>
               {action.href && !action.disabled
                 ? <a href={action.href} target="_blank" rel="noreferrer">{content}</a>
-                : <button type="button" className={action.danger ? 'danger-text' : undefined}>{content}</button>}
+                : <Button variant="plain" type="button" className={action.danger ? 'danger-text' : undefined}>{content}</Button>}
             </Menu.Item>;
           })}
         </Menu.Content>

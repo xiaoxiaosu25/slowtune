@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import type { Song, SongCatalogRecord, SongLibraryState } from '../server/song-library-types';
 import { request, cancelled, errorText } from './api';
@@ -34,13 +35,13 @@ export function SongCatalogPanel({ song, revision, disabled, onChange, onClose }
     <form className="song-catalog-search" onSubmit={event => { event.preventDefault(); if (!query.trim() || busy || disabled) return; void run(async signal => {
       const result = await request<{ candidates: SongCatalogRecord[] }>('/api/song-library/catalog/search', { query: query.trim() }, signal);
       if (!signal.aborted) setCandidates(result.candidates);
-    }); }}><label className="field"><span className="field-label">目录搜索关键词</span><input className="input" aria-label="目录搜索关键词" value={query} maxLength={500} disabled={disabled || busy} onChange={e => setQuery(e.target.value)}/></label><button className="btn btn-secondary" disabled={disabled || busy || !query.trim()}>搜索目录</button></form>
-    {busy && <p role="status">正在读取目录… <button className="btn btn-ghost btn-sm" onClick={() => { work.current?.abort(); setBusy(false); }}>取消</button></p>}
+    }); }}><label className="field"><span className="field-label">目录搜索关键词</span><input className="input" aria-label="目录搜索关键词" value={query} maxLength={500} disabled={disabled || busy} onChange={e => setQuery(e.target.value)}/></label><Button variant="secondary" type="submit"  disabled={disabled || busy || !query.trim()}>搜索目录</Button></form>
+    {busy && <p role="status">正在读取目录… <Button variant="ghost" compact  onClick={() => { work.current?.abort(); setBusy(false); }}>取消</Button></p>}
     {error && <p className="feedback" role="alert">{error}</p>}
     {candidates && (candidates.length ? <div className="song-catalog-results">{candidates.map(record => <article className="song-catalog-candidate" key={record.id}>
       <SongCover song={{ ...song, artwork: record.artwork }}/><div><strong>{record.title}</strong><p>{record.artists.join(' / ')}</p><small className="muted">{record.album || '专辑未提供'} · 网易云</small><a href={record.url} target="_blank" rel="noreferrer">查看目录来源</a></div>
-      <button className="btn btn-secondary btn-sm" aria-label={'采用目录资料 ' + record.title + ' · ' + (record.album ?? record.id)} disabled={disabled || busy} onClick={() => select({ id: record.id })}>采用这份资料</button>
+      <Button variant="secondary" compact  aria-label={'采用目录资料 ' + record.title + ' · ' + (record.album ?? record.id)} disabled={disabled || busy} onClick={() => select({ id: record.id })}>采用这份资料</Button>
     </article>)}</div> : <p role="status" className="muted">没有找到目录歌曲，可以调整歌名、歌手后重试。</p>)}
-    <button className="btn btn-ghost btn-sm" disabled={disabled || busy || song.desktopCatalog?.state === 'disabled'} onClick={() => select({ disabled: true })}>保留来源资料，停止自动匹配</button>
+    <Button variant="ghost" compact  disabled={disabled || busy || song.desktopCatalog?.state === 'disabled'} onClick={() => select({ disabled: true })}>保留来源资料，停止自动匹配</Button>
   </section>;
 }

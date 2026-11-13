@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import { renderTrackList } from '../components/TrackList';
 import { TrackListSkeleton } from '../components/TrackRowCue';
 import { ErrorFeedback } from '../components/WorkspaceControls';
@@ -85,10 +86,10 @@ export function SearchPanel() {
           onLink={() => open({ type: 'link' })}
         >
           {desktop && searchReturn.current && (
-            <button className="btn btn-ghost btn-sm" onClick={closeSearch}>
+            <Button variant="ghost" compact  onClick={closeSearch}>
               <ArrowLeftIcon size={18} />
               返回歌曲与版本
-            </button>
+            </Button>
           )}
           {desktop && (
             <form
@@ -106,33 +107,33 @@ export function SearchPanel() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <button aria-label="搜索" type="submit">
+              <Button variant="plain" aria-label="搜索" type="submit">
                 <MagnifyingGlassIcon size={20} />
-              </button>
+              </Button>
             </form>
           )}
           {!linkRef && !searchTarget.current.songId && (
             <div className="segmented search-type-tabs" aria-label="搜索类型">
-              <button
+              <Button variant="plain"
                 aria-pressed={searchType === 'video'}
                 className={searchType === 'video' ? 'selected' : ''}
                 onClick={() => changeSearchType('video')}
               >
                 视频
-              </button>
-              <button
+              </Button>
+              <Button variant="plain"
                 aria-pressed={searchType === 'users'}
                 className={searchType === 'users' ? 'selected' : ''}
                 onClick={() => changeSearchType('users')}
               >
                 用户
-              </button>
+              </Button>
             </div>
           )}
           {searchType === 'video' && youtubeEnabled && (
             <div className="segmented search-source-tabs" aria-label="搜索来源">
               {Object.entries(names).map(([id, name]) => (
-                <button
+                <Button variant="plain"
                   key={id}
                   className={searchSource === id ? 'selected' : ''}
                   aria-pressed={searchSource === id}
@@ -147,7 +148,7 @@ export function SearchPanel() {
                   }}
                 >
                   {name}
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -163,14 +164,14 @@ export function SearchPanel() {
                     ['newest', '最新发布'],
                   ] as const
                 ).map(([order, label]) => (
-                  <button
+                  <Button variant="plain"
                     key={order}
                     className={searchOrder === order ? 'selected' : ''}
                     aria-pressed={searchOrder === order}
                     onClick={() => changeSearchOrder(order)}
                   >
                     {label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -240,15 +241,15 @@ export function SearchPanel() {
                         )}
                       </div>
                       <div className="toolbar">
-                        <button
-                          className="btn btn-primary btn-sm"
+                        <Button variant="primary" compact
+
                           disabled={sourceBlocked(item.entry)}
                           onClick={() => void trackAction(item.entry, 'play', undefined, 'part')}
                         >
                           播放此结果
-                        </button>
-                        <button
-                          className="btn btn-secondary btn-sm"
+                        </Button>
+                        <Button variant="secondary" compact
+
                           onClick={() =>
                             open({
                               type: 'track',
@@ -259,7 +260,7 @@ export function SearchPanel() {
                           }
                         >
                           管理匹配偏好
-                        </button>
+                        </Button>
                       </div>
                     </section>
                   ))}
@@ -297,8 +298,8 @@ export function SearchPanel() {
                               }
                             />
                             {r.busy && (
-                              <button
-                                className="btn btn-ghost"
+                              <Button variant="ghost"
+
                                 onClick={() => {
                                   search.current?.abort();
                                   setResults((old) =>
@@ -309,7 +310,7 @@ export function SearchPanel() {
                                 }}
                               >
                                 取消搜索
-                              </button>
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -324,12 +325,12 @@ export function SearchPanel() {
                                 ；筛选切换仅影响本次展示。
                               </span>
                             </p>
-                            <button
-                              className="btn btn-secondary btn-sm"
+                            <Button variant="secondary" compact
+
                               onClick={() => setShowAllSearch(!showAll)}
                             >
                               {showAll ? '恢复筛选' : '显示全部'}
-                            </button>
+                            </Button>
                           </div>
                         )}
                         {r.classificationIssue && (
@@ -401,22 +402,22 @@ export function SearchPanel() {
               <div className="feedback" role="alert">
                 <p>{error}</p>
                 {pending && (
-                  <button className="btn btn-secondary" onClick={retryWrite}>
+                  <Button variant="secondary"  onClick={retryWrite}>
                     重试保留编辑
-                  </button>
+                  </Button>
                 )}
-                <button className="btn btn-ghost" onClick={() => setError('')}>
+                <Button variant="ghost"  onClick={() => setError('')}>
                   关闭提示
-                </button>
+                </Button>
               </div>
             )}
             {desktop && notice && !popup && !error && (
               <div className="action-notice" role="status">
                 {notice}
                 {noticeAction && (
-                  <button className="btn btn-ghost btn-sm" onClick={noticeAction.run}>
+                  <Button variant="ghost" compact  onClick={noticeAction.run}>
                     {noticeAction.label}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}

@@ -803,20 +803,23 @@ test('Browser regressions: favorite state, unavailable warnings and current acce
       await page.getByRole('button',{name:'返回浏览音乐',exact:true}).click();
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'the dock fits '+width+'px');
       if(width>760){
-        assert(await page.locator('.playbar-tools').evaluate(element => [...element.children].filter(child => child.getClientRects().length).every(child => child.getBoundingClientRect().right <= innerWidth)), 'dock tools fit ' + width + 'px');
-        await page.locator('.playbar').getByRole('button',{name:'更多播放选项',exact:true}).click();
-        const options=page.locator('.playbar .player-options .control-popover-panel');
-        assert.equal(await options.getByRole('button',{name:'播放速度',exact:true}).isVisible(), width<=1250);
-        assert.equal(await options.getByRole('button',{name:'睡眠定时器',exact:true}).isVisible(), width<=1250);
-        if(width<=1250){
-          await selectRate(options, 1.5);
-          assert(await options.isVisible(), 'choosing a speed keeps the parent options open');
-          await options.getByRole('button',{name:'播放速度',exact:true}).click();
-          await options.getByRole('menu',{name:'播放速度',exact:true}).waitFor();
-          await page.keyboard.press('Escape');
-          assert(await options.isVisible(), 'Escape dismisses the nested speed menu first');
-          await selectRate(options, 1);
+        const dock = page.locator('.playbar-tools');
+        assert(await dock.evaluate(element => {
+          const bounds = element.getBoundingClientRect();
+          const buttons = [...element.querySelectorAll('button')].filter(button => button.getClientRects().length).map(button => button.getBoundingClientRect());
+          return buttons.every((button, index) => button.left >= (buttons[index - 1]?.right ?? bounds.left) - 1 && button.right <= bounds.right + 1);
+        }), 'dock tools fit without overlap at ' + width + 'px');
+        for (const name of ['播放速度', '睡眠定时器']) {
+          const button = dock.getByRole('button', { name, exact: true });
+          assert(await button.isVisible());
+          assert.equal(await button.textContent(), '');
+          assert.equal(await button.evaluate(el => getComputedStyle(el).borderRadius), '50%');
         }
+        await selectRate(dock, 1.5);
+        await selectRate(dock, 1);
+        await dock.getByRole('button',{name:'更多播放选项',exact:true}).click();
+        const options=dock.locator('.player-options .control-popover-panel');
+        assert.equal(await options.getByRole('button',{name:/播放速度|睡眠定时器|快退|快进|停止/}).count(), 0);
         await page.keyboard.press('Escape');
         assert.equal(await options.isVisible(),false);
       }

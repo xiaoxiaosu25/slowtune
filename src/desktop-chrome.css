@@ -11,14 +11,15 @@ html[data-desktop-host] .topbar {
   backdrop-filter:none;
   app-region:drag;
 }
-html[data-desktop-host] :is(.topbar,.welcome-header) :is(button,input,form,a,select) { app-region:no-drag; }
+html[data-desktop-host] :is(button,input,textarea,form,a,select,summary,dialog,[popover],[data-layer]) { app-region:no-drag; }
 html[data-desktop-host] .welcome-screen:not(.welcome-screen-preview) .welcome-header {
   padding-right:calc(var(--desktop-caption-width) + 16px);
   app-region:drag;
 }
 html[data-desktop-host] .welcome-screen:not(.welcome-screen-preview) .welcome-header>.btn:first-of-type { margin-left:auto; }
 html[data-desktop-host] .desktop-immersive-chrome {
-  position:fixed; top:0; left:0; right:var(--desktop-caption-width); height:40px; z-index:calc(var(--z-overlay) + 1);
+  /* Keep the drag strip below the lyric view's close button. */
+  position:fixed; top:0; left:0; right:var(--desktop-caption-width); height:40px; z-index:var(--z-base);
   pointer-events:none;
 }
 html[data-desktop-host] .desktop-window-drag { position:absolute; inset:0; app-region:drag; pointer-events:auto; }

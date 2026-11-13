@@ -99,7 +99,7 @@ export function useTrackDialogs({
         setCanonical((old) => ({ ...old, [key(popup.track!.ref)]: entry.ref }));
         setPopup((old) =>
           old && old.session === session
-            ? { ...old, track: { ...old.track!, ...entry }, parts: entry.parts ?? [entry] }
+            ? { ...old, track: { ...old.track!, ...entry, partsGroupTitle:old.track!.partsGroupTitle ?? old.track!.title }, parts: entry.parts ?? [entry] }
             : old,
         );
       })

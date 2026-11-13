@@ -1,3 +1,4 @@
+import { Button, IconButton } from './ui/Button';
 import { useEffect, useId, useState } from 'react';
 import { EyeIcon, EyeSlashIcon, LockKeyIcon } from '@phosphor-icons/react';
 import type { AccessState } from '../server/startup-types';
@@ -5,7 +6,7 @@ import { errorText, request } from './api';
 
 function AccessCodeField({label,value,onChange,autoComplete,required=false,disabled=false}:{label:string;value:string;onChange:(value:string)=>void;autoComplete:string;required?:boolean;disabled?:boolean}) {
   const [visible,setVisible]=useState(false),id=useId();
-  return <label className="field" htmlFor={id}><span className="field-label">{label}</span><span className="welcome-password"><input id={id} className="input" aria-label={label} type={visible?'text':'password'} autoComplete={autoComplete} value={value} onChange={event=>onChange(event.target.value)} required={required} disabled={disabled} maxLength={256}/><button className="btn btn-icon" type="button" aria-label={(visible?'隐藏':'显示')+label} onClick={()=>setVisible(value=>!value)}>{visible?<EyeSlashIcon size={18}/>:<EyeIcon size={18}/>}</button></span></label>;
+  return <label className="field" htmlFor={id}><span className="field-label">{label}</span><span className="welcome-password"><input id={id} className="input" aria-label={label} type={visible?'text':'password'} autoComplete={autoComplete} value={value} onChange={event=>onChange(event.target.value)} required={required} disabled={disabled} maxLength={256}/><IconButton  type="button" aria-label={(visible?'隐藏':'显示')+label} onClick={()=>setVisible(value=>!value)}>{visible?<EyeSlashIcon size={18}/>:<EyeIcon size={18}/>}</IconButton></span></label>;
 }
 
 export function AccessSettings({onChanged}:{onChanged:()=>void}) {
@@ -26,7 +27,7 @@ export function AccessSettings({onChanged}:{onChanged:()=>void}) {
   };
   return <div className="settings-stack access-settings">
     <header className="settings-section-heading"><div><h3>启动与访问</h3><p className="muted">决定如何进入慢听，也可以在这里修改私人访问码。</p></div><LockKeyIcon size={25}/></header>
-    {!state?<><p role="status">{error||'正在读取访问设置…'}</p>{error&&<button className="btn btn-secondary" onClick={()=>void read()}>重新读取</button>}</>:<form className="settings-stack" onSubmit={event=>{event.preventDefault();void save();}}>
+    {!state?<><p role="status">{error||'正在读取访问设置…'}</p>{error&&<Button variant="secondary"  onClick={()=>void read()}>重新读取</Button>}</>:<form className="settings-stack" onSubmit={event=>{event.preventDefault();void save();}}>
       <section className="settings-group settings-stack"><h4>进入方式</h4><label className="choice"><input type="checkbox" checked={required} disabled={busy} onChange={event=>{setRequired(event.target.checked);setMessage('');}}/>进入时验证访问码</label><p className="muted">{required?'没有有效会话时，需要输入访问码。已验证的浏览器会自动连接。':'连接此服务的设备可直接进入，共用歌单、收藏和来源账号。'}</p><p className="muted">欢迎页至少展示约 1.5 秒，同时准备歌单、收藏和首页内容，准备好后自动进入。</p>
         <AccessCodeField label="当前访问码" value={current} onChange={setCurrent} autoComplete="current-password" required disabled={busy}/>
         <p className="muted">保存进入方式或修改访问码，都需要输入当前访问码。</p>
@@ -38,7 +39,7 @@ export function AccessSettings({onChanged}:{onChanged:()=>void}) {
       </section>
       {(error||message)&&<p className="feedback" data-tone={error?'error':undefined} role={error?'alert':'status'}>{error||message}</p>}
       {dirty&&!current&&<p className="muted" role="status">有未保存的修改。请填写上方的当前访问码，再保存设置。</p>}
-      <div className="settings-form-actions"><button className="btn btn-primary" type="submit" disabled={busy||!dirty}>{busy?'保存中…':'保存访问设置'}</button><button className="btn btn-ghost" type="button" disabled={busy} onClick={()=>{setRequired(state.authenticationRequired);setCurrent('');setNext('');setConfirmation('');setMessage('');setError('');}}>取消修改</button>{error&&<button className="btn btn-ghost" type="button" disabled={busy} onClick={()=>void read()}>重读当前设置</button>}</div>
+      <div className="settings-form-actions"><Button variant="primary"  type="submit" disabled={busy||!dirty}>{busy?'保存中…':'保存访问设置'}</Button><Button variant="ghost"  type="button" disabled={busy} onClick={()=>{setRequired(state.authenticationRequired);setCurrent('');setNext('');setConfirmation('');setMessage('');setError('');}}>取消修改</Button>{error&&<Button variant="ghost"  type="button" disabled={busy} onClick={()=>void read()}>重读当前设置</Button>}</div>
     </form>}
   </div>;
 }

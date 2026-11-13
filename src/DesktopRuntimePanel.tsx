@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useState } from 'react';
 import { RefreshButton } from './ListActions';
 import { errorText, type BilibiliAccountState, type ServerStatus } from './api';
@@ -25,20 +26,20 @@ export function DesktopRuntimePanel({ status, checkedAt, account, library, onRef
     })}/></header>
     <p className="muted diagnostics-checked-at">{checkedAt ? `最近取得运行信息：${new Date(checkedAt).toLocaleString('zh-CN', { hour12: false })}` : '尚未取得运行信息'}{refreshFailed ? ' · 本次检查失败，保留上次信息' : ''}</p>
     <dl className="service-overview">
-      <div><dt>B站账号</dt><dd>{accountLabel}<button className="settings-text-link" onClick={onOpenAccount}>管理B站账号</button></dd></div>
-      <div><dt>YouTube</dt><dd>{!youtube ? '未知' : youtube.enabled === false ? '已关闭' : youtube.checking ? '正在检查工具' : youtube.available ? '取源工具可用' : '当前不可用'}<button className="settings-text-link" onClick={onOpenSources}>管理音乐来源</button></dd></div>
+      <div><dt>B站账号</dt><dd>{accountLabel}<Button variant="plain" className="settings-text-link" onClick={onOpenAccount}>管理B站账号</Button></dd></div>
+      <div><dt>YouTube</dt><dd>{!youtube ? '未知' : youtube.enabled === false ? '已关闭' : youtube.checking ? '正在检查工具' : youtube.available ? '取源工具可用' : '当前不可用'}<Button variant="plain" className="settings-text-link" onClick={onOpenSources}>管理音乐来源</Button></dd></div>
       <div><dt>歌单与收藏</dt><dd>{library ? `${library.snapshot.playlists.length} 个歌单 · ${library.snapshot.favorites.length} 首收藏` : '未知'}</dd></div>
     </dl>
     {status?.build?.stale && <p className="feedback">程序已更新，请退出后重新打开慢听。</p>}
-    <section className="settings-group"><h4>诊断复制</h4><p className="muted">复制版本、运行环境、来源状态与错误分类。缺失信息标为未知；不含凭据、媒体地址、账号身份或私人路径，不自动上传。</p><button className="btn btn-secondary" disabled={!!busy} onClick={() => void run('copy', async () => {
+    <section className="settings-group"><h4>诊断复制</h4><p className="muted">复制版本、运行环境、来源状态与错误分类。缺失信息标为未知；不含凭据、媒体地址、账号身份或私人路径，不自动上传。</p><Button variant="secondary"  disabled={!!busy} onClick={() => void run('copy', async () => {
       let runtime;
       try { runtime = await window.slowTuneDesktop!.getRuntimeInfo(); } catch { /* unknown fields remain explicit */ }
       await window.slowTuneDesktop!.copyDiagnostics(desktopDiagnostics({ runtime, status, account, checkedAt, refreshFailed, operationError }));
       setMessage('诊断信息已复制。');
-    })}>{busy === 'copy' ? '正在复制…' : '复制诊断信息'}</button></section>
-    <div className="settings-action-row"><p className="muted">停止播放并释放资源，保留当前队列。</p><button className="btn btn-secondary" disabled={!!busy} onClick={() => void run('stop', async () => { if (!await onStopPlayback()) throw new Error('未能停止播放，请重试。'); setMessage('播放已停止。'); })}>停止播放</button></div>
+    })}>{busy === 'copy' ? '正在复制…' : '复制诊断信息'}</Button></section>
+    <div className="settings-action-row"><p className="muted">停止播放并释放资源，保留当前队列。</p><Button variant="secondary"  disabled={!!busy} onClick={() => void run('stop', async () => { if (!await onStopPlayback()) throw new Error('未能停止播放，请重试。'); setMessage('播放已停止。'); })}>停止播放</Button></div>
     {(message || error) && <p className="feedback" data-tone={error ? 'error' : undefined} role={error ? 'alert' : 'status'}>{error || message}</p>}
     <details className="settings-details"><summary>高级运行信息</summary><dl className="diagnostics"><dt>应用版本</dt><dd>{status?.version ?? '未知'}</dd><dt>内部服务环境</dt><dd>{status?.node ? `Node.js ${status.node}` : '未知'}</dd><dt>本机资源</dt><dd>媒体读取 {status?.delivery?.activeReads ?? '未知'} · 取源任务 {status?.tool?.active ?? '未知'}</dd></dl></details>
-    <p className="muted">队列、模式和音量保存在本应用的 data 文件夹；播放进度不持久化。关闭主窗口会停止播放并退出，最小化可继续播放。<button className="settings-text-link" onClick={onOpenAbout}>查看来源、隐私与开源声明</button></p>
+    <p className="muted">队列、模式和音量保存在本应用的 data 文件夹；播放进度不持久化。关闭主窗口会停止播放并退出，最小化可继续播放。<Button variant="plain" className="settings-text-link" onClick={onOpenAbout}>查看来源、隐私与开源声明</Button></p>
   </div>;
 }

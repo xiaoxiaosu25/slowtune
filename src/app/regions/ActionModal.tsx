@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import { TrackRow, CreatorContent } from '../components/TrackList';
 import { PlaybackSlot } from '../components/PlaybackControls';
 import { PlusIcon, UsersIcon, LinkIcon } from '@phosphor-icons/react';
@@ -79,13 +80,13 @@ export function ActionModal() {
   const feedback = error && (
     <div className="feedback" data-tone="error" role="alert">
       <p>{error}</p>
-      <button type="button" className="btn btn-ghost" onClick={() => void reload()}>
+      <Button variant="ghost" type="button"  onClick={() => void reload()}>
         重读资料 / 检查服务
-      </button>
+      </Button>
       {pending && (
-        <button type="button" className="btn btn-ghost" disabled={saving} onClick={retryWrite}>
+        <Button variant="ghost" type="button"  disabled={saving} onClick={retryWrite}>
           重试保留编辑
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -175,20 +176,20 @@ export function ActionModal() {
                 />
               </label>
               <div className="modal-actions">
-                <button className="btn btn-primary" disabled={linkBusy || !field}>
+                <Button variant="primary" type="submit"  disabled={linkBusy || !field}>
                   {linkBusy ? '解析中…' : '读取真实元信息'}
-                </button>
+                </Button>
                 {linkBusy && (
-                  <button
+                  <Button variant="secondary"
                     type="button"
-                    className="btn btn-secondary"
+
                     onClick={() => {
                       linkWork.current?.abort();
                       setLinkBusy(false);
                     }}
                   >
                     取消
-                  </button>
+                  </Button>
                 )}
               </div>
             </form>
@@ -199,13 +200,13 @@ export function ActionModal() {
               <p className="muted">YouTube 已关闭。歌曲资料保留，可在设置中重新开启。</p>
               <div className="toolbar">
                 {isFavorite(popup.track) && (
-                  <button
-                    className="btn btn-secondary"
+                  <Button variant="secondary"
+
                     disabled={saving}
                     onClick={() => favorite(popup.track!, true, 'part')}
                   >
                     取消收藏
-                  </button>
+                  </Button>
                 )}
               </div>
               {error && <p role="alert">{error}</p>}
@@ -248,22 +249,22 @@ export function ActionModal() {
               }
               more={
                 <>
-                  <button
-                    className="btn btn-secondary song-group-entry"
+                  <Button variant="secondary"
+                    className="song-group-entry"
                     onClick={() => groupSource(popup.track!)}
                   >
                     <PlusIcon size={19} />
                     归入歌曲 · 添加版本
-                  </button>
+                  </Button>
                   <div className="action-list">
-                    <button
-                      className="btn btn-secondary"
+                    <Button variant="secondary"
+
                       disabled={authorBusy}
                       onClick={() => void openCreator(popup.track!)}
                     >
                       <UsersIcon size={19} />
                       {authorBusy ? '读取作者中…' : '查看 UP / 博主'}
-                    </button>
+                    </Button>
                     <FollowTrackButton
                       key={key(popup.track.ref)}
                       client={client}
@@ -296,8 +297,8 @@ export function ActionModal() {
                   {attachingSong && (
                     <div className="settings-group">
                       <h3>添加到「{attachingSong.title}」</h3>
-                      <button
-                        className="btn btn-primary"
+                      <Button variant="primary"
+
                         disabled={saving}
                         onClick={() =>
                           void mutate(
@@ -313,7 +314,7 @@ export function ActionModal() {
                         }
                       >
                         将此来源添加为歌曲版本
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </>
@@ -324,26 +325,26 @@ export function ActionModal() {
                     <div className="action-notice" role="status">
                       {notice}
                       {noticeAction && (
-                        <button className="btn btn-ghost btn-sm" onClick={noticeAction.run}>
+                        <Button variant="ghost" compact  onClick={noticeAction.run}>
                           {noticeAction.label}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
                   {!desktop && (playback.preparing || snapshot.loading) && (
                     <div className="feedback" role="status">
                       <p>正在准备音轨…</p>
-                      <button className="btn btn-ghost" onClick={playback.cancel}>
+                      <Button variant="ghost"  onClick={playback.cancel}>
                         取消播放准备
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {(error || (!desktop && playback.error)) && (
                     <div className="feedback" data-tone="error" role="alert">
                       <p>{error || playback.error}</p>
                       {!popup.parts && (
-                        <button
-                          className="btn btn-ghost"
+                        <Button variant="ghost"
+
                           disabled={metadataBusy}
                           onClick={() => {
                             setError('');
@@ -351,15 +352,15 @@ export function ActionModal() {
                           }}
                         >
                           重试读取歌曲
-                        </button>
+                        </Button>
                       )}
-                      <button className="btn btn-ghost" onClick={() => void reload()}>
+                      <Button variant="ghost"  onClick={() => void reload()}>
                         重读资料 / 检查服务
-                      </button>
+                      </Button>
                       {pending && (
-                        <button className="btn btn-ghost" disabled={saving} onClick={retryWrite}>
+                        <Button variant="ghost"  disabled={saving} onClick={retryWrite}>
                           重试保留编辑
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
@@ -372,12 +373,12 @@ export function ActionModal() {
               addSingle={() => trackAction(popup.track!, 'add', undefined, popup.entryContext ?? 'video')}
               favoriteSingle={() => favorite(popup.track!, true, popup.entryContext ?? 'video')}
               play={async (parts) => {
-                const ok = await startPlayback(() => playback.playAll(parts), false);
+                const ok = await startPlayback(() => playback.playAll(parts, popup.track!.partsGroupTitle ?? popup.track!.title), false);
                 if (ok && !desktop) flash(`已开始播放 ${parts.length} 首`);
                 return !!ok;
               }}
               add={async (parts) => {
-                const ok = await playback.addAll(parts);
+                const ok = await playback.addAll(parts, popup.track!.partsGroupTitle ?? popup.track!.title);
                 if (ok) flash(`已加入队尾 ${parts.length} 首`);
                 return ok;
               }}

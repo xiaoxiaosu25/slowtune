@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { SpinnerGapIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { errorText } from './api';
 import { ControlPopover } from './ControlPopover';
@@ -18,11 +19,11 @@ export function DiscoveryStatus({ title, issue, loading, onRetry, onCancel }: {
   const label = loading ? '正在更新' : '暂未更新';
   return <div className="discovery-status" data-loading={loading || undefined}>
     <span className="sr-only" role="status">{title}：{label}</span>
-    <ControlPopover className="discovery-status-popover" side="bottom" buttonClassName="btn-ghost btn-sm" label={title + '：' + label + '，查看详情'} icon={<>{loading ? <SpinnerGapIcon size={16}/> : <WarningCircleIcon size={16}/>}<span>{label}</span></>}>
+    <ControlPopover className="discovery-status-popover" side="bottom" buttonVariant="ghost" compact label={title + '：' + label + '，查看详情'} icon={<>{loading ? <SpinnerGapIcon size={16}/> : <WarningCircleIcon size={16}/>}<span>{label}</span></>}>
       <p className="popover-heading">{title} · {loading ? '正在获取新推荐' : '推荐暂未更新'}</p>
       <p className="discovery-status-copy">{loading ? '已有内容可继续浏览，更新完成后会自动替换。' : issueText(issue)}</p>
       {!loading && <p className="discovery-status-copy muted">已保留当前可用的音乐。</p>}
-      {loading ? onCancel && <button onClick={onCancel}>取消更新</button> : onRetry && <button onClick={onRetry}>重试更新</button>}
+      {loading ? onCancel && <Button variant="plain" onClick={onCancel}>取消更新</Button> : onRetry && <Button variant="plain" onClick={onRetry}>重试更新</Button>}
     </ControlPopover>
   </div>;
 }
@@ -31,6 +32,6 @@ export function DiscoveryUnavailable({ issue, onRetry }: { issue: unknown; onRet
   return <div className="empty discovery-unavailable">
     <WarningCircleIcon size={32}/><h3>暂时无法获取推荐</h3>
     <p role="status">{issueText(issue)}</p>
-    {onRetry && <button className="btn btn-secondary" onClick={onRetry}>重新获取推荐</button>}
+    {onRetry && <Button variant="secondary"  onClick={onRetry}>重新获取推荐</Button>}
   </div>;
 }

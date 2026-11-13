@@ -17,6 +17,7 @@ import { desktopCatalogSong } from '../server/song-catalog-display';
 import type { ChartItem } from '../server/chart-types';
 import { type QueueTrack, isTrack, pendingChartTrack, readSavedPlayback, savedQueueEntry, playbackStorageKey, fatalChartError } from './chart-playback';
 import { planPartExpansion, type PartMetadataStore } from './multipart';
+import { groupPartTracks } from './queue-groups';
 import { PlaybackAudioAnalysis } from './audio-analysis';
 import { PlaybackRecovery } from './playback-recovery';
 import { desktopSongSearchOptions } from './song-search';
@@ -37,6 +38,10 @@ interface ChartSession {failed:Set<string>;handled:Set<unknown>;allowed:boolean}
 interface PlaybackEngine {audioIntent?:{signal:AbortSignal;selection:AudioSelection};audioChange?:{id:string;plan:PlaybackPlan;signal:AbortSignal;used:boolean}}
 interface PlaybackEngine {player:StudioPlayer;queue:QueueController;bridge:BestAudioBridge;recovery:PlaybackRecovery;system:MediaSessionController;sleep:SleepTimerController;tracks:Map<string,QueueTrack>;aliases:Map<string,string>;committed:Map<string,EntryRef>;staged?:{id:string;plan:PlaybackPlan;track:Track;used:boolean};ownCommit?:boolean;restored?:string;releasing?:boolean;sourceStopping?:boolean;sourceSkipping?:boolean;nativeNext?:()=>Promise<boolean>;nativePrevious?:()=>Promise<boolean>;sync?:()=>void;intent:number;pendingRecords:Map<string,number>;created:Map<string,AbortSignal|undefined>;prune:()=>void;prefetch?:DesktopNextPrefetch<Track>;batchSession?:ChartSession;chartSession?:ChartSession;chartSelection?:{id:string;track:Track;signal:AbortSignal};advanceFailure?:()=>void}
 const idleSleep:SleepTimerSnapshot={status:'idle',deadline:null,remainingMs:0,trigger:null,action:'pause',remainingItems:null,actionPending:false,error:null};
+function retainQueueGroup<T extends QueueTrack>(engine:PlaybackEngine,id:string,track:T):T {
+  const latest=engine.tracks.get(id);
+  return {...track,partsGroupId:latest?.partsGroupId,partsGroupTitle:latest?.partsGroupTitle};
+}
 export function usePlayback(client:MusicClient, youtubeAvailable=false, partsStore?:PartMetadataStore,youtubeEnabled=youtubeAvailable) {
   const [audioPreference,setAudioPreference]=useState<AudioPreference>(()=>{try{return audioSelection({preference:preferenceStorage().getItem('slow-listening:audio-preference:v1')??'auto'}).preference;}catch{return 'auto';}});
   const audioPreferenceRef=useRef(audioPreference);
@@ -60,7 +65,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     const entry=await withPlaybackDiagnostic(operationId,()=>client.metadata(ref,options));if(!options.signal?.aborted)partsStore?.seed(entry);return entry;
   };
   const engine=useRef<PlaybackEngine|null>(null);
-  const [snapshot,setSnapshot]=useState({current:null as Track|null,currentId:undefined as string|undefined,format:undefined as AudioFormat|undefined,audioSelection:undefined as AudioSelection|undefined,position:0,duration:undefined as number|undefined,playing:false,loading:false,volume:.5,rate:1,muted:false,buffered:[] as {start:number;end:number}[],items:[] as QueueTrack[],order:'sequential',repeat:'off',state:'idle',canPrevious:false,canNext:false});
+  const [snapshot,setSnapshot]=useState({current:null as Track|null,currentId:undefined as string|undefined,format:undefined as AudioFormat|undefined,audioSelection:undefined as AudioSelection|undefined,position:0,duration:undefined as number|undefined,playing:false,loading:false,volume:.5,rate:1,muted:false,buffered:[] as {start:number;end:number}[],items:[] as QueueTrack[],order:'sequential',repeat:'off',shuffleGroups:true,state:'idle',canPrevious:false,canNext:false});
   const [sleep,setSleep]=useState<SleepTimerSnapshot>(idleSleep),[sleepTimer,setSleepTimer]=useState<SleepTimerController|null>(null);
   const [audioAnalysis,setAudioAnalysis]=useState<PlaybackAudioAnalysis|null>(null);
   const analysisRef=useRef<PlaybackAudioAnalysis|null>(null);
@@ -118,7 +123,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     // Rate and mute are user preferences: they survive reloads and later source switches.
     if(initial.rate!==1)player.setPlaybackRate(initial.rate);
     if(initial.muted)player.setMuted(true);
-    const queue=new QueueController(player,{order:initial.order,repeat:initial.repeat,autoAdvance:true});
+    const queue=new QueueController(player,{order:initial.order,repeat:initial.repeat,shuffleGroups:initial.shuffleGroups,autoAdvance:true});
     const system=new MediaSessionController(player,{queue,getMetadata:()=>{const track=tracks.get(queue.snapshot.current?.id??'');return track?{title:track.title,artist:track.artists?.join(' / ')??track.uploader?.name,artwork:track.artwork?[{src:track.artwork}]:[]}:null;}});
     const sleep=new SleepTimerController(player);
     engine.current={player,queue,bridge,recovery,system,sleep,tracks,aliases,committed,restored:initial.current,intent:0,pendingRecords:new Map(),created:new Map(),prune:()=>{},...(initial.tracks.some(t=>t.chartItem)?{chartSession:{failed:new Set<string>(),handled:new Set<unknown>(),allowed:false}}:{})};
@@ -156,8 +161,8 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       // Failed source preparation retains the previous plan; only expose an applied queue selection's format.
       const format=q.loaded?player.currentMetadata?.format as AudioFormat|undefined:undefined;
       clock.publish({position:player.currentTime,duration:Number.isFinite(player.duration)&&player.duration>0?player.duration:current?.durationSeconds,buffered:player.buffered.map(range=>({start:range.start,end:range.end}))});
-      setSnapshot({current,currentId:q.current?.id??e?.restored,format,audioSelection:player.currentPlan?.metadata?.audioSelection as AudioSelection|undefined,position:player.currentTime,duration:Number.isFinite(player.duration)&&player.duration>0?player.duration:current?.durationSeconds,playing:player.state==='playing'&&!player.paused,loading:q.loading,volume:player.volume,rate:player.playbackRate,muted:player.muted,buffered:player.buffered.map(range=>({start:range.start,end:range.end})),items,order:q.order,repeat:q.repeat,state:player.state,canPrevious:q.canPrevious,canNext:q.canNext});
-      try {const saved=JSON.stringify({version:3,items:items.map(savedQueueEntry),current:q.current?.id??e?.restored,order:q.order,repeat:q.repeat,volume:player.volume,rate:player.playbackRate,muted:player.muted});if(saved!==lastSaved){preferenceStorage().setItem(playbackStorageKey,saved);lastSaved=saved;}}catch{setError(window.slowTuneDesktop?'本地播放偏好无法保存；歌单与收藏仍保存在本应用的资料库。':'浏览器无法保存播放资料；歌单与收藏仍由服务保存。');}
+      setSnapshot({current,currentId:q.current?.id??e?.restored,format,audioSelection:player.currentPlan?.metadata?.audioSelection as AudioSelection|undefined,position:player.currentTime,duration:Number.isFinite(player.duration)&&player.duration>0?player.duration:current?.durationSeconds,playing:player.state==='playing'&&!player.paused,loading:q.loading,volume:player.volume,rate:player.playbackRate,muted:player.muted,buffered:player.buffered.map(range=>({start:range.start,end:range.end})),items,order:q.order,repeat:q.repeat,shuffleGroups:q.shuffleGroups,state:player.state,canPrevious:q.canPrevious,canNext:q.canNext});
+      try {const saved=JSON.stringify({version:3,items:items.map(savedQueueEntry),current:q.current?.id??e?.restored,order:q.order,repeat:q.repeat,shuffleGroups:q.shuffleGroups,volume:player.volume,rate:player.playbackRate,muted:player.muted});if(saved!==lastSaved){preferenceStorage().setItem(playbackStorageKey,saved);lastSaved=saved;}}catch{setError(window.slowTuneDesktop?'本地播放偏好无法保存；歌单与收藏仍保存在本应用的资料库。':'浏览器无法保存播放资料；歌单与收藏仍由服务保存。');}
       if(!q.loading&&e?.advanceFailure){const advance=e.advanceFailure;e.advanceFailure=undefined;queueMicrotask(advance);}
     };
     engine.current.sync=update;
@@ -166,7 +171,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     let queueIdentity='',prefetchCurrent:string|undefined;
     const prefetchQueue=()=>{
       if(!owned.prefetch)return;
-      const q=queue.snapshot,identity=JSON.stringify([q.items.map(item=>item.id),q.order,q.repeat]);
+      const q=queue.snapshot,identity=JSON.stringify([q.items.map(item=>[item.id,item.groupId]),q.order,q.repeat,q.shuffleGroups]);
       if(queueIdentity!==identity){queueIdentity=identity;owned.prefetch.cancel();}
       if(prefetchCurrent!==q.current?.id)owned.prefetch.retain([q.current?.id??'']);
       else owned.prefetch.retain([queue.peekNext()?.id??'']);
@@ -328,7 +333,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
   };
   const chartQueueItem=(e:PlaybackEngine,t:QueueTrack):QueueItem=>{
     const id=t.resourceId,resourceId='chart:'+id;e.tracks.set(id,t);e.created.set(id,operation.current?.signal);
-    return {id,title:t.title,artist:t.artists?.join(', '),artwork:t.artwork?[{src:t.artwork}]:undefined,source:{resourceId,resolveTimeoutSeconds:60,prepare:ctx=>preparingRecord(e,id,ctx.signal,async()=>{
+    return {id,groupId:t.partsGroupId,title:t.title,artist:t.artists?.join(', '),artwork:t.artwork?[{src:t.artwork}]:undefined,source:{resourceId,resolveTimeoutSeconds:60,prepare:ctx=>preparingRecord(e,id,ctx.signal,async()=>{
       const audio=selectionFor(e);
       // The fixed queue still selects failed entries when it wraps. Skip their
       // source I/O; the error handler advances again without duplicating them.
@@ -341,7 +346,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       const metadata=await readMetadata(result.ref,{signal:ctx.signal});ctx.signal.throwIfAborted();
       const resolvedEntry=metadata.ref.part?metadata:metadata.parts?.[0]??metadata;
       const entry={...resolvedEntry,...(result.verifiedAudio&&key(result.verifiedAudio.ref)===key(resolvedEntry.ref)?{verifiedAudio:result.verifiedAudio}:{})};
-      e.tracks.set(id,{...entry,resourceId:id,chartItem:t.chartItem});e.sync?.();
+      e.tracks.set(id,retainQueueGroup(e,id,{...entry,resourceId:id,chartItem:t.chartItem}));e.sync?.();
       const source=await e.bridge.sourceFrom(entry,{signal:ctx.signal},audio),plan=await source.prepare(ctx);
       if(ctx.signal.aborted){if(desktopSurface())e.player.sourceController.releaseUnusedPlan(plan);ctx.signal.throwIfAborted();}
       e.aliases.set(resourceId,source.resourceId);e.committed.set(resourceId,entry.ref);return {...plan,resourceId};
@@ -362,7 +367,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     signal.throwIfAborted();if(!enabled.current&&result.entry.ref.provider==='youtube')throw {code:'source-disabled'};
     const source=await withPlaybackDiagnostic(operationId,()=>e.bridge.sourceFrom(result.entry,{signal},audio)),original=await source.prepare({signal,restart:true});
     if(signal.aborted){e.player.sourceController.releaseUnusedPlan(original);signal.throwIfAborted();}
-    const track:Track={...result.entry,...(original.durationSeconds!==undefined?{durationSeconds:original.durationSeconds}:{}),resourceId:t.resourceId,selection,...(t.partsGroupId?{partsGroupId:t.partsGroupId}:{}),...(t.chartItem?{chartItem:t.chartItem}:{}),...((selection.kind==='source'||selection.kind==='chart')&&selection.context?{chartContext:selection.context}:{}),...(result.song?{songId:result.song.id,title:result.song.title,artists:result.song.artists,artwork:result.song.artwork??result.entry.artwork,...(desktopSongSearchOptions().searchMode?{sourceArtwork:result.entry.artwork??null,sourceTitle:result.entry.title}:{})}:{}),...(result.versionId?{versionId:result.versionId}:{})};
+    const track:Track={...result.entry,...(original.durationSeconds!==undefined?{durationSeconds:original.durationSeconds}:{}),resourceId:t.resourceId,selection,...(t.partsGroupId?{partsGroupId:t.partsGroupId,partsGroupTitle:t.partsGroupTitle}:{}),...(t.chartItem?{chartItem:t.chartItem}:{}),...((selection.kind==='source'||selection.kind==='chart')&&selection.context?{chartContext:selection.context}:{}),...(result.song?{songId:result.song.id,title:result.song.title,artists:result.song.artists,artwork:result.song.artwork??result.entry.artwork,...(desktopSongSearchOptions().searchMode?{sourceArtwork:result.entry.artwork??null,sourceTitle:result.entry.title}:{})}:{}),...(result.versionId?{versionId:result.versionId}:{})};
     if(desktopSurface())track.sourceTitle=result.entry.title;
     if(selection.kind==='chart'&&!result.song){track.title=selection.context.title;track.artists=selection.context.artists;track.artwork=selection.context.artwork??track.artwork;}
     return {track,plan:{...original,resourceId:'song:'+t.resourceId,metadata:{...original.metadata,title:track.title,artists:track.artists,artwork:track.artwork}},sourceId:source.resourceId};
@@ -372,18 +377,18 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     if(e.chartSession?.allowed&&e.chartSession.failed.has(id))throw {code:'not-found'};
     const staged=e.staged;
     if(blocked(staged?.id===id?staged.track:e.tracks.get(id)??t))throw {code:'source-disabled'};
-    if(staged?.id===id){signal.throwIfAborted();staged.used=true;e.staged=undefined;e.tracks.set(id,staged.track);e.committed.set(resourceId,staged.track.ref);return {...staged.plan,resourceId};}
+    if(staged?.id===id){signal.throwIfAborted();staged.used=true;e.staged=undefined;e.tracks.set(id,retainQueueGroup(e,id,staged.track));e.committed.set(resourceId,staged.track.ref);return {...staged.plan,resourceId};}
     const original=e.tracks.get(id)?.selection??selection,explicit=e.chartSelection;
     const requested:SongPlaybackSelection=explicit?.id===id&&!explicit.signal.aborted?{kind:'source',ref:explicit.track.ref as any,...(original.kind==='song'?{songId:original.songId}:original.kind==='chart'?{context:original.context}:{})}:original;
     const prepared=await prepareSelection(e,t,requested,signal);
     // A one-time explicit source must not become the queue's permanent automatic choice.
     if(requested!==original)prepared.track.selection=original;
     if(signal.aborted||blocked(prepared.track)){e.player.sourceController.releaseUnusedPlan(prepared.plan);signal.throwIfAborted();throw {code:'source-disabled'};}
-    e.tracks.set(id,prepared.track);e.aliases.set(resourceId,prepared.sourceId);e.committed.set(resourceId,prepared.track.ref);return {...prepared.plan,resourceId};
+    e.tracks.set(id,retainQueueGroup(e,id,prepared.track));e.aliases.set(resourceId,prepared.sourceId);e.committed.set(resourceId,prepared.track.ref);return {...prepared.plan,resourceId};
   };
   const songQueueItem=(e:PlaybackEngine,t:QueueTrack,selection:SongPlaybackSelection,owner=operation.current?.signal):QueueItem=>{
     const id=t.resourceId,resourceId='song:'+id;e.tracks.set(id,t);e.created.set(id,owner);
-    return {id,title:t.title,artist:t.artists?.join(' / '),artwork:t.artwork?[{src:t.artwork}]:undefined,source:{resourceId,resolveTimeoutSeconds:60,prepare:ctx=>preparingRecord(e,id,ctx.signal,()=>prepareSongQueueSource(e,t,selection,resourceId,ctx.signal))}};
+    return {id,groupId:t.partsGroupId,title:t.title,artist:t.artists?.join(' / '),artwork:t.artwork?[{src:t.artwork}]:undefined,source:{resourceId,resolveTimeoutSeconds:60,prepare:ctx=>preparingRecord(e,id,ctx.signal,()=>prepareSongQueueSource(e,t,selection,resourceId,ctx.signal))}};
   };
   const selectionTrack=(selection:SongPlaybackSelection,song:Pick<Song,'title'|'artists'|'artwork'>):QueueTrack=>selection.kind==='chart'?{...pendingChartTrack({rank:selection.context.rank??1,title:song.title,artists:song.artists,artwork:song.artwork},queueId()),selection}:{kind:'song',selection,resourceId:queueId(),title:song.title,artists:song.artists,artwork:song.artwork};
   const playSelection=(selection:SongPlaybackSelection,song:Pick<Song,'title'|'artists'|'artwork'>,replaceCurrent=false)=>run(async(e,signal)=>{
@@ -420,7 +425,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       const existing=matches.find(item=>item.id===(q.current?.id??e.restored))??matches[0];
       if(!existing&&q.items.length>=500)throw {code:'queue-limit'};
       const item=existing??songQueueItem(e,track,selection),retained=existing?e.tracks.get(existing.id):undefined;
-      const selected={...retained,...resolved,resourceId:item.id,...(retained?.partsGroupId?{partsGroupId:retained.partsGroupId}:{}),...(retained?.chartItem?{chartItem:retained.chartItem}:{}),...(retained?.selection&&selection.kind!=='song'?{selection:retained.selection}:{})};
+      const selected={...retained,...resolved,resourceId:item.id,...(retained?.partsGroupId?{partsGroupId:retained.partsGroupId,partsGroupTitle:retained.partsGroupTitle}:{}),...(retained?.chartItem?{chartItem:retained.chartItem}:{}),...(retained?.selection&&selection.kind!=='song'?{selection:retained.selection}:{})};
       staged={id:item.id,track:selected,plan:prepared.plan,used:false};e.staged=staged;
       if(!existing){
         if(q.current)e.queue.insertNext([item]);
@@ -456,7 +461,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     e.tracks.set(id,{...t,resourceId:id});e.created.set(id,owner);
     let firstEntry=ready?t:undefined;
     const resourceId='queue:'+id;
-    return {id,title:t.title,artist:t.artists?.join(', ')??t.uploader?.name,artwork:t.artwork?[{src:t.artwork}]:undefined,source:{resourceId,resolveTimeoutSeconds:60,prepare:ctx=>preparingRecord(e,id,ctx.signal,async()=>{
+    return {id,groupId:t.partsGroupId,title:t.title,artist:t.artists?.join(', ')??t.uploader?.name,artwork:t.artwork?[{src:t.artwork}]:undefined,source:{resourceId,resolveTimeoutSeconds:60,prepare:ctx=>preparingRecord(e,id,ctx.signal,async()=>{
       const audio=selectionFor(e);
       if(e.batchSession?.allowed&&e.batchSession.failed.has(id))throw {code:'not-found'};
       const current=e.tracks.get(id)??t,songSelection=e.staged?.id===id?e.staged.track.selection:current.selection;
@@ -466,7 +471,7 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       // A video's default part may become canonical only now. Keep the declared
       // player resource stable and map refresh/recovery to the bridge's real source.
       if(ctx.signal.aborted||blocked({...entry,resourceId:id})){e.player.sourceController.releaseUnusedPlan(plan);ctx.signal.throwIfAborted();throw {code:'source-disabled'};}
-      e.tracks.set(id,{...t,...entry,resourceId:id});e.aliases.set(resourceId,source.resourceId);e.committed.set(resourceId,entry.ref);return {...plan,resourceId};
+      e.tracks.set(id,retainQueueGroup(e,id,{...t,...entry,resourceId:id}));e.aliases.set(resourceId,source.resourceId);e.committed.set(resourceId,entry.ref);return {...plan,resourceId};
     })}};
   };
   const item=async(e:NonNullable<typeof engine.current>,t:Track,signal:AbortSignal,id=queueId(),ready=false,operationId=e.recovery.diagnosticId):Promise<QueueItem>=>{
@@ -558,6 +563,12 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
       if(at>=0){ordered.splice(at+1,0,...items);ordered.forEach((item,index)=>{if(e.queue.snapshot.items[index]?.id!==item.id)e.queue.move(item.id,index);});}
     }
   };
+  const detachPartGroup=(e:PlaybackEngine,id:string)=>{
+    const track=e.tracks.get(id);
+    if(!track?.partsGroupId)return;
+    const {partsGroupId:_group,partsGroupTitle:_title,...single}=track;
+    e.tracks.set(id,single);e.queue.setGroup([id]);
+  };
   return {snapshot,clock,readPosition,sleep,sleepTimer,audioAnalysis,error,preparing,chartFailures,chartSearchTitle,chartSearchSong,diagnostics:playbackDiagnostics,audioPreference,availableAudio,changeAudio,
     setAudioPreference:(preference:AudioPreference)=>{const selected=audioSelection({preference});audioPreferenceRef.current=selected.preference;setAudioPreference(selected.preference);engine.current?.prefetch?.cancel();try{preferenceStorage().setItem('slow-listening:audio-preference:v1',selected.preference);}catch{setError('音质偏好无法保存，本次选择仍然有效。');}},
     playSelection,
@@ -602,17 +613,17 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     }e.system.updateMetadata();e.sync?.();},
     cancelPending:()=>{operation.current?.abort();const e=engine.current;if(e){e.prefetch?.foreground();e.recovery.cancelEnvironment();e.intent++;if(e.chartSession)e.chartSession.allowed=false;if(e.batchSession)e.batchSession.allowed=false;e.advanceFailure=undefined;if(e.queue.snapshot.loading)void e.player.stop().catch(()=>{});}},
     currentTrackId:()=>engine.current?.queue.snapshot.current?.id,
-    expandParts:(anchorId:string,list:Track[])=>{
+    expandParts:(anchorId:string,list:Track[],title?:string)=>{
       const e=engine.current;if(!e||e.releasing||e.queue.snapshot.current?.id!==anchorId||!e.queue.snapshot.loaded)return false;
       try {
         const tracks=e.queue.snapshot.items.map(item=>e.tracks.get(item.id)!);
-        const plan=planPartExpansion(tracks,anchorId,list,queueId);
+        const plan=planPartExpansion(tracks,anchorId,list,queueId,title);
         const additions=plan.additions.map(track=>deferredItem(e,track,track.resourceId));
         for(const track of plan.group)e.tracks.set(track.resourceId,track);
         // All validation is complete. These edits are synchronous and never reload the selected source.
         if(additions.length)e.queue.add(additions);
         plan.items.forEach((track,index)=>{if(e.queue.snapshot.items[index]?.id!==track.resourceId)e.queue.move(track.resourceId,index);});
-        e.queue.setOrder('sequential');e.queue.setRepeat('off');e.sync?.();setError('');return true;
+        e.queue.setGroup(plan.group.map(track=>track.resourceId),plan.group[0].partsGroupId);e.sync?.();setError('');return true;
       }catch(issue){if(!cancelled(issue))setError(errorText(issue));return false;}
     },
     playChartItem:(chartItem:ChartItem)=>run(async(e,s)=>{
@@ -631,8 +642,8 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     }),
     play:(t:Track,_context?:{tracks:Track[];index:number},ready=false,deadline?:number)=>run((e,s)=>playSingle(e,t,s,ready),true,{deadline}),
     add:(t:Track,ready=false,next=false)=>editQueue(async(e,s)=>{if(blocked(t))throw {code:'source-disabled'};if(e.queue.snapshot.items.length>=500)throw {code:'queue-limit'};const added=await item(e,t,s,queueId(),ready);s.throwIfAborted();if(blocked(t))throw {code:'source-disabled'};if(e.queue.snapshot.items.length>=500)throw {code:'queue-limit'};enqueueItems(e,[added],next);}),
-    playAll:(list:Track[])=>run(async(e,s)=>{if(list.length>500)throw {code:'queue-limit'};if(!list.some(t=>!blocked(t)))throw {code:'source-disabled'};await cancelLoading(e,s);const desktop=desktopSurface(),items=desktop?list.map(track=>deferredItem(e,track)):await batchItems(e,list,s);s.throwIfAborted();normalQueue(e);if(!await e.queue.replaceItems(items))return false;s.throwIfAborted();if(desktop)e.batchSession={failed:new Set(),handled:new Set(),allowed:true};return e.queue.select(list.findIndex(t=>!blocked(t)),{restart:true});}),
-    addAll:(list:Track[])=>editQueue(async(e,s)=>{if(e.queue.snapshot.items.length+list.length>500)throw {code:'queue-limit'};const items=await batchItems(e,list,s);s.throwIfAborted();if(e.queue.snapshot.items.length+items.length>500)throw {code:'queue-limit'};e.queue.add(items);}),
+    playAll:(list:Track[],partsTitle?:string)=>run(async(e,s)=>{if(list.length>500)throw {code:'queue-limit'};if(!list.some(t=>!blocked(t)))throw {code:'source-disabled'};if(partsTitle!==undefined)list=groupPartTracks(list,partsTitle,queueId);await cancelLoading(e,s);const desktop=desktopSurface(),items=desktop?list.map(track=>deferredItem(e,track)):await batchItems(e,list,s);s.throwIfAborted();normalQueue(e);if(!await e.queue.replaceItems(items))return false;s.throwIfAborted();if(desktop)e.batchSession={failed:new Set(),handled:new Set(),allowed:true};return e.queue.select(list.findIndex(t=>!blocked(t)),{restart:true});}),
+    addAll:(list:Track[],partsTitle?:string)=>editQueue(async(e,s)=>{if(e.queue.snapshot.items.length+list.length>500)throw {code:'queue-limit'};if(partsTitle!==undefined)list=groupPartTracks(list,partsTitle,queueId);const items=await batchItems(e,list,s);s.throwIfAborted();if(e.queue.snapshot.items.length+items.length>500)throw {code:'queue-limit'};e.queue.add(items);}),
     select:(id:string)=>run(e=>{resumeChart(e);e.chartSession?.failed.delete(id);resumeBatchItem(e,id);return e.queue.selectId(id,{restart:true});}),
     toggle:()=>{const e=engine.current;if(e&&(e.recovery.preparing||audioPreparing.current===operation.current?.signal&&!!audioPreparing.current)){if(e.player.playbackRequested)e.player.pause();else e.player.requestPlayback();return Promise.resolve(true);}return run(e=>{if(!e.player.paused)e.player.pause();else {resumeChart(e);const track=e.tracks.get(e.queue.snapshot.current?.id??e.restored??'');if(track&&blocked(track))return advancePlayable(e,1);if(e.restored)return e.queue.selectId(e.restored,{restart:true});return e.queue.play();}},false);},
     retry:()=>run(async(e,signal)=>{explicitRetry.current=signal;try{resumeChart(e);const track=e.tracks.get(e.queue.snapshot.current?.id??'');return await(track&&blocked(track)?advancePlayable(e,1):e.recovery.retry(signal)??e.queue.retry());}finally{if(explicitRetry.current===signal)explicitRetry.current=undefined;}}), next:()=>run(e=>{resumeChart(e);return enabled.current?e.queue.next():advancePlayable(e,1);}), previous:()=>run(e=>{resumeChart(e);return enabled.current?e.queue.previous():advancePlayable(e,-1);}),
@@ -644,9 +655,11 @@ export function usePlayback(client:MusicClient, youtubeAvailable=false, partsSto
     skip:(delta:number)=>run(e=>e.player.seekAsync(Math.max(0,e.player.currentTime+delta)),false),
     startSleep:(rule:SleepTimerRule)=>engine.current?.sleep.start(rule),
     cancelSleep:()=>engine.current?.sleep.cancel(),
-    remove:(id:string)=>run(e=>e.queue.remove(id),false),move:(id:string,to:number)=>engine.current?.queue.move(id,to),clear:()=>{cancelQueueEdits();return run(e=>{normalQueue(e);return e.queue.clear();},false);},
-    moveNext:(id:string)=>{const e=engine.current;if(!e||id===(e.queue.snapshot.current?.id??e.restored))return;e.queue.enqueueNext(id);if(!e.queue.snapshot.current&&e.restored){const at=e.queue.snapshot.items.filter(item=>item.id!==id).findIndex(item=>item.id===e.restored);if(at>=0)e.queue.move(id,at+1);}},
-    moveLast:(id:string)=>{const e=engine.current;if(e)e.queue.move(id,e.queue.snapshot.items.length-1,{cancelUpNext:true});},
+    remove:(id:string)=>run(e=>e.queue.remove(id),false),move:(id:string,to:number)=>{const e=engine.current;if(e){detachPartGroup(e,id);e.queue.move(id,to);}},clear:()=>{cancelQueueEdits();return run(e=>{normalQueue(e);return e.queue.clear();},false);},
+    removeGroup:(groupId:string)=>run(async(e,signal)=>{const q=e.queue.snapshot,current=q.current?.id??e.restored,ids=q.items.filter(item=>e.tracks.get(item.id)?.partsGroupId===groupId).map(item=>item.id);if(!q.current&&e.restored&&ids.includes(e.restored)){const at=q.items.findIndex(item=>item.id===e.restored),remaining=q.items.filter(item=>!ids.includes(item.id));e.restored=(q.items.slice(at+1).find(item=>!ids.includes(item.id))??remaining.at(-1))?.id;}for(const id of [...ids.filter(id=>id!==current),...ids.filter(id=>id===current)]){signal.throwIfAborted();await e.queue.remove(id);}},false),
+    setShuffleGroups:(enabled:boolean)=>engine.current?.queue.setShuffleGroups(enabled),
+    moveNext:(id:string)=>{const e=engine.current;if(!e||id===(e.queue.snapshot.current?.id??e.restored))return;detachPartGroup(e,id);e.queue.enqueueNext(id);if(!e.queue.snapshot.current&&e.restored){const at=e.queue.snapshot.items.filter(item=>item.id!==id).findIndex(item=>item.id===e.restored);if(at>=0)e.queue.move(id,at+1);}},
+    moveLast:(id:string)=>{const e=engine.current;if(e){detachPartGroup(e,id);e.queue.move(id,e.queue.snapshot.items.length-1,{cancelUpNext:true});}},
     cycleMode:()=>{const e=engine.current;if(!e)return;const {order,repeat}=e.queue.snapshot;
       // Clear the previous mode before enabling its successor, including during persistence.
       if(order==='shuffle'){e.queue.setOrder('sequential');e.queue.setRepeat('all');}

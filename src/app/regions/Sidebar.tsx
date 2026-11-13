@@ -1,3 +1,4 @@
+import { Button, IconButton } from '../../ui/Button';
 import { GlobalTools } from '../components/WorkspaceControls';
 import { motion, useReducedMotion } from 'motion/react';
 import { useMemo } from 'react';
@@ -56,7 +57,7 @@ export function Sidebar() {
     const songs = new Map(lib.snapshot.songs.map((song) => [song.id, song]));
     return lib.snapshot.playlists.map((p) => (
       <div className="sidebar-playlist-item" key={p.id}>
-        <button
+        <Button variant="plain"
           className={'sidebar-playlist ' + (page === 'library' && selected === p.id ? 'active' : '')}
           onClick={() => {
             setSelected(p.id);
@@ -71,7 +72,7 @@ export function Sidebar() {
             <strong className="playlist-label">{p.name}</strong>
             <small>{p.entries.length} 首</small>
           </span>
-        </button>
+        </Button>
         {sidebarPlaylistMenu(p.id)}
       </div>
     ));
@@ -90,7 +91,7 @@ export function Sidebar() {
     <>
       {page !== 'playing' && (
         <aside className="sidebar">
-          <button className="brand" aria-label="慢听" onClick={() => navigate('discover')}>
+          <Button variant="plain" className="brand" aria-label="慢听" onClick={() => navigate('discover')}>
             <span className="brand-mark">
               <HeadphonesIcon size={22} weight="bold" />
             </span>
@@ -98,10 +99,10 @@ export function Sidebar() {
               {brand.name}
               <small>{brand.english.toUpperCase()}</small>
             </span>
-          </button>
+          </Button>
           <nav className="sidebar-nav" data-sliding-selection={desktop && !reducedMotion || undefined} aria-label="主导航">
             {nav.map((n) => (
-              <button
+              <Button variant="plain"
                 key={n.id}
                 className={'nav-item ' + (page === n.id ? 'active' : '')}
                 aria-current={page === n.id ? 'page' : undefined}
@@ -112,24 +113,24 @@ export function Sidebar() {
                 )}
                 <n.icon size={22} weight={page === n.id ? 'fill' : 'regular'} />
                 <span>{n.label}</span>
-              </button>
+              </Button>
             ))}
           </nav>
           <div className="sidebar-library">
             <div className="sidebar-heading">
               <span>我的歌单</span>
-              <button
-                className="btn btn-icon"
+              <IconButton
+
                 aria-label="新建歌单"
                 title="新建歌单"
                 disabled={!lib}
                 onClick={() => open({ type: 'new' })}
               >
                 <PlusIcon size={19} />
-              </button>
+              </IconButton>
             </div>
             <div className="sidebar-playlist-item">
-              <button
+              <Button variant="plain"
                 className={
                   'sidebar-playlist ' + (page === 'library' && selected === favoritesId ? 'active' : '')
                 }
@@ -149,13 +150,13 @@ export function Sidebar() {
                     {lib ? lib.snapshot.favorites.length + ' 首' : libraryError ? '暂不可用' : '读取中…'}
                   </small>
                 </span>
-              </button>
+              </Button>
               {desktop && lib && sidebarPlaylistMenu(favoritesId)}
             </div>
             {desktop
               ? desktopSidebarPlaylists
               : lib?.snapshot.playlists.map((p) => (
-                  <button
+                  <Button variant="plain"
                     className={
                       'sidebar-playlist ' + (page === 'library' && selected === p.id ? 'active' : '')
                     }
@@ -170,7 +171,7 @@ export function Sidebar() {
                       <strong className="playlist-label">{p.name}</strong>
                       <small>{p.entries.length} 首</small>
                     </span>
-                  </button>
+                  </Button>
                 ))}
             {lib && !lib.snapshot.playlists.length && (
               <p className="sidebar-empty">把喜欢的音乐整理成歌单</p>

@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import { errorText } from './api';
 import { maxSongLibrarySnapshotBytes, type SongLibraryState } from '../server/song-library-types';
@@ -51,12 +52,12 @@ export function SongBackupPanel({ library, onCommitted }: { library: SongLibrary
       }}/></label>
       <label className="field"><span className="field-label">快照内容</span><textarea className="textarea" aria-label="新资料库快照内容" value={draft} disabled={busy} onChange={event => update(event.target.value)} rows={6}/></label>
       <label className="field"><span className="field-label">导入方式</span><select className="select" value={mode} disabled={busy} onChange={event => { ++serial.current; setMode(event.target.value as 'append' | 'replace'); setPreview(undefined); setAcknowledged(false); }}><option value="append">追加资料</option><option value="replace">替换全部资料</option></select></label>
-      <button className="btn btn-secondary" disabled={busy || !draft.trim()} onClick={() => void inspect()}>校验并预览影响</button>
+      <Button variant="secondary"  disabled={busy || !draft.trim()} onClick={() => void inspect()}>校验并预览影响</Button>
       {error && <p className="feedback" role="alert">{error}</p>}
       {preview && <div className="backup-preview" role="status"><p>当前：{counts(preview.impact.before)}</p><p>导入后：{counts(preview.impact.after)}</p><p>复用收藏 {preview.impact.reusedFavorites} 项；替换移除当前成员 {preview.impact.removedMembers} 项；需要重新确认同步的关联 {preview.impact.reviewLinks.length} 个。</p>
         {!!preview.impact.conflicts.length && <p role="alert">存在 {preview.impact.conflicts.length} 项身份或资料冲突，不能提交。现有人工资料保留。</p>}
         {mode === 'replace' && <label className="choice"><input type="checkbox" checked={acknowledged} disabled={busy} onChange={event => setAcknowledged(event.target.checked)}/>我已导出需要保留的资料，确认按备份完整替换</label>}
-        <div className="modal-actions"><button className="btn btn-ghost" disabled={busy} onClick={()=>{setPreview(undefined);setAcknowledged(false);setError('');}}>取消预览</button><button className="btn btn-primary" disabled={busy || !!preview.impact.conflicts.length || preview.revision !== library.revision || mode === 'replace' && !acknowledged} onClick={() => void commit()}>{busy ? '提交中…' : '确认导入'}</button></div>
+        <div className="modal-actions"><Button variant="ghost"  disabled={busy} onClick={()=>{setPreview(undefined);setAcknowledged(false);setError('');}}>取消预览</Button><Button variant="primary"  disabled={busy || !!preview.impact.conflicts.length || preview.revision !== library.revision || mode === 'replace' && !acknowledged} onClick={() => void commit()}>{busy ? '提交中…' : '确认导入'}</Button></div>
         {preview.revision !== library.revision && <p role="alert">资料已变化，请重新预览。</p>}
       </div>}
     </section>

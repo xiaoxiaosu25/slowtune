@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { RefreshButton } from './ListActions';
 import { DiscoveryShelf } from './DiscoveryShelf';
@@ -18,7 +19,7 @@ export function FollowUpdatesShelf({state,source,renderCovers,renderList,onPlayA
   }
   useEffect(()=>{void load();return()=>active.current?.abort();},[state?.revision,source,youtubeEnabled]);
   return <>
-    <DiscoveryShelf mobile={mobile} shelf={{id:'follow-updates',title:'关注的最近更新',kind:'new',page:{items}}} loading={busy} renderCovers={renderCovers} renderList={renderList} renderError={()=>null} onPlayAll={onPlayAll} onImport={onImport} onRefresh={creators.length?()=>void load(true):undefined} info={<p>已关注作者的最新投稿，按发布时间倒序。</p>} status={busy?'正在读取最近更新…':data?`获取于 ${new Date(data.fetchedAt).toLocaleTimeString('zh-CN')}`:undefined} empty={!state?<p className="muted">正在读取关注名单…</p>:!creators.length?<div className="empty"><h3>先关注喜欢的作者</h3><button className="btn btn-secondary" onClick={onFollow}>添加关注</button></div>:<p className="muted">暂时没有可展示的更新。</p>}/>
+    <DiscoveryShelf mobile={mobile} shelf={{id:'follow-updates',title:'关注的最近更新',kind:'new',page:{items}}} loading={busy} renderCovers={renderCovers} renderList={renderList} renderError={()=>null} onPlayAll={onPlayAll} onImport={onImport} onRefresh={creators.length?()=>void load(true):undefined} info={<p>已关注作者的最新投稿，按发布时间倒序。</p>} status={busy?'正在读取最近更新…':data?`获取于 ${new Date(data.fetchedAt).toLocaleTimeString('zh-CN')}`:undefined} empty={!state?<p className="muted">正在读取关注名单…</p>:!creators.length?<div className="empty"><h3>先关注喜欢的作者</h3><Button variant="secondary"  onClick={onFollow}>添加关注</Button></div>:<p className="muted">暂时没有可展示的更新。</p>}/>
     {(error||!!data?.warnings.length)&&<div className="feedback" role="status"><p>{error||data?.warnings.map(w=>`${w.name}：${errorText({code:w.code})}`).join('；')} 已保留可用内容。</p><RefreshButton label="重试更新" busy={busy} onClick={()=>void load(true)}/></div>}
   </>;
 }

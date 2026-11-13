@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useState } from 'react';
 import type { ServerStatus } from './api';
 
@@ -95,7 +96,7 @@ export function AboutPanel({ active, status }: { active: boolean; status?: Serve
       {desktop && <p className="muted">慢听及随附自有公共包的原创代码按 AGPL-3.0-only 提供，不作担保；允许按许可证修改与再分发。<a className="settings-text-link" href="/legal/PROJECT-LICENSE.txt" download="slowtune-LICENSE.txt">项目许可证</a> · <a className="settings-text-link" href="/legal/PROJECT-NOTICE.txt" download="slowtune-NOTICE.txt">版权与范围</a> · <a className="settings-text-link" href="/legal/desktop-lyrics-source.tar.gz" download="slowtune-source.tar.gz">本构建对应源码</a>。第三方材料保留各自许可。</p>}
       <p className="muted">感谢第三方项目的贡献。下方清单按当前安装的运行依赖和随应用提供的字体生成，保留原版权与许可文本，可离线阅读；外部项目链接需要网络。</p>
       {!notices && !error && <p role="status">正在读取随应用提供的许可清单…</p>}
-      {error && <div className="feedback" data-tone="error" role="alert"><p>许可清单读取失败，请重试或下载随应用提供的许可文件。</p><button className="btn btn-secondary" onClick={() => setRetry(value => value + 1)}>重新读取许可清单</button></div>}
+      {error && <div className="feedback" data-tone="error" role="alert"><p>许可清单读取失败，请重试或下载随应用提供的许可文件。</p><Button variant="secondary"  onClick={() => setRetry(value => value + 1)}>重新读取许可清单</Button></div>}
       {openSource && <details className="settings-details license-list"><summary>查看第三方组件与许可全文（{openSource.length} 项）</summary>
         <ul>{openSource.map((entry, index) => <li key={entry.name + entry.version + index}>
           <details><summary><span><strong>{entry.name}</strong><small>{entry.version} · {entry.license ?? '许可证未声明'} · {entry.purpose}</small></span></summary>

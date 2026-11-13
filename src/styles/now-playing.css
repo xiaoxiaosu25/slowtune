@@ -1,9 +1,9 @@
 /* ==========================================================================
    16. 正在播放（沉浸页）
    ========================================================================== */
-.listening-stage { position:relative; display:flex; flex:1; min-height:0; align-items:center; justify-content:center; padding:clamp(12px,3cqh,40px); border-radius:var(--r-card); background:var(--bg); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--border) 60%,transparent); isolation:isolate; overflow:clip; }
-.listening-stage::after { content:''; position:absolute; inset:0; z-index:-1; background:color-mix(in srgb,var(--bg) 35%,transparent); pointer-events:none; }
-.listening-atmosphere { position:absolute; inset:0; z-index:-2; pointer-events:none; background:radial-gradient(ellipse at 20% 35%,color-mix(in srgb,var(--listening-art-tone,var(--bg)) 16%,var(--bg)),var(--bg) 75%); }
+.listening-stage { position:relative; display:flex; flex:1; min-height:0; align-items:center; justify-content:center; padding:clamp(12px,3cqh,40px); overflow:clip; }
+.listening-atmosphere { position:absolute; inset:0; z-index:-1; overflow:hidden; pointer-events:none; background:radial-gradient(ellipse at 20% 35%,color-mix(in srgb,var(--listening-art-tone,var(--bg)) 16%,var(--bg)),var(--bg) 75%); }
+.listening-atmosphere::after { content:''; position:absolute; inset:0; background:linear-gradient(var(--bg),transparent min(240px,40%)),color-mix(in srgb,var(--bg) 35%,transparent); }
 .listening-backdrop { position:absolute; left:-8%; top:-5%; width:76%; height:110%; max-width:none; object-fit:cover; filter:blur(88px) saturate(.7); opacity:.22; }
 .listening-content { position:relative; display:grid; grid-template-columns:minmax(0,460px) minmax(280px,520px); align-items:center; justify-content:center; gap:96px; width:100%; height:100%; max-width:1120px; min-width:0; min-height:0; }
 .playing-art-slot { --playing-art-max:460px; display:grid; place-items:center; width:100%; height:100%; min-width:0; min-height:0; container-type:size; }
@@ -81,25 +81,8 @@
 .playing-detail .progress-track { grid-column:1/-1; grid-row:1; }
 .playing-detail .progress>span { grid-row:2; font-size:var(--fs-body); }
 .playing-detail .progress>span:last-child { text-align:right; }
-.listening-seek { display:flex; align-items:center; justify-content:center; gap:var(--sp-4); margin-top:calc(var(--sp-2) * -1); }
-.listening-seek .seek-button { background:transparent; border-color:transparent; }
-.seek-button-compact { min-width:64px; height:44px; min-height:44px; padding:0 var(--sp-2); gap:var(--sp-1); font-size:var(--fs-body); }
 .stage-volume { display:flex; align-items:center; justify-content:center; gap:var(--sp-3); }
 .stage-volume .volume-control { width:min(220px,calc(100% - 54px)); }
 .volume-value { min-width:42px; color:var(--muted); font-size:var(--fs-body); white-space:nowrap; font-variant-numeric:tabular-nums; }
-.stage-controls { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--sp-1); width:100%; padding:5px; border:1px solid var(--border); border-radius:var(--r-pill); background:color-mix(in srgb,var(--surface) 70%,transparent); }
-.stage-controls>.btn,.stage-controls>.rate-control>.player-setting { gap:6px; height:44px; padding:0 var(--sp-2); min-width:0; border-color:transparent; border-radius:var(--r-pill); background:transparent; font-size:var(--fs-body); font-weight:500; }
-.stage-controls>.btn:hover:not(:disabled),.stage-controls>.rate-control>.player-setting:hover { background:var(--raised); }
-.stage-controls>.btn[aria-expanded="true"],.stage-controls>.rate-control>.player-setting[aria-expanded="true"],.stage-controls>.btn.saved,.stage-controls>.rate-control>.player-setting.saved { background:var(--selected); color:var(--accent-text); }
-.stage-controls .setting-icon { color:var(--accent-text); }
-.stage-controls .setting-value { margin-left:2px; }
-.stage-controls .setting-value,.stage-controls .rate-value .setting-value,.stage-controls :is(.rate-menu-heading,.rate-option,.rate-option small) { font-size:var(--fs-body); }
-.stage-queue small { padding:1px 5px; border-radius:var(--r-pill); background:var(--raised); font-size:var(--fs-body); font-variant-numeric:tabular-nums; }
-.player-shortcuts { display:flex; align-items:center; justify-content:center; gap:6px; color:var(--muted); font-size:var(--fs-body); }
-.player-shortcuts kbd { padding:0 4px; border:1px solid var(--border); border-radius:calc(var(--r-control) / 2); font:inherit; }
-.player-shortcuts>span { margin:0 var(--sp-1); }
-.restore-hint { text-align:center; }
-.player-help { display:grid; gap:var(--sp-2); padding:var(--sp-3); border-top:1px solid var(--border); color:var(--muted); font-size:var(--fs-body); }
-.player-help .restore-hint { text-align:left; }
-.player-help .player-shortcuts { display:flex; justify-content:flex-start; }
-.playing-song-actions .control-popover-panel>:is(button,a),.playing-song-actions .popover-heading { font-size:var(--fs-body); }
+.stage-controls { display:flex; align-items:center; justify-content:center; gap:var(--sp-1); }
+.stage-controls .btn-icon { width:36px; height:36px; }

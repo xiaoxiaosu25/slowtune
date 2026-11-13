@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import {useEffect,useRef,useState} from 'react';
 import {audioPreferences,type AudioPreference,type AudioSelection} from '../server/audio-selection';
 import {audioQualityLabel} from './audio-quality';
@@ -15,10 +16,21 @@ export function AudioQualityDialog({playback,generation,onClose}:{playback:Playb
   const [choice,setChoice]=useState(()=>value(current)),[formats,setFormats]=useState<Awaited<ReturnType<Playback['availableAudio']>>>([]),[loading,setLoading]=useState(false),[issue,setIssue]=useState(''),[message,setMessage]=useState(''),[revision,setRevision]=useState(0);
   const owner=useRef(0);
   const pendingApply=useRef<AbortController|null>(null);
-  const canApply=!!identity&&!['idle','stopped','loading'].includes(playback.snapshot.state);
+  const hasCurrent=!!identity&&playback.snapshot.state!=='idle';
+  const canApply=hasCurrent&&!['stopped','loading'].includes(playback.snapshot.state);
   useEffect(()=>()=>pendingApply.current?.abort(),[]);
   useEffect(()=>{setChoice(value(current));setMessage('');},[identity,current?.preference,current?.formatId]);
-  useEffect(()=>{const controller=new AbortController(),serial=++owner.current;setLoading(true);setIssue('');setFormats([]);void playback.availableAudio(controller.signal).then(rows=>{if(!controller.signal.aborted&&owner.current===serial)setFormats(rows);}).catch(error=>{if(!controller.signal.aborted&&owner.current===serial)setIssue(errorText(error));}).finally(()=>{if(!controller.signal.aborted&&owner.current===serial)setLoading(false);});return()=>{controller.abort();owner.current++;};},[identity,generation,revision]);
+  useEffect(()=>{
+    if(!hasCurrent)return;
+    const controller=new AbortController(),serial=++owner.current;
+    setLoading(true);setIssue('');setFormats([]);
+    const isCurrent=()=>!controller.signal.aborted&&owner.current===serial;
+    void playback.availableAudio(controller.signal)
+      .then(rows=>{if(isCurrent())setFormats(rows);})
+      .catch(error=>{if(isCurrent())setIssue(errorText(error));})
+      .finally(()=>{if(isCurrent())setLoading(false);});
+    return()=>{controller.abort();owner.current++;};
+  },[hasCurrent,identity,generation,revision]);
   const apply=async()=>{
     if(pendingApply.current)return;
     const controller=new AbortController(),serial=owner.current;
@@ -35,6 +47,7 @@ export function AudioQualityDialog({playback,generation,onClose}:{playback:Playb
   const close=()=>{pendingApply.current?.abort();onClose();};
   return <Dialog title="音质与音轨" className="audio-quality-dialog" onClose={close}>
     <div className="audio-quality-content"><AudioPreferenceSelect playback={playback}/>
+      {hasCurrent?<>
       <section aria-label="当前播放音质"><h3>当前播放</h3><p className="audio-quality-current" role="status">{audioQualityLabel(playback.snapshot.format)||'尚未取得音轨信息'}</p><p className="muted">{current?.formatId?'本次指定音轨':audioPreferences[current?.preference??'auto']} · 来源音轨规格</p></section>
       <label className="field"><span className="field-label">本次播放选择</span><select className="select" aria-label="本次播放选择" value={choice} onChange={event=>{setChoice(event.target.value);setMessage('');}} disabled={playback.preparing}>
         {Object.entries(audioPreferences).map(([key,label])=><option key={key} value={'preference:'+key}>{label}</option>)}
@@ -44,7 +57,8 @@ export function AudioQualityDialog({playback,generation,onClose}:{playback:Playb
       <p className="muted">应用到当前歌曲会保留播放进度和暂停状态。指定音轨不可用时会提示失败。</p>
       <p className="muted">这里只显示来源提供的规格，不代表输出设备规格；未提供的采样率、位深和声道不会推测补全。</p>
       {loading&&<p role="status">正在读取可用音轨…</p>}{(issue||playback.error)&&<p className="feedback" role="alert">{issue||playback.error}</p>}{message&&<p role="status">{message}</p>}
-      <div className="audio-quality-actions"><button type="button" className="btn btn-secondary" disabled={loading||playback.preparing} onClick={()=>setRevision(value=>value+1)}>重读音轨</button><button type="button" className="btn btn-primary" disabled={!canApply||playback.preparing||loading} onClick={()=>void apply()}>{playback.preparing?'正在准备…':'应用到当前曲'}</button></div>
+      <div className="audio-quality-actions"><Button variant="secondary" type="button"  disabled={loading||playback.preparing} onClick={()=>setRevision(value=>value+1)}>重读音轨</Button><Button variant="primary" type="button"  disabled={!canApply||playback.preparing||loading} onClick={()=>void apply()}>{playback.preparing?'正在准备…':'应用到当前曲'}</Button></div>
+      </>:<p className="muted">播放歌曲后可查看和切换当前音轨。</p>}
     </div>
   </Dialog>;
 }

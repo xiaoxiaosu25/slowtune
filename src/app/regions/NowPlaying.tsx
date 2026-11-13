@@ -1,3 +1,4 @@
+import { Button, IconButton } from '../../ui/Button';
 import { CreatorContent } from '../components/TrackList';
 import {
   PlaybackSlot,
@@ -25,7 +26,7 @@ import { useWorkspace } from '../workspace-context';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { FastAverageColor } from 'fast-average-color';
 
-function ListeningBackdrop({ artwork }: { artwork: string }) {
+export function ListeningBackdrop({ artwork }: { artwork: string }) {
   const [color, setColor] = useState<string>();
   useEffect(() => {
     const image = new Image();
@@ -134,21 +135,21 @@ export function MobilePlayerView() {
           }
           quality={
             snapshot.format && (
-              <button
+              <Button variant="ghost"
                 type="button"
-                className="btn btn-ghost mobile-audio-quality"
+                className="mobile-audio-quality"
                 aria-label="当前音质"
                 onClick={() => setAudioQualityOpen(true)}
               >
                 {audioQualityLabel(snapshot.format)}
-              </button>
+              </Button>
             )
           }
           source={
             current && (
               <>
-                <button
-                  className="btn btn-ghost mobile-player-version"
+                <Button variant="ghost"
+                  className="mobile-player-version"
                   aria-label={currentSong ? '选择播放版本 ' + currentSong.title : '查看当前来源'}
                   title={currentVersion?.label || '查看当前来源与版本'}
                   onClick={() =>
@@ -172,7 +173,7 @@ export function MobilePlayerView() {
                     {mobileVersionCount ? '版本 · ' + mobileVersionCount : '来源详情'}
                     <ArrowRightIcon size={14} />
                   </span>
-                </button>
+                </Button>
                 <PartBadge
                   track={current}
                   store={partsStore}
@@ -207,9 +208,9 @@ export function MobilePlayerView() {
           }
           empty={
             !current && (
-              <button className="btn btn-primary" onClick={() => navigate('discover')}>
+              <Button variant="primary"  onClick={() => navigate('discover')}>
                 去发现音乐
-              </button>
+              </Button>
             )
           }
         />
@@ -247,9 +248,6 @@ export function ListeningStage() {
     <>
       {page === 'playing' && desktop && (
         <section className="listening-stage">
-          {currentArtwork && (
-            <ListeningBackdrop key={currentArtwork} artwork={currentArtwork} />
-          )}
           <div className="listening-content">
             <PlayingArtwork
               artwork={currentArtwork}
@@ -271,7 +269,7 @@ export function ListeningStage() {
                     {playbackLabel}
                   </span>
                   {!playback.preparing && !snapshot.loading && snapshot.format && (
-                    <button
+                    <Button variant="plain"
                       type="button"
                       className="audio-quality"
                       aria-label="当前音质"
@@ -279,7 +277,7 @@ export function ListeningStage() {
                       onClick={() => setAudioQualityOpen(true)}
                     >
                       {audioQualityLabel(snapshot.format)}
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <PlayingTitle
@@ -319,9 +317,6 @@ export function ListeningStage() {
                   )}
                   <PlaybackSlot />
                 </div>
-                <div className="listening-seek">
-                  <SeekButtons compact />
-                </div>
               </div>
               <div className="stage-volume">
                 <Volume />
@@ -330,23 +325,24 @@ export function ListeningStage() {
                 </span>
               </div>
               <div className="stage-controls">
-                <PlaybackRate labeled />
-                <SleepButton labeled />
-                <button
-                  className="btn btn-secondary stage-queue"
+                <SeekButtons iconOnly />
+                <PlaybackRate iconOnly />
+                <SleepButton iconOnly />
+                <IconButton
+                  className={' ' + (queueVisible && listeningPanel === 'queue' ? ' saved' : '')}
                   aria-label="播放队列"
+                  title={'播放队列 · ' + snapshot.items.length + ' 首'}
+                  aria-description={snapshot.items.length + ' 首'}
                   aria-expanded={queueVisible && listeningPanel === 'queue'}
                   onClick={toggleQueue}
                 >
-                  <QueueIcon size={21} />
-                  <span>队列</span>
-                  <small>{snapshot.items.length}</small>
-                </button>
+                  <QueueIcon size={20} />
+                </IconButton>
               </div>
               {!current && (
-                <button className="btn btn-primary" onClick={() => navigate('discover')}>
+                <Button variant="primary"  onClick={() => navigate('discover')}>
                   去发现音乐
-                </button>
+                </Button>
               )}
             </div>
           </div>

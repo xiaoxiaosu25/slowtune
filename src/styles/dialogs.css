@@ -24,7 +24,7 @@
   .mobile-drawer,.mobile-drawer-backdrop { animation:none!important; }
 }
 .modal-header { position:sticky; top:calc(var(--sp-5) * -1); z-index:calc(var(--z-sticky) + 1); display:flex; align-items:center; justify-content:space-between; gap:var(--sp-4); margin:calc(var(--sp-5) * -1) 0 var(--sp-4); padding:var(--sp-5) 0 var(--sp-3); border-bottom:1px solid var(--border); background:var(--surface); }
-.modal-header h2 { font-size:var(--fs-heading); }
+.modal-header h2 { flex:1; min-width:0; overflow-wrap:anywhere; font-size:var(--fs-heading); }
 .modal>p+p { margin-top:var(--sp-3); }
 .search-modal { width:min(1040px,calc(100% - 48px)); height:min(840px,calc(100dvh - 64px)); overflow:hidden; }
 .search-modal[open] { display:flex; flex-direction:column; gap:var(--sp-3); }
@@ -76,7 +76,7 @@
 /* 歌曲菜单：歌曲摘要、主要操作、次要操作与歌单分别成组。 */
 .track-modal { width:min(600px,calc(100% - var(--sp-6))); border-radius:var(--r-overlay); box-shadow:var(--shadow-lg); }
 .track-modal .modal-header { margin-bottom:var(--sp-5); padding-bottom:var(--sp-3); border-bottom:0; }
-.track-modal .modal-header .btn-icon { width:32px; height:32px; background:var(--bg); }
+.track-modal .modal-header .btn-icon { background:var(--bg); }
 .track-intro { align-items:flex-start; gap:var(--sp-4); margin-bottom:var(--sp-5); }
 .track-intro>img,.track-intro>.unknown-cover { width:112px; height:72px; border:1px solid var(--border); border-radius:var(--r-control); }
 .track-intro>div { flex:1; }

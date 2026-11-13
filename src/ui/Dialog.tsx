@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Root, Portal, Overlay, Content, Title, Close } from '@radix-ui/react-dialog';
-import { XIcon } from '@phosphor-icons/react';
+import { Root, Portal, Overlay, Content, Title } from '@radix-ui/react-dialog';
 import { closeNestedPopover } from './layers';
+import { DialogHeader } from './DialogHeader';
 
 export function Dialog({ title, onClose, children, className = '', showHeader = true }: {
   title: string;
@@ -49,12 +49,7 @@ export function Dialog({ title, onClose, children, className = '', showHeader = 
           }}
         >
           {showHeader ? (
-            <header className="modal-header">
-              <Title asChild><h2>{title}</h2></Title>
-              <Close asChild>
-                <button type="button" className="btn btn-icon" aria-label="关闭" title="关闭 · Esc"><XIcon size={22}/></button>
-              </Close>
-            </header>
+            <DialogHeader heading={<Title asChild><h2>{title}</h2></Title>} onClose={onClose} />
           ) : <Title hidden>{title}</Title>}
           {children}
         </Content>

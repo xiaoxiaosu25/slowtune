@@ -1,3 +1,4 @@
+import { Button, IconButton } from '../../ui/Button';
 import { GearIcon, LinkIcon, ChatCircleTextIcon, QueueIcon } from '@phosphor-icons/react';
 import { errorText } from '../../api';
 import { isTrack } from '../../chart-playback';
@@ -44,6 +45,9 @@ export function WorkspaceQueue() {
       currentId={snapshot.currentId}
       playing={snapshot.playing}
       order={snapshot.order}
+      shuffleGroups={snapshot.shuffleGroups}
+      onShuffleGroups={playback.setShuffleGroups}
+      onRemoveGroup={(id)=>void playback.removeGroup(id)}
       renderCover={(track) => <Cover track={track} />}
       title={displayTitle}
       onClose={closeQueue}
@@ -74,22 +78,22 @@ export function ListeningSidePanel() {
   return (
     <div className="listening-sidepanel">
       <div className="listening-panel-tabs segmented" aria-label="聆听面板">
-        <button
+        <Button variant="plain"
           className={listeningPanel === 'comments' ? 'selected' : ''}
           aria-pressed={listeningPanel === 'comments'}
           onClick={() => setListeningPanel('comments')}
         >
           <ChatCircleTextIcon size={18} />
           评论
-        </button>
-        <button
+        </Button>
+        <Button variant="plain"
           className={listeningPanel === 'queue' ? 'selected' : ''}
           aria-pressed={listeningPanel === 'queue'}
           onClick={() => setListeningPanel('queue')}
         >
           <QueueIcon size={18} />
           队列
-        </button>
+        </Button>
       </div>
       {listeningPanel === 'comments' ? (
         <CommentsPanel
@@ -108,24 +112,24 @@ export function GlobalTools({ className }: { className: string }) {
   const { desktopLyricsOpen, open, page, openSettings } = useWorkspace();
   return (
     <div className={className} role="group" aria-label="工具" inert={desktopLyricsOpen}>
-      <button
-        className="btn btn-icon"
+      <IconButton
+
         aria-label="粘贴链接"
         title="粘贴视频或歌单链接"
         onClick={() => open({ type: 'link' })}
       >
         <LinkIcon size={22} />
-      </button>
+      </IconButton>
       <ThemeToggle />
-      <button
-        className={'btn btn-icon' + (page === 'settings' ? ' active' : '')}
+      <IconButton
+        className={' ' + (page === 'settings' ? ' active' : '')}
         aria-label="设置"
         title="设置"
         aria-current={page === 'settings' ? 'page' : undefined}
         onClick={openSettings}
       >
         <GearIcon size={22} />
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -147,14 +151,14 @@ export function SourceTabs() {
   return youtubeEnabled ? (
     <div className="segmented source-tabs" aria-label="音乐来源">
       {Object.entries(names).map(([id, name]) => (
-        <button
+        <Button variant="plain"
           key={id}
           className={source === id ? 'selected' : ''}
           aria-pressed={source === id}
           onClick={() => setSource(id as keyof typeof names)}
         >
           {name}
-        </button>
+        </Button>
       ))}
     </div>
   ) : null;

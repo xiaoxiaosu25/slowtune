@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { closeNestedPopover } from './ui/layers';
+import { Button, type ButtonProps } from './ui/Button';
 
-export function ControlPopover({ label, icon, children, className = '', buttonClassName = 'btn-icon',
+export function ControlPopover({ label, icon, children, className = '', buttonVariant = 'icon', compact = false,
   side = 'top', closeOnAction = true, onOpenChange }: {
-  label: string; icon: ReactNode; children: ReactNode; className?: string; buttonClassName?: string;
+  label: string; icon: ReactNode; children: ReactNode; className?: string; buttonVariant?: ButtonProps['variant']; compact?: boolean;
   side?: 'top' | 'bottom' | 'left'; closeOnAction?: boolean; onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -43,8 +44,8 @@ export function ControlPopover({ label, icon, children, className = '', buttonCl
   return (
     <Popover.Root open={open} onOpenChange={change}>
       <div className={'control-popover ' + className} data-open={open || undefined}>
-        <Popover.Trigger ref={button} className={'btn ' + buttonClassName + (open ? ' saved' : '')} aria-label={label} title={label}>
-          {icon}
+        <Popover.Trigger asChild>
+          <Button ref={button} variant={buttonVariant} compact={compact} className={open ? 'saved' : undefined} aria-label={label} title={label}>{icon}</Button>
         </Popover.Trigger>
         <Popover.Content ref={panel} className="control-popover-panel floating-control" data-layer="popover"
           role="group" aria-label={label} side={side} align={side === 'left' ? 'center' : 'end'}

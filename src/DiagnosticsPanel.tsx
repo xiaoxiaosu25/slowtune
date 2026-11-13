@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import { RefreshButton } from './ListActions';
 import { errorText, type BilibiliAccountState, type ServerStatus } from './api';
@@ -33,15 +34,15 @@ export function DiagnosticsPanel({ status, checkedAt, account, library, onRefres
     {status?.build?.stale && <p className="feedback" role="status">磁盘上有更新的构建，重启服务后生效。请在服务电脑上重启慢听，再刷新页面。</p>}
     <dl className="service-overview">
       <div><dt>服务连接</dt><dd>{refreshFailed ? '本次检查失败' : status ? '最近读取成功' : '等待检查'}<p>仅表示服务响应，不代表所有来源可用。</p></dd></div>
-      <div><dt>B站账号</dt><dd>{accountLabel}<button className="settings-text-link" onClick={onOpenAccount}>检查或管理B站账号</button></dd></div>
-      <div><dt>YouTube</dt><dd>{youtubeLabel}{youtube?.enabled !== false && !youtube?.available && youtube?.issue && <p>{youtube.issue}</p>}<button className="settings-text-link" onClick={onOpenSources}>管理音乐来源</button></dd></div>
+      <div><dt>B站账号</dt><dd>{accountLabel}<Button variant="plain" className="settings-text-link" onClick={onOpenAccount}>检查或管理B站账号</Button></dd></div>
+      <div><dt>YouTube</dt><dd>{youtubeLabel}{youtube?.enabled !== false && !youtube?.available && youtube?.issue && <p>{youtube.issue}</p>}<Button variant="plain" className="settings-text-link" onClick={onOpenSources}>管理音乐来源</Button></dd></div>
       <div><dt>歌单与收藏</dt><dd>{library ? `${library.snapshot.playlists.length} 个歌单 · ${library.snapshot.favorites.length} 首收藏` : '尚未读取资料'}<p>资料读取不等同于数据库完整性检查。</p></dd></div>
     </dl>
     {(message || error) && <p className="feedback" data-tone={error ? 'error' : undefined} role={error ? 'alert' : 'status'}>{error || message}</p>}
 
-    <section className="settings-group" aria-labelledby="backup-settings-heading"><h4 id="backup-settings-heading">备份与恢复</h4><p className="muted">备份歌单、收藏与曲目来源资料。电脑和手机连接同一个服务时共享这些资料；全部替换会影响这些设备。</p><button className="btn btn-secondary" onClick={onOpenBackup}>备份与恢复</button><p className="muted">备份不包含音乐文件、登录凭据、关注、推荐偏好、来源设置或收藏夹同步关联。</p></section>
-    <section className="settings-group" aria-labelledby="playback-recovery-heading"><h4 id="playback-recovery-heading">播放与连接</h4><div className="settings-action-row"><div><strong>停止播放</strong><p className="muted">停止当前播放器并释放播放资源，保留播放队列。</p></div><button className="btn btn-secondary" aria-label="停止播放并释放来源" disabled={!!busy} onClick={() => void run('stop', async () => { if (!await onStopPlayback()) { setError('未能完成停止播放，请重试。'); return; } setMessage('已停止当前播放器并释放播放资源，队列保留。'); })}>{busy === 'stop' ? '停止中…' : '停止播放'}</button></div>
-      {!desktop&&status?.authenticationRequired!==false&&<div className="settings-action-row"><div><strong>退出当前浏览器登录</strong><p className="muted">停止当前播放器，重新进入需要服务访问码。服务端B站登录仍保留。</p></div><button className="btn btn-secondary" disabled={!!busy} onClick={() => void run('logout', onLogout)}>{busy === 'logout' ? '退出中…' : '退出当前浏览器登录'}</button></div>}
+    <section className="settings-group" aria-labelledby="backup-settings-heading"><h4 id="backup-settings-heading">备份与恢复</h4><p className="muted">备份歌单、收藏与曲目来源资料。电脑和手机连接同一个服务时共享这些资料；全部替换会影响这些设备。</p><Button variant="secondary"  onClick={onOpenBackup}>备份与恢复</Button><p className="muted">备份不包含音乐文件、登录凭据、关注、推荐偏好、来源设置或收藏夹同步关联。</p></section>
+    <section className="settings-group" aria-labelledby="playback-recovery-heading"><h4 id="playback-recovery-heading">播放与连接</h4><div className="settings-action-row"><div><strong>停止播放</strong><p className="muted">停止当前播放器并释放播放资源，保留播放队列。</p></div><Button variant="secondary"  aria-label="停止播放并释放来源" disabled={!!busy} onClick={() => void run('stop', async () => { if (!await onStopPlayback()) { setError('未能完成停止播放，请重试。'); return; } setMessage('已停止当前播放器并释放播放资源，队列保留。'); })}>{busy === 'stop' ? '停止中…' : '停止播放'}</Button></div>
+      {!desktop&&status?.authenticationRequired!==false&&<div className="settings-action-row"><div><strong>退出当前浏览器登录</strong><p className="muted">停止当前播放器，重新进入需要服务访问码。服务端B站登录仍保留。</p></div><Button variant="secondary"  disabled={!!busy} onClick={() => void run('logout', onLogout)}>{busy === 'logout' ? '退出中…' : '退出当前浏览器登录'}</Button></div>}
     </section>
     <details className="settings-details diagnostics-advanced"><summary>高级诊断与播放策略</summary>
       <dl className="diagnostics">
@@ -54,6 +55,6 @@ export function DiagnosticsPanel({ status, checkedAt, account, library, onRefres
         <dt>YouTube 工具</dt><dd>{youtube?.available ? `yt-dlp ${youtube.toolVersion ?? '版本未知'}` : youtube?.issue ?? youtubeLabel}</dd>
       </dl>
     </details>
-    <p className="muted">{desktop?'队列、模式和音量保存在本机 data 文件夹；播放进度不持久化。':'队列、模式和音量保存在当前浏览器；播放进度不持久化。'}<button className="settings-text-link" onClick={onOpenAbout}>查看来源、隐私与开源声明</button></p>
+    <p className="muted">{desktop?'队列、模式和音量保存在本机 data 文件夹；播放进度不持久化。':'队列、模式和音量保存在当前浏览器；播放进度不持久化。'}<Button variant="plain" className="settings-text-link" onClick={onOpenAbout}>查看来源、隐私与开源声明</Button></p>
   </div>;
 }

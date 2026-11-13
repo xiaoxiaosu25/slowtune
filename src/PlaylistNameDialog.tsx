@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import type { ReactNode } from 'react';
 import { Dialog } from './ui/Dialog';
 
@@ -23,10 +24,10 @@ export function PlaylistNameDialog({ mode, name, busy, onNameChange, onSave, onC
         </label>
         {feedback}
         <div className="modal-actions">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>取消</button>
-          <button type="submit" className="btn btn-primary" disabled={busy || !trimmedName}>
+          <Button variant="ghost" type="button"  onClick={onClose}>取消</Button>
+          <Button variant="primary" type="submit"  disabled={busy || !trimmedName}>
             {busy ? '保存中…' : '保存歌单'}
-          </button>
+          </Button>
         </div>
       </form>
     </Dialog>

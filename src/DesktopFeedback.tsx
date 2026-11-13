@@ -1,4 +1,5 @@
-import { SpinnerGapIcon, WarningCircleIcon, XIcon } from '@phosphor-icons/react';
+import { Button, DismissButton } from './ui/Button';
+import { SpinnerGapIcon, WarningCircleIcon } from '@phosphor-icons/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ControlPopover } from './ControlPopover';
@@ -28,7 +29,7 @@ export function PlaybackFeedback(props: PlaybackFeedbackProps) {
   if (!target) return null;
   const dialog = target.closest(OPEN_DIALOG);
   return createPortal(<>
-    {props.preparing && dialog && !dialog.querySelector('.play-toggle') && <button className="btn btn-ghost btn-sm playback-pending" aria-busy="true" onClick={props.onStop}><SpinnerGapIcon size={18}/>取消播放准备</button>}
+    {props.preparing && dialog && !dialog.querySelector('.play-toggle') && <Button variant="ghost" compact className="playback-pending" aria-busy="true" onClick={props.onStop}><SpinnerGapIcon size={18}/>取消播放准备</Button>}
     <PlaybackIssue {...props}/>
   </>, target);
 }
@@ -40,8 +41,8 @@ function PlaybackIssue({ error, failures, onRetry, retryLabel, onStop, onDismiss
     <span className="sr-only" role="status">{label}</span>
     <ControlPopover className="playback-feedback-popover" label={label + '，查看详情'} icon={<><WarningCircleIcon size={19}/><span>{label}</span></>}>
       <p className="popover-heading">播放状态</p>
-      {error && <><p className="playback-issue" role="alert">{error}</p><button onClick={onRetry}>{retryLabel}</button><button onClick={onStop}>取消并停止</button><button onClick={onDismiss}>关闭提示</button></>}
-      {!!failures.length && <><p className="popover-heading">{failures.length} 首榜单歌曲未能播放</p><ul className="playback-failure-list">{failures.map((item, index) => <li key={item.id + ':' + index}><strong>{item.title}</strong><span>{item.reason}</span></li>)}</ul><button onClick={onDismissFailures}>清除失败记录</button></>}
+      {error && <><p className="playback-issue" role="alert">{error}</p><Button variant="plain" onClick={onRetry}>{retryLabel}</Button><Button variant="plain" onClick={onStop}>取消并停止</Button><Button variant="plain" onClick={onDismiss}>关闭提示</Button></>}
+      {!!failures.length && <><p className="popover-heading">{failures.length} 首榜单歌曲未能播放</p><ul className="playback-failure-list">{failures.map((item, index) => <li key={item.id + ':' + index}><strong>{item.title}</strong><span>{item.reason}</span></li>)}</ul><Button variant="plain" onClick={onDismissFailures}>清除失败记录</Button></>}
     </ControlPopover>
   </div>;
 }
@@ -49,7 +50,7 @@ function PlaybackIssue({ error, failures, onRetry, retryLabel, onStop, onDismiss
 export function DesktopOperationFeedback({ error, offline, children, onDismiss }: { error: string; offline: boolean; children: ReactNode; onDismiss: () => void }) {
   if (!error && !offline) return null;
   return <aside className="desktop-operation-feedback" aria-label="操作提示">
-    <div className="desktop-feedback-heading"><WarningCircleIcon size={20}/><strong>{error ? '操作未完成' : '网络已断开'}</strong>{error && <button className="btn btn-icon" aria-label="关闭操作提示" onClick={onDismiss}><XIcon size={18}/></button>}</div>
+    <div className="desktop-feedback-heading"><WarningCircleIcon size={20}/><strong>{error ? '操作未完成' : '网络已断开'}</strong>{error && <DismissButton aria-label="关闭操作提示" onClick={onDismiss}/>}</div>
     <p role={error ? 'alert' : 'status'}>{error || '资料保留，联网后可重试。'}</p>
     {error && <div className="toolbar">{children}</div>}
   </aside>;

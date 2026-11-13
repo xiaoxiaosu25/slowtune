@@ -1,3 +1,4 @@
+import { Button, IconButton } from '../../ui/Button';
 import { motion, useReducedMotion } from 'motion/react';
 import { Provider as TooltipProvider, Root as Tooltip, Trigger as TooltipTrigger, Content as TooltipContent, Portal as TooltipPortal } from '@radix-ui/react-tooltip';
 import {
@@ -29,7 +30,7 @@ export function Playbar() {
           <CoverGlow artwork={artwork} playing={snapshot.playing} />
           <div className="playbar-inner">
             <div className="playbar-now">
-              <button
+              <Button variant="plain"
                 className="now-playing"
                 aria-label="打开正在播放"
                 onClick={() => open({ type: 'playing' })}
@@ -39,11 +40,11 @@ export function Playbar() {
                   <strong title={current?.title}>{current ? displayTitle(current) : '选择一首音乐'}</strong>
                   <small>{current ? creator(current) : '好音乐，等你发现'}</small>
                 </span>
-              </button>
+              </Button>
               <PlaybackSlot />
               {current && (
-                <button
-                  className={'btn btn-icon playbar-heart ' + (isFavorite(current) ? 'saved' : '')}
+                <IconButton
+                  className={' playbar-heart ' + (isFavorite(current) ? 'saved' : '')}
                   title={isFavorite(current) ? '取消收藏当前歌曲' : '收藏当前歌曲'}
                   aria-label="收藏当前歌曲"
                   aria-pressed={isFavorite(current)}
@@ -56,7 +57,7 @@ export function Playbar() {
                   ) : (
                     <HeartIcon size={22} weight={isFavorite(current) ? 'fill' : 'regular'} />
                   )}
-                </button>
+                </IconButton>
               )}
             </div>
             <div className="playbar-center">
@@ -69,19 +70,19 @@ export function Playbar() {
             </div>
             <div className="playbar-tools">
               <Volume />
-              <PlaybackRate />
-              <SleepButton />
+              <PlaybackRate iconOnly />
+              <SleepButton iconOnly />
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
-                      className={'btn btn-icon ' + (queueVisible ? 'saved' : '')}
+                    <IconButton
+                      className={' ' + (queueVisible ? 'saved' : '')}
                       aria-label="打开播放队列"
                       aria-expanded={queueVisible}
                       onClick={() => open({ type: 'queue' })}
                     >
-                      <QueueIcon size={25} />
-                    </button>
+                      <QueueIcon size={20} />
+                    </IconButton>
                   </TooltipTrigger>
                   <TooltipPortal>
                     <TooltipContent className="control-tooltip" side="top" sideOffset={8}>播放队列</TooltipContent>

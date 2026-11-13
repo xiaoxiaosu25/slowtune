@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import type { LoginChallenge, LoginStatus } from '@studio/music-sources';
@@ -94,15 +95,15 @@ export function BilibiliAccountControls({ status, onChange, onOpenAbout }: { sta
       <div><strong>{status.account.name}</strong><p className="muted">已登录 · 音乐推荐、音轨与收藏夹</p></div>
     </div> : <p className="muted">{!status ? '正在检查账号状态…' : status.state === 'expired' ? 'B站登录已过期，请重新扫码。' : status.state === 'unavailable' ? status.issue ?? '保存的账号无法读取，请重新扫码登录。' : '未登录 · 使用匿名音乐栏目'}</p>}
     <p className="muted account-description">登录后使用账号音乐推荐与音轨，并可读取收藏夹关联歌单。{desktop ? '此账号与收藏夹关联保存在本桌面应用，与服务版各自保存。' : '同一服务的 PC 和手机共享此账号与收藏夹关联。'}</p>
-    <p className="muted account-description">{desktop ? '登录凭据由当前 Windows 用户加密后保存在本应用的 data 中，退出应用会保留登录。' : '登录凭据加密保存在服务所在电脑的 Windows 用户下，不保存在手机中。'}启用收藏夹关联后，歌曲新增与删除会双向同步，可能修改B站收藏夹。{onOpenAbout&&<button className="settings-text-link" onClick={onOpenAbout}>查看账号与隐私说明</button>}</p>
+    <p className="muted account-description">{desktop ? '登录凭据由当前 Windows 用户加密后保存在本应用的 data 中，退出应用会保留登录。' : '登录凭据加密保存在服务所在电脑的 Windows 用户下，不保存在手机中。'}启用收藏夹关联后，歌曲新增与删除会双向同步，可能修改B站收藏夹。{onOpenAbout&&<Button variant="plain" className="settings-text-link" onClick={onOpenAbout}>查看账号与隐私说明</Button>}</p>
     {challenge && <div className="panel platform-login">
       {qr ? <img className="login-qr" src={qr} alt="B站登录二维码"/> : <p>正在生成二维码…</p>}
       <p className="muted">请用B站客户端扫码。二维码约 3 分钟后过期。</p>
-      <div className="toolbar"><button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void begin()}>重新生成二维码</button><button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void stop()}>取消扫码</button></div>
+      <div className="toolbar"><Button variant="secondary" compact  disabled={busy} onClick={() => void begin()}>重新生成二维码</Button><Button variant="ghost" compact  disabled={busy} onClick={() => void stop()}>取消扫码</Button></div>
     </div>}
     {!challenge && <div className="toolbar">
-      <button className="btn btn-primary" disabled={busy} onClick={() => void begin()}>{busy ? '正在处理…' : status?.state === 'authenticated' ? '更换B站账号' : '扫码登录 B站'}</button>
-      {status?.state === 'authenticated' && <button className="btn btn-secondary danger" disabled={busy} onClick={() => void disconnect()}>退出B站账号</button>}
+      <Button variant="primary"  disabled={busy} onClick={() => void begin()}>{busy ? '正在处理…' : status?.state === 'authenticated' ? '更换B站账号' : '扫码登录 B站'}</Button>
+      {status?.state === 'authenticated' && <Button variant="secondary" className="danger" disabled={busy} onClick={() => void disconnect()}>退出B站账号</Button>}
       <RefreshButton label="检查账号状态" busy={busy} onClick={() => void refresh()}/>
     </div>}
     {phase && <p className="muted account-feedback" role="status">{phase}</p>}

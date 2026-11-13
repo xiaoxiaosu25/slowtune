@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { preferenceStorage } from './preference-storage';
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
@@ -71,7 +72,7 @@ export function PlayingArtwork({ artwork, playing, muted, analysis, lyrics, allo
   const Switch = sharedArtwork ? motion.button : 'button';
   if (mode === 'lyrics') return <div className="playing-art-slot playing-lyrics-slot">
     <div className="playing-art-lyrics">{lyrics ?? <p className="muted">播放音乐后自动显示歌词</p>}</div>
-    <button type="button" className="btn btn-ghost playing-art-switch lyrics-style-switch" data-visual-mode={mode} aria-label="封面样式：歌词，点击切换为唱片" onClick={cycle}><ArrowClockwiseIcon size={15}/>歌词 · 切换样式</button>
+    <Button variant="ghost" type="button" className="playing-art-switch lyrics-style-switch" data-visual-mode={mode} aria-label="封面样式：歌词，点击切换为唱片" onClick={cycle}><ArrowClockwiseIcon size={15}/>歌词 · 切换样式</Button>
   </div>;
   return <div className="playing-art-slot">
     <Switch {...layout} type="button" className="playing-art-switch" data-visual-mode={mode} data-analysis-state={state}

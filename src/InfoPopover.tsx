@@ -1,3 +1,4 @@
+import { IconButton } from './ui/Button';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { InfoIcon } from '@phosphor-icons/react';
 import * as Popover from '@radix-ui/react-popover';
@@ -21,11 +22,11 @@ export function InfoPopover({ label, children }: { label: string; children: Reac
         onPointerLeave={() => hide()} onFocus={show}
         onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { pinned.current = false; hide(0); } }}>
         <Popover.Anchor asChild>
-          <button ref={button} type="button" className="btn btn-icon btn-icon-xs" aria-label={label}
+          <IconButton ref={button} type="button"  aria-label={label}
             aria-expanded={open} aria-controls={open ? id : undefined}
             onClick={() => { if (pinned.current) dismiss(); else { pinned.current = true; show(); } }}>
             <InfoIcon size={16} />
-          </button>
+          </IconButton>
         </Popover.Anchor>
         <Popover.Content id={id} className="info-popover" aria-label={label} side="bottom" align="start"
           sideOffset={8} collisionPadding={12} onOpenAutoFocus={event => event.preventDefault()}

@@ -1,5 +1,6 @@
+import { Button, DismissButton } from './ui/Button';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeftIcon, PaletteIcon, PlugsConnectedIcon, UserCircleIcon, SlidersHorizontalIcon, DatabaseIcon, InfoIcon, LockKeyIcon, MusicNotesIcon } from '@phosphor-icons/react';
+import { PaletteIcon, PlugsConnectedIcon, UserCircleIcon, SlidersHorizontalIcon, DatabaseIcon, InfoIcon, LockKeyIcon, MusicNotesIcon } from '@phosphor-icons/react';
 import type { BilibiliAccountState, ServerStatus } from './api';
 import type { SongLibraryState as LibraryData } from '../server/song-library-types';
 import { BilibiliAccountControls } from './BilibiliAccountControls';
@@ -87,12 +88,12 @@ export function SettingsPage({ desktopLyricsRequest = 0, onSectionChanged, statu
   };
   return <section className="settings-view" aria-labelledby="settings-heading">
     <div className="page-heading">
-      <button className="btn btn-icon" aria-label="返回浏览音乐" onClick={onBack}><ArrowLeftIcon size={22}/></button>
+      <DismissButton action="back" aria-label="返回浏览音乐" onClick={onBack}/>
       <h1 id="settings-heading">设置</h1>
     </div>
     <div className="settings-body">
       <nav className="settings-nav" ref={navigation} aria-label="设置分组">{sections.filter(item => item.id === 'access' ? !window.slowTuneDesktop : ['desktop-lyrics','local-data'].includes(item.id) ? !!window.slowTuneDesktop : true).map(item =>
-        <button key={item.id} className={'nav-item ' + (section === item.id ? 'active' : '')} aria-current={section === item.id ? 'true' : undefined} onClick={() => openSection(item.id)}><item.icon size={19}/>{item.id === 'diagnostics' && window.slowTuneDesktop ? '运行信息' : item.label}</button>
+        <Button variant="plain" key={item.id} className={'nav-item ' + (section === item.id ? 'active' : '')} aria-current={section === item.id ? 'true' : undefined} onClick={() => openSection(item.id)}><item.icon size={19}/>{item.id === 'diagnostics' && window.slowTuneDesktop ? '运行信息' : item.label}</Button>
       )}</nav>
       <div className="settings-panels" ref={panels}>
         <section className="panel" data-settings-section="appearance" hidden={section !== 'appearance'} aria-label="外观">

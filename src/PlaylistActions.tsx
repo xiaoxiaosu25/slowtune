@@ -51,7 +51,7 @@ export function PlaylistActions({ library, targetId, commit, busy, target, class
     ...(playlist ? [{ separator: true } as const, { id: 'delete', label: '删除歌单', icon: <TrashIcon size={18}/>, disabled: busy, danger: true, onSelect: onDelete ?? (() => open('delete')) }] : []),
   ];
   return <>
-    <ActionMenu label="歌单管理" title={title} subtitle={selections && selections.length !== items.length ? `当前筛选 ${selections.length} / ${items.length} 首` : items.length + ' 首歌曲'} target={target} className={className} trigger={trigger} buttonClassName="btn-secondary" actions={actions}/>
+    <ActionMenu label="歌单管理" title={title} subtitle={selections && selections.length !== items.length ? `当前筛选 ${selections.length} / ${items.length} 首` : items.length + ' 首歌曲'} target={target} className={className} trigger={trigger} buttonVariant="secondary" actions={actions}/>
     {dialog === 'rename' && playlist && (
       <PlaylistNameDialog
         mode="rename"

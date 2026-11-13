@@ -12,12 +12,12 @@
       "documentation": "README.md"
     },
     {
-      "file": "studio-player-0.12.15.tgz",
+      "file": "studio-player-0.12.18.tgz",
       "name": "@studio/player",
-      "version": "0.12.15",
+      "version": "0.12.18",
       "license": "AGPL-3.0-only",
-      "origin": "Studio platform: packages/audio-video/player; commit a04f6c2; 2026-10-29 explicit queue priority cancellation, based on 0.12.13 without the parallel host-presentation changes",
-      "source": "sources/studio-player-0.12.15.tar.gz",
+      "origin": "Studio platform: packages/audio-video/player; 2026-11-13 explicit queue groups and grouped shuffle, preserving priority cancellation; source tracked in platform Git",
+      "source": "sources/studio-player-0.12.18.tar.gz",
       "sourceBasis": "Current platform src and tests; standalone package build inputs and existing AGPL license material supplied with this distribution",
       "documentation": "README.md"
     },

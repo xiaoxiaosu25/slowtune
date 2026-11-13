@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowSquareOutIcon, CaretRightIcon, CopyIcon, TelevisionSimpleIcon, YoutubeLogoIcon } from '@phosphor-icons/react';
 import type { MusicEntry } from '@studio/music-sources';
@@ -54,15 +55,15 @@ export function PlaybackSource({ track, version, store, onVersions, versionsOpen
     } catch { setIssue('复制失败，请从原视频复制链接。'); }
   };
   return <div ref={anchor} className="playback-source" onPointerEnter={() => { clearTimeout(timer.current); timer.current = setTimeout(show, 250); }} onPointerLeave={leave} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) leave(); }}>
-    <button ref={trigger} type="button" className="playback-source-trigger" aria-label="查看歌曲来源" aria-controls={id} popoverTarget={id} onFocus={() => { clearTimeout(timer.current); timer.current = setTimeout(show, 0); }} onClick={event => { event.preventDefault(); show(); }}><Icon size={15}/>来源 · {provider}<ArrowSquareOutIcon size={12}/></button>
+    <Button variant="plain" ref={trigger} type="button" className="playback-source-trigger" aria-label="查看歌曲来源" aria-controls={id} popoverTarget={id} onFocus={() => { clearTimeout(timer.current); timer.current = setTimeout(show, 0); }} onClick={event => { event.preventDefault(); show(); }}><Icon size={15}/>来源 · {provider}<ArrowSquareOutIcon size={12}/></Button>
     <div ref={panel} id={id} popover="auto" className="playback-source-card" aria-label="歌曲来源详情" onPointerEnter={() => clearTimeout(timer.current)} onPointerLeave={leave}>
       <strong>{originalTitle || '来源标题未提供'}</strong>
       <dl><dt>平台</dt><dd>{provider}</dd><dt>{track.ref.provider === 'bilibili' ? 'UP主' : '作者'}</dt><dd>{version?.facts.uploader || metadata?.uploader?.name || track.uploader?.name || '未提供'}</dd>
         {track.ref.part && <><dt>分P</dt><dd>{part?.title || track.ref.part}</dd></>}
       </dl>
       {issue && <p className="muted">{issue}</p>}
-      <div className="playback-source-actions"><a className="btn btn-ghost btn-sm" href={url} target="_blank" rel="noreferrer"><ArrowSquareOutIcon size={16}/>打开原视频</a><button type="button" className="btn btn-ghost btn-sm" onClick={() => void copy()}><CopyIcon size={16}/>{copied ? '已复制' : '复制链接'}</button></div>
-      <div className="playback-source-version"><button type="button" className="btn btn-ghost" aria-label="选择播放版本" aria-haspopup="dialog" aria-expanded={versionsOpen} onClick={() => { panel.current?.hidePopover(); trigger.current?.focus({ preventScroll: true }); clearTimeout(timer.current); onVersions(); }}>选择版本<CaretRightIcon size={16}/></button></div>
+      <div className="playback-source-actions"><a className="btn btn-ghost btn-sm" href={url} target="_blank" rel="noreferrer"><ArrowSquareOutIcon size={16}/>打开原视频</a><Button variant="ghost" compact type="button"  onClick={() => void copy()}><CopyIcon size={16}/>{copied ? '已复制' : '复制链接'}</Button></div>
+      <div className="playback-source-version"><Button variant="ghost" type="button"  aria-label="选择播放版本" aria-haspopup="dialog" aria-expanded={versionsOpen} onClick={() => { panel.current?.hidePopover(); trigger.current?.focus({ preventScroll: true }); clearTimeout(timer.current); onVersions(); }}>选择版本<CaretRightIcon size={16}/></Button></div>
     </div>
   </div>;
 }

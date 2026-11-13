@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Track } from './api';
 import { PartMetadataStore } from './multipart';
@@ -21,5 +22,5 @@ export function PartBadge({ track, store, active, onOpen, current = false, viewK
   if (track.ref.provider !== 'bilibili') return null;
   const count = entry?.parts?.length ?? track.parts?.length ?? 0;
   const index = entry?.parts?.findIndex(part => part.ref.part === track.ref.part) ?? -1;
-  return <span ref={element} className="part-badge-slot">{count > 1 && <button type="button" className="part-badge" aria-label={'查看分 P · ' + track.title} onClick={onOpen}>{current && index >= 0 ? `P${index + 1} / ${count}` : `${count} 个分 P`}</button>}</span>;
+  return <span ref={element} className="part-badge-slot">{count > 1 && <Button variant="plain" type="button" className="part-badge" aria-label={'查看分 P · ' + track.title} onClick={onOpen}>{current && index >= 0 ? `P${index + 1} / ${count}` : `${count} 个分 P`}</Button>}</span>;
 }

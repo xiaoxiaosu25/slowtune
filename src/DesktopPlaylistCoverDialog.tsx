@@ -1,3 +1,4 @@
+import { Button } from './ui/Button';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { ImageSquareIcon, UploadSimpleIcon, ArrowCounterClockwiseIcon } from '@phosphor-icons/react';
 import type { Song, SongLibraryState } from '../server/song-library-types';
@@ -86,7 +87,7 @@ export function DesktopPlaylistCoverDialog({ library, targetId, songs, image, bu
   return <Modal title="更换封面" className="playlist-cover-modal" onClose={close}>
     <p className="muted playlist-cover-title">{targetId === 'system:favorites' ? '我的收藏' : library.snapshot.playlists.find(p => p.id === targetId)?.name}</p>
     <div className="segmented playlist-cover-modes" role="group" aria-label="封面来源">
-      {([['upload', '上传图片', UploadSimpleIcon], ['songs', '从歌曲选择', ImageSquareIcon], ['auto', '恢复自动封面', ArrowCounterClockwiseIcon]] as const).map(([value, label, Icon]) => <button key={value} disabled={locked} className={mode === value ? 'selected' : ''} aria-pressed={mode === value} onClick={() => changeMode(value)}><Icon size={18}/>{label}</button>)}
+      {([['upload', '上传图片', UploadSimpleIcon], ['songs', '从歌曲选择', ImageSquareIcon], ['auto', '恢复自动封面', ArrowCounterClockwiseIcon]] as const).map(([value, label, Icon]) => <Button variant="plain" key={value} disabled={locked} className={mode === value ? 'selected' : ''} aria-pressed={mode === value} onClick={() => changeMode(value)}><Icon size={18}/>{label}</Button>)}
     </div>
     <div className="playlist-cover-body">
       <div className="playlist-cover-source">
@@ -96,21 +97,21 @@ export function DesktopPlaylistCoverDialog({ library, targetId, songs, image, bu
           void prepare(async () => file, 'upload');
         }}/></label><p className="muted">支持 JPG、PNG、WebP，最大 12 MiB。选择后可拖动和缩放，保存为正方形封面。</p></>}
         {mode === 'songs' && <><label className="field"><span className="field-label">搜索当前列表中的歌曲</span><input className="input" aria-label="搜索封面歌曲" value={query} onChange={event => setQuery(event.target.value)} disabled={locked}/></label>
-          <PagedList id={'cover:' + targetId + ':' + query} group="library" label="封面歌曲" items={candidates}>{items => <div className="playlist-cover-grid">{items.map(song => <button className={'playlist-cover-choice' + (prepared?.mode === 'songs' && prepared.songId === song.id ? ' selected' : '')} key={song.id} disabled={locked} aria-pressed={prepared?.mode === 'songs' && prepared.songId === song.id} aria-label={'使用封面 ' + song.title} title={song.title + (song.artists?.length ? ' · ' + song.artists.join(' / ') : '')} onClick={() => chooseSong(song)}><SongCover song={song}/><strong>{song.title}</strong><small>{song.artists?.join(' / ') || '歌手待整理'}</small></button>)}</div>}</PagedList>
+          <PagedList id={'cover:' + targetId + ':' + query} group="library" label="封面歌曲" items={candidates}>{items => <div className="playlist-cover-grid">{items.map(song => <Button variant="plain" className={'playlist-cover-choice' + (prepared?.mode === 'songs' && prepared.songId === song.id ? ' selected' : '')} key={song.id} disabled={locked} aria-pressed={prepared?.mode === 'songs' && prepared.songId === song.id} aria-label={'使用封面 ' + song.title} title={song.title + (song.artists?.length ? ' · ' + song.artists.join(' / ') : '')} onClick={() => chooseSong(song)}><SongCover song={song}/><strong>{song.title}</strong><small>{song.artists?.join(' / ') || '歌手待整理'}</small></Button>)}</div>}</PagedList>
           {!candidates.length && <p className="muted">{songs.some(song => song.artwork) ? '没有匹配的歌曲。' : '当前列表还没有可用的歌曲封面，可以上传图片。'}</p>}
         </>}
         {mode === 'auto' && <p className="muted">使用列表中第一首有封面的歌曲，随歌曲顺序自动更新。列表没有可用封面时显示默认图标。</p>}
       </div>
       <div className="playlist-cover-preview"><span className="field-label">{bitmap || mode === 'auto' ? '封面预览' : '当前封面'}</span>
         {bitmap ? <><canvas ref={canvas} width={size} height={size} tabIndex={0} role="img" aria-label="封面裁剪预览，可拖动或用方向键移动图片" onPointerDown={event => { if (locked) return; event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY, crop }; }} onPointerMove={pointerMove} onPointerUp={() => { drag.current = undefined; }} onPointerCancel={() => { drag.current = undefined; }} onLostPointerCapture={() => { drag.current = undefined; }} onKeyDown={event => { const delta: Record<string, [number, number]> = { ArrowLeft: [-10, 0], ArrowRight: [10, 0], ArrowUp: [0, -10], ArrowDown: [0, 10] }; if (delta[event.key] && !locked) { event.preventDefault(); move(...delta[event.key]); } }}/>
-          <label className="playlist-cover-zoom"><span>缩放</span><input type="range" aria-label="封面缩放" min="1" max="4" step="0.01" value={crop.zoom} disabled={locked} onChange={event => setCrop(old => ({ ...old, zoom: Number(event.target.value) }))}/><output>{Math.round(crop.zoom * 100)}%</output></label><button className="btn btn-ghost btn-sm" disabled={locked} onClick={() => setCrop(centered())}>重新居中</button>
+          <label className="playlist-cover-zoom"><span>缩放</span><input type="range" aria-label="封面缩放" min="1" max="4" step="0.01" value={crop.zoom} disabled={locked} onChange={event => setCrop(old => ({ ...old, zoom: Number(event.target.value) }))}/><output>{Math.round(crop.zoom * 100)}%</output></label><Button variant="ghost" compact  disabled={locked} onClick={() => setCrop(centered())}>重新居中</Button>
         </> : <PlaylistCover image={mode === 'auto' ? undefined : image} song={autoSong} className="playlist-cover-sample"/>}
         {mode !== 'auto' && <p className="muted">保存后固定使用这张图片，移除歌曲也会保留。</p>}
       </div>
     </div>
     {loading && <p role="status" className="muted">正在读取图片…</p>}
     {error && <p className="feedback" role="alert">{error}</p>}
-    {conflict && <div className="playlist-cover-conflict"><PlaylistCover image={image} song={autoSong}/><span>资料库当前封面</span><button className="btn btn-secondary" onClick={() => { setRevision(library.revision); setConflict(false); setError('当前选择已保留，请确认预览后再次保存。'); }}>已核对，保留我的选择</button></div>}
-    <div className="modal-actions"><button className="btn btn-ghost" disabled={saving} onClick={close}>取消</button><button className="btn btn-primary" disabled={locked || loading || conflict || mode !== 'auto' && !bitmap} onClick={() => void save()}>{saving ? '正在保存…' : '保存封面'}</button></div>
+    {conflict && <div className="playlist-cover-conflict"><PlaylistCover image={image} song={autoSong}/><span>资料库当前封面</span><Button variant="secondary"  onClick={() => { setRevision(library.revision); setConflict(false); setError('当前选择已保留，请确认预览后再次保存。'); }}>已核对，保留我的选择</Button></div>}
+    <div className="modal-actions"><Button variant="ghost"  disabled={saving} onClick={close}>取消</Button><Button variant="primary"  disabled={locked || loading || conflict || mode !== 'auto' && !bitmap} onClick={() => void save()}>{saving ? '正在保存…' : '保存封面'}</Button></div>
   </Modal>;
 }

@@ -110,10 +110,24 @@ test('full App exposes audio preferences and the current-track dialog on desktop
     await page.route('**/*',route=>new URL(route.request().url()).origin===fixture.origin?route.continue():route.abort());
     await page.route('**/v1/handshake',route=>route.fulfill({json:{protocol:2,capabilities:[{provider:'bilibili',operations:['metadata','prepare','search','formats'],anonymous:true,limitations:[]}]}}));
     await page.route('**/v1/call/formats',route=>route.fulfill({json:{protocol:2,result:[{id:'wav',codec:'1',mimeType:'audio/wav',container:'wav',sampleRate:8000,bitDepth:16,channels:1}]}}));
-    await page.goto(fixture.origin);await navigate(page,'收藏');await page.getByRole('button',{name:'播放 晴天',exact:true}).click();await page.waitForFunction(()=>{const a=document.querySelector('audio');return a&&!a.paused&&a.currentTime>.1;});
+    await page.goto(fixture.origin);await navigate(page,'收藏');
+    const dialog=page.getByRole('dialog',{name:'音质与音轨'});
+    if(surface==='desktop'){
+      await page.getByRole('button',{name:'更多播放选项',exact:true}).click();
+      await page.getByRole('button',{name:'音质与音轨',exact:true}).click();
+      assert.equal(await dialog.getByRole('combobox',{name:'默认音质'}).inputValue(),'auto');
+      assert.equal(await dialog.getByRole('combobox',{name:'本次播放选择'}).count(),0);
+      await page.keyboard.press('Escape');
+    }
+    await page.getByRole('button',{name:'播放 晴天',exact:true}).click();await page.waitForFunction(()=>{const a=document.querySelector('audio');return a&&!a.paused&&a.currentTime>.1;});
     if(surface==='mobile')await page.getByRole('button',{name:'打开正在播放',exact:true}).click();
-    await page.getByRole('button',{name:'更多播放选项',exact:true}).click();const defaults=page.locator('select[aria-label="默认音质"]:visible');await defaults.selectOption('compatible');const count=prepares;await page.waitForTimeout(100);assert.equal(prepares,count);
-    await page.getByRole('button',{name:'音质与音轨',exact:true}).click();const dialog=page.getByRole('dialog',{name:'音质与音轨'});await dialog.getByRole('option',{name:/8 kHz/}).waitFor({state:'attached'});assert.equal(await dialog.getByRole('combobox',{name:'默认音质'}).inputValue(),'compatible');
+    await page.getByRole('button',{name:'更多播放选项',exact:true}).click();
+    const count=prepares;
+    if(surface==='mobile')await page.getByRole('combobox',{name:'默认音质'}).selectOption('compatible');
+    await page.getByRole('button',{name:'音质与音轨',exact:true}).click();await dialog.getByRole('option',{name:/8 kHz/}).waitFor({state:'attached'});
+    const defaults=dialog.getByRole('combobox',{name:'默认音质'});
+    if(surface==='desktop')await defaults.selectOption('compatible');
+    assert.equal(await defaults.inputValue(),'compatible');await page.waitForTimeout(100);assert.equal(prepares,count);
     await dialog.getByRole('combobox',{name:'本次播放选择'}).selectOption('format:wav');
     await dialog.getByRole('button',{name:'应用到当前曲'}).click();
     await dialog.getByText('本次指定音轨 · 来源音轨规格',{exact:true}).waitFor();

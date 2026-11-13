@@ -15,6 +15,7 @@ import { MobileDock } from './app/regions/MobileDock';
 import { SearchPanel } from './app/regions/SearchPanel';
 import { ActionModal } from './app/regions/ActionModal';
 import { DesktopCommandPalette } from './app/regions/DesktopCommandPalette';
+import { ListeningBackdrop } from './app/regions/NowPlaying';
 
 export function App() {
   return (
@@ -33,6 +34,7 @@ function Workspace(props: { client: MusicClient; preload: StartupPreload; onLogo
     youtubeEnabled,
     knownArtworks,
     page,
+    currentArtwork,
     mobilePlayerEmpty,
     mobileSecondary,
     desktop,
@@ -64,6 +66,9 @@ function Workspace(props: { client: MusicClient; preload: StartupPreload; onLogo
             data-player-style={playerStyle}
           >
             <MotionConfig reducedMotion="user">
+              {desktop && page === 'playing' && currentArtwork && (
+                <ListeningBackdrop key={currentArtwork} artwork={currentArtwork} />
+              )}
               <Sidebar />
               <TopBar />
               <MainContent />

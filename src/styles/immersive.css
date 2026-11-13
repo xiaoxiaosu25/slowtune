@@ -3,9 +3,10 @@
    ========================================================================== */
 .immersive .topbar { left:0; }
 .listening-header { justify-content:space-between; }
+.app[data-layout="desktop"]>.listening-header { border-bottom:0; background:transparent; backdrop-filter:none; }
 .listening-header-title { display:flex; flex:1; align-items:center; gap:var(--sp-4); min-width:0; }
 .listening-header-title h1 { flex-shrink:0; white-space:nowrap; font-size:var(--fs-heading); font-weight:600; }
-.listening-header-title>span { min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:var(--fs-body); }
+.listening-header-title>span { min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:color-mix(in srgb,var(--muted) 85%,var(--text)); font-size:var(--fs-body); }
 .desktop-nav button.active { color:var(--accent-text); font-weight:600; }
 .immersive .search-field { max-width:440px; margin-left:var(--sp-6); }
 .immersive .main-content { height:100%; max-width:none; display:flex; flex-direction:column; min-height:0; overflow:hidden; padding:var(--sp-4); container-type:size; container-name:listening; }

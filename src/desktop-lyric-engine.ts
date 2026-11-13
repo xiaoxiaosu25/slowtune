@@ -28,19 +28,32 @@ class DesktopPlayer extends LyricPlayer {
 const hostStyles = `
 :host { display:block; width:100%; height:100%; font:inherit; color:var(--text); }
 .amll-lyric-player.dom { --amll-lp-font-size:inherit; --amll-lp-color:var(--text); --lyric-line-padding-x:8px; --amll-lp-line-width-aspect:1; --amll-lp-hover-bg-color:transparent; font:inherit; line-height:1.4; mix-blend-mode:normal; overflow:clip; }
-.slow-lyric-line { padding:8px !important; cursor:pointer; opacity:var(--slow-line-opacity,.6) !important; filter:none !important; transition:opacity 300ms ease-out; }
+.slow-lyric-line { padding:8px !important; pointer-events:none; opacity:var(--slow-line-opacity,.6) !important; filter:none !important; transition:opacity 300ms ease-out; }
 .slow-lyric-line:focus-visible { outline:2px solid var(--accent-text); outline-offset:-2px; }
 .slow-lyric-line:focus-visible,.slow-lyric-line:hover { opacity:1 !important; filter:none !important; }
 .slow-lyric-line [class*="_lyricLine"] { --bright-mask-alpha:1; --dark-mask-alpha:.4; }
-.slow-lyric-line [class*="_lyricMainLine"] { line-height:1.4; overflow-wrap:break-word; font-weight:400; scale:.666667; transform-origin:left center; transition:scale 300ms cubic-bezier(.2,0,0,1),font-weight 300ms ease-out,text-shadow 300ms ease-out; }
+.slow-lyric-line :is([class*="_lyricMainLine"],[class*="_lyricSubLine"]):not(:empty) { width:fit-content; max-width:100%; overflow-wrap:anywhere; pointer-events:auto; cursor:pointer; }
+.slow-lyric-line [class*="_lyricMainLine"] { margin:0; padding:0; line-height:1.4; font-weight:400; scale:.666667; transform-origin:left center; transition:scale 300ms cubic-bezier(.2,0,0,1),font-weight 300ms ease-out,text-shadow 300ms ease-out; }
+.slow-lyric-line [class*="_lyricMainLine"] * { pointer-events:none; }
 .slow-lyric-line[aria-current="true"] [class*="_lyricMainLine"] { scale:1; font-weight:800; text-shadow:0 4px 24px color-mix(in srgb,var(--text) 12%,transparent); }
 .slow-lyric-line [class*="_lyricSubLine"] { font-size:14px; line-height:1.6; opacity:.8; margin-top:4px; font-weight:400; }
 .slow-static-line [class*="_lyricMainLine"],.slow-static-line [class*="_lyricMainLine"] * { mask-image:none !important; -webkit-mask-image:none !important; opacity:1 !important; filter:none !important; transform:none !important; }
 .slow-static-line [class*="_lyricMainLine"] * { text-shadow:inherit !important; }
-.amll-lyric-player[data-snap="true"] *,.amll-lyric-player[data-reduced="true"] * { transition:none !important; animation:none !important; }
-.amll-lyric-player[data-reduced="true"] [class*="_lyricMainLine"] { scale:1; }
-.amll-lyric-player[data-reduced="true"] [class*="_lyricMainLine"],.amll-lyric-player[data-reduced="true"] [class*="_lyricMainLine"] * { mask-image:none !important; -webkit-mask-image:none !important; text-shadow:none !important; }
+.amll-lyric-player[data-snap="true"] * { transition:none !important; animation:none !important; }
 `;
+
+function containsLyricText(element: Element, x: number, y: number) {
+  const range = document.createRange();
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.textContent?.trim()) continue;
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) {
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
+    }
+  }
+  return false;
+}
 
 export function mountDesktopLyricEngine(host: HTMLElement, lines: LyricLine[], timedWords: boolean[], initialTime: number, onSeek: (index: number) => void) {
   const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
@@ -65,25 +78,26 @@ export function mountDesktopLyricEngine(host: HTMLElement, lines: LyricLine[], t
     row.setAttribute('aria-label', lines[index].words.map(word => word.word).join(''));
     return row;
   });
-  const click = (event: Event) => { const index = (event as LyricLineMouseEvent).lineIndex; if (index >= 0) onSeek(index); };
+  const click = (event: Event) => {
+    const { lineIndex, detail, clientX, clientY } = event as LyricLineMouseEvent;
+    if (lineIndex < 0) return;
+    if (detail === 0) { onSeek(lineIndex); return; }
+    const text = shadow.elementFromPoint(clientX, clientY);
+    // Wrapped text has a rectangular box even where its last row is shorter.
+    if (text && containsLyricText(text, clientX, clientY)) onSeek(lineIndex);
+  };
   const keyboard = (event: KeyboardEvent) => {
     if (!['Enter', ' '].includes(event.key)) return;
     const row = (event.target as HTMLElement).closest<HTMLElement>('[data-line-index]');
     if (row) { event.preventDefault(); event.stopPropagation(); onSeek(Number(row.dataset.lineIndex)); }
   };
   player.addEventListener('line-click', click); element.addEventListener('keydown', keyboard);
-  let active = -2, playing = false, reduced = false, previousTime = initialTime;
-  const sync = (time: number, isPlaying: boolean, reduce: boolean, seek = false, delta = 0) => {
-    const snap=seek||reduce||time<previousTime||Math.abs(time-previousTime)>1200;
+  let active = -2, playing = false, previousTime = initialTime;
+  const sync = (time: number, isPlaying: boolean, seek = false, delta = 0) => {
+    const snap=seek||time<previousTime||Math.abs(time-previousTime)>1200;
     player.snapLayout=snap;
     element.dataset.snap=String(snap);previousTime=time;
     if (playing !== isPlaying) { playing = isPlaying; if (playing) player.resume(); else player.pause(); }
-    if (element.dataset.reduced === undefined || reduced !== reduce) {
-      reduced = reduce; element.dataset.reduced = String(reduce);
-      player.setEnableSpring(!reduce);
-      active = -2;
-      if (!reduce && playing) player.resume();
-    }
     player.setCurrentTime(time, snap);
     player.update(delta);
     player.syncWordClock(time, timedWords);
@@ -97,11 +111,9 @@ export function mountDesktopLyricEngine(host: HTMLElement, lines: LyricLine[], t
         if (index === current) row.setAttribute('aria-current', 'true'); else row.removeAttribute('aria-current');
       });
     }
-    // Single-word LRC rows never receive an invented progressive mask.
-    if (reduce) element.getAnimations({ subtree: true }).forEach(animation => animation.pause());
     host.dataset.activeLine = String(current); host.dataset.time = String(time);
   };
-  player.pause(); sync(initialTime, false, false, true);
+  player.pause(); sync(initialTime, false, true);
   return {
     sync,
     browse: () => { player.browsing = true; },

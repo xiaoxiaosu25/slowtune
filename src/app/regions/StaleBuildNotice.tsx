@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import type { ServerStatus } from '../../api';
 
 /** 页面与运行中的服务不是同一次构建时，提示重启服务。 */
@@ -26,9 +27,9 @@ export function StaleBuildNotice({
           hour12: false,
         })}
       </p>
-      <button className="btn btn-primary" onClick={() => void reload()}>
+      <Button variant="primary"  onClick={() => void reload()}>
         重新检查
-      </button>
+      </Button>
     </div>
   );
 }

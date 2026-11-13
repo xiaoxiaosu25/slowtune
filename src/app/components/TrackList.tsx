@@ -1,3 +1,4 @@
+import { Button, IconButton } from '../../ui/Button';
 import type { CSSProperties } from 'react';
 import {
   PlayIcon,
@@ -170,7 +171,7 @@ export function CreatorContent({ track, className = '' }: { track: Track; classN
       {track.artists?.length && (desktop || className !== 'card-creator') ? (
         <span className="creator-artists">{track.artists.join(' / ')}</span>
       ) : null}
-      <button
+      <Button variant="plain"
         className="creator-link"
         title={'查看 ' + (track.uploader?.name ?? 'UP / 博主') + ' 的合集和投稿'}
         aria-label={'查看 UP / 博主 · ' + track.title}
@@ -183,11 +184,11 @@ export function CreatorContent({ track, className = '' }: { track: Track; classN
           : !desktop && className === 'card-creator' && track.artists?.length
             ? track.artists.join(' / ')
             : (track.uploader?.name ?? '查看 UP / 博主')}
-      </button>
+      </Button>
       {desktop && authorBusy && authorTarget === artworkKey(track) && (
-        <button className="btn btn-ghost btn-sm" onClick={cancelAuthor}>
+        <Button variant="ghost" compact  onClick={cancelAuthor}>
           取消
-        </button>
+        </Button>
       )}
     </span>
   );
@@ -278,14 +279,14 @@ export function TrackRow({
           ? <TrackRowCue number={number} title={t.title} playing={isCurrent && snapshot.playing} disabled={sourceBlocked(t)} onPlay={() => void playTrack()} />
           : <span className="row-number">{number}</span>
       )}
-      <button
+      <Button variant="plain"
         className="row-cover"
         aria-label={'播放 ' + t.title}
         disabled={sourceBlocked(t)}
         onClick={() => void playTrack()}
       >
         <Cover track={t} />
-      </button>
+      </Button>
       <div className="row-info">
         {!desktop && context === 'normal' ? (
           <MobileBrowseTitle
@@ -296,14 +297,14 @@ export function TrackRow({
             onPlay={() => void playTrack()}
           />
         ) : (
-          <button
+          <Button variant="plain"
             className="track-name"
             title={t.title}
             disabled={sourceBlocked(t)}
             onClick={() => void playTrack()}
           >
             {displayTitle(t)}
-          </button>
+          </Button>
         )}
         {context !== 'part' && (
           <PartBadge
@@ -344,35 +345,35 @@ export function TrackRow({
       <span className="row-duration">{time(t.durationSeconds)}</span>
       {context === 'queue' ? (
         <>
-          <button
-            className="btn btn-icon"
+          <IconButton
+
             aria-label={'队列上移 ' + t.title}
             disabled={index === 0}
             onClick={() => playback.move(t.resourceId, index - 1)}
           >
             <ArrowUpIcon size={18} />
-          </button>
-          <button
-            className="btn btn-icon"
+          </IconButton>
+          <IconButton
+
             aria-label={'队列下移 ' + t.title}
             disabled={index === snapshot.items.length - 1}
             onClick={() => playback.move(t.resourceId, index + 1)}
           >
             <ArrowDownIcon size={18} />
-          </button>
-          <button
-            className="btn btn-icon"
+          </IconButton>
+          <IconButton
+
             aria-label={'移除队列 ' + t.title}
             onClick={() => void playback.remove(t.resourceId)}
           >
             <TrashIcon size={20} />
-          </button>
+          </IconButton>
         </>
       ) : (
         <>
           {t.targetSongId ? (
-            <button
-              className="btn btn-icon"
+            <IconButton
+
               title="添加为这首歌曲的版本"
               aria-label={'添加版本 ' + t.title}
               disabled={saving || !lib || sourceBlocked(t)}
@@ -381,10 +382,10 @@ export function TrackRow({
               }
             >
               <PlusIcon size={21} />
-            </button>
+            </IconButton>
           ) : (
-            <button
-              className={'btn btn-icon ' + (saved ? 'saved' : '')}
+            <IconButton
+              className={' ' + (saved ? 'saved' : '')}
               title={saved && entryContext === 'part' ? '取消收藏' : '收藏'}
               aria-label={(saved && entryContext === 'part' ? '取消收藏 ' : '收藏 ') + t.title}
               aria-pressed={saved}
@@ -397,7 +398,7 @@ export function TrackRow({
               ) : (
                 <HeartIcon size={21} weight={saved ? 'fill' : 'regular'} />
               )}
-            </button>
+            </IconButton>
           )}
           {desktop ? (
             <TrackSourceMenu
@@ -422,8 +423,8 @@ export function TrackRow({
               }
             />
           ) : (
-            <button
-              className="btn btn-icon"
+            <IconButton
+
               title="更多操作"
               aria-label={'更多操作 ' + t.title}
               onClick={() =>
@@ -455,7 +456,7 @@ export function TrackRow({
               }
             >
               <DotsThreeIcon size={26} />
-            </button>
+            </IconButton>
           )}
         </>
       )}
@@ -544,14 +545,14 @@ function TrackCoverCard({
   return (
     <article className="music-card">
       <div className="art-wrap">
-        <button
+        <Button variant="plain"
           className="cover-button"
           aria-label={'播放 ' + t.title}
           onClick={() => void trackAction(t, 'play', { tracks: all, index: all.indexOf(t) }, 'video')}
         >
           <Cover track={t} />
-        </button>
-        <button
+        </Button>
+        <Button variant="plain"
           className={'cover-favorite ' + (isVideoFavorite(t) ? 'saved' : '')}
           aria-label={'收藏 ' + t.title}
           aria-pressed={isVideoFavorite(t)}
@@ -564,17 +565,17 @@ function TrackCoverCard({
           ) : (
             <HeartIcon size={18} weight={isVideoFavorite(t) ? 'fill' : 'regular'} />
           )}
-        </button>
+        </Button>
       </div>
       <div className="card-heading">
         {desktop ? (
-          <button
+          <Button variant="plain"
             className="card-title"
             title={t.title}
             onClick={() => void trackAction(t, 'play', { tracks: all, index: all.indexOf(t) }, 'video')}
           >
             {displayTitle(t)}
-          </button>
+          </Button>
         ) : (
           <MobileBrowseTitle
             className="card-title"
@@ -597,8 +598,8 @@ function TrackCoverCard({
         {desktop ? (
           <TrackSourceMenu track={t} target=".music-card" />
         ) : (
-          <button
-            className="btn btn-icon card-menu"
+          <IconButton
+            className="card-menu"
             aria-label={'更多操作 ' + t.title}
             onClick={() =>
               open({
@@ -610,7 +611,7 @@ function TrackCoverCard({
             }
           >
             <DotsThreeIcon size={22} />
-          </button>
+          </IconButton>
         )}
       </div>
       {timestamps && (

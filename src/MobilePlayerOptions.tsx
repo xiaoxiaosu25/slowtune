@@ -1,7 +1,9 @@
+import { IconButton } from './ui/Button';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { DotsThreeIcon, XIcon } from '@phosphor-icons/react';
+import { DotsThreeIcon } from '@phosphor-icons/react';
 import { Drawer } from 'vaul';
 import { closeNestedPopover } from './ui/layers';
+import { DialogHeader } from './ui/DialogHeader';
 
 export function MobilePlayerOptions({ children }: { children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -16,7 +18,7 @@ export function MobilePlayerOptions({ children }: { children: (close: () => void
     return () => element?.removeEventListener('cancel', close);
   }, [open]);
   return <>
-    <button ref={trigger} className={'btn btn-icon' + (open ? ' saved' : '')} aria-label="更多播放选项" aria-expanded={open} onClick={() => setOpen(true)}><DotsThreeIcon size={25}/></button>
+    <IconButton ref={trigger} className={' ' + (open ? ' saved' : '')} aria-label="更多播放选项" aria-expanded={open} onClick={() => setOpen(true)}><DotsThreeIcon size={25}/></IconButton>
     {open && <Drawer.Root open autoFocus handleOnly noBodyStyles repositionInputs={false} container={container} onOpenChange={setOpen}>
       <Drawer.Portal>
         <Drawer.Overlay className="modal-backdrop mobile-drawer-backdrop" />
@@ -27,10 +29,7 @@ export function MobilePlayerOptions({ children }: { children: (close: () => void
             trigger.current?.focus({ preventScroll: true });
           }}>
           <Drawer.Handle className="mobile-drawer-handle" aria-hidden="true" />
-          <header className="modal-header">
-            <Drawer.Title>更多播放选项</Drawer.Title>
-            <Drawer.Close asChild><button type="button" className="btn btn-icon" aria-label="关闭"><XIcon size={22} /></button></Drawer.Close>
-          </header>
+          <DialogHeader heading={<Drawer.Title>更多播放选项</Drawer.Title>} onClose={close}/>
           {children(close)}
         </Drawer.Content>
       </Drawer.Portal>

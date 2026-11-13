@@ -9,6 +9,7 @@
   .mobile-header .mobile-header-title h1 { font-size:var(--fs-title); letter-spacing:.02em; font-weight:600; text-align:left; }
   .mobile-header-actions { gap:0; }
   .app[data-layout="mobile"] .btn-icon { width:48px; height:48px; }
+  .app[data-layout="mobile"] summary { min-height:48px; }
   .app[data-layout="mobile"] .play-all { flex-shrink:0; min-width:104px; height:48px; padding:0 12px; gap:6px; border:1px solid color-mix(in srgb,var(--accent-text) 18%,var(--border)); border-radius:var(--r-pill); background:var(--selected); color:var(--accent-text); box-shadow:none; font-size:var(--fs-secondary); font-weight:600; }
   .app[data-layout="mobile"] .play-all>svg { width:20px; height:20px; }
   .app[data-layout="mobile"] .play-all:hover:not(:disabled) { background:color-mix(in srgb,var(--selected) 80%,var(--accent-text)); }
@@ -18,7 +19,7 @@
   .app[data-layout="mobile"] .row-cover { min-width:48px; width:48px; height:48px; }
   .app[data-layout="mobile"] :is(.segmented>button,.song-version-link,.part-badge) { min-width:48px; min-height:48px; }
   .app[data-layout="mobile"] :is(.player-setting,.rate-option) { height:48px; }
-  .app[data-layout="mobile"] :is(.btn-icon-xs,.catalog-view>button) { width:48px; height:48px; }
+  .app[data-layout="mobile"] .catalog-view>button { width:48px; height:48px; }
   .app[data-layout="mobile"] :is(.catalog-actions .btn,.catalog-tools .btn,.catalog-tools .input,.catalog-tools .select,.pagination .btn,.pagination .input,.pagination .select) { min-height:48px; height:48px; }
   .app[data-layout="mobile"] .control-popover-panel>:is(button,a) { min-height:48px; }
   .app[data-layout="mobile"] :is(.input,.select,.textarea,.search-field input) { font-size:var(--fs-input-touch); }
@@ -235,6 +236,7 @@
   .app[data-layout="mobile"] .queue-drawer .queue-panel { padding:12px 16px max(12px,env(safe-area-inset-bottom)); }
   .app[data-layout="mobile"] .queue-heading { margin-bottom:8px; }
   .app[data-layout="mobile"] .queue-mode { margin-bottom:8px; padding-bottom:8px; }
+  .app[data-layout="mobile"] .queue-shuffle-choice .select { min-height:48px; font-size:var(--fs-body); }
   .app[data-layout="mobile"] .queue-footer { margin-top:8px; padding-top:8px; }
   .app[data-layout="mobile"] { --notice-offset:calc(var(--mobile-nav-height) + var(--mobile-player-height) + 30px + env(safe-area-inset-bottom)); }
   .app[data-layout="mobile"].immersive { --notice-offset:var(--sp-4); }
@@ -540,13 +542,17 @@
   .mobile-player-controls.playing-detail { grid-column:2; grid-row:2; align-self:end; }
   .app[data-layout="mobile"] .queue-drawer { height:100dvh; max-height:100dvh; border-radius:0; }
   .app[data-layout="mobile"] .listening-panel-tabs { margin:8px 16px 0; }
-  .app[data-layout="mobile"] .queue-drawer .queue-panel { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto minmax(0,1fr) auto; gap:4px; padding:8px 16px max(8px,env(safe-area-inset-bottom)); }
+  .app[data-layout="mobile"] .queue-drawer .queue-panel { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto minmax(0,1fr) auto; gap:4px; padding:8px 16px max(8px,env(safe-area-inset-bottom)); }
   .app[data-layout="mobile"] .queue-heading { grid-column:1; grid-row:1; min-height:48px; margin:0; }
   .app[data-layout="mobile"] .queue-heading .eyebrow,.app[data-layout="mobile"] .queue-mode { display:none; }
+  .app[data-layout="mobile"] .queue-mode:has(.queue-shuffle-choice) { display:flex; grid-column:1; grid-row:3; margin:0; padding:0; border:0; }
+  .app[data-layout="mobile"] .queue-mode:has(.queue-shuffle-choice)>span { display:none; }
+  .app[data-layout="mobile"] .queue-shuffle-choice { display:flex; align-items:center; }
+  .app[data-layout="mobile"] .queue-shuffle-choice>span { flex-shrink:0; }
   .app[data-layout="mobile"] .queue-heading h2 { margin:0; }
   .app[data-layout="mobile"] .queue-toolbar { grid-column:1; grid-row:1; align-self:center; justify-self:end; margin:0 56px 0 136px; flex-wrap:nowrap; }
   .app[data-layout="mobile"] .queue-toolbar>.btn { padding-inline:10px; white-space:nowrap; }
   .app[data-layout="mobile"] .queue-panel>.muted { grid-column:1; grid-row:2; margin:0; font-size:var(--fs-meta); }
-  .app[data-layout="mobile"] .queue-content { grid-column:1; grid-row:3; }
-  .app[data-layout="mobile"] .queue-footer { grid-column:1; grid-row:4; margin:0; padding-top:4px; }
+  .app[data-layout="mobile"] .queue-content { grid-column:1; grid-row:4; }
+  .app[data-layout="mobile"] .queue-footer { grid-column:1; grid-row:5; margin:0; padding-top:4px; }
 }

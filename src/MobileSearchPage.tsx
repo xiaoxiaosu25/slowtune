@@ -1,5 +1,6 @@
+import { Button, DismissButton } from './ui/Button';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ArrowLeftIcon, LinkIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react';
+import { LinkIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react';
 import { OPEN_LAYER } from './ui/layers';
 
 export function MobileSearchPage({ query, onQuery, onSearch, onBack, onLink, autoFocus, children }: {
@@ -12,8 +13,8 @@ export function MobileSearchPage({ query, onQuery, onSearch, onBack, onLink, aut
     window.addEventListener('keydown', escape); return () => window.removeEventListener('keydown', escape);
   }, [onBack]);
   return <main className="mobile-search-page" aria-label="搜索音乐">
-    <header className="mobile-search-header"><button className="btn btn-icon" aria-label="关闭搜索" onClick={onBack}><ArrowLeftIcon size={24}/></button><form role="search" onSubmit={event => { event.preventDefault(); input.current?.blur(); onSearch(); }}><MagnifyingGlassIcon size={21}/><input ref={input} aria-label="搜索关键词" type="search" enterKeyHint="search" autoComplete="off" placeholder="歌曲、视频或用户昵称" value={query} onChange={event => onQuery(event.target.value)}/>{query && <button type="button" aria-label="清空搜索关键词" onClick={() => { onQuery(''); input.current?.focus(); }}><XIcon size={18}/></button>}<button type="submit" aria-label="搜索">搜索</button></form></header>
-    <div className="mobile-search-tools"><button className="btn btn-ghost" onClick={onLink}><LinkIcon size={20}/>粘贴链接</button></div>
+    <header className="mobile-search-header"><DismissButton action="back" aria-label="关闭搜索" onClick={onBack}/><form role="search" onSubmit={event => { event.preventDefault(); input.current?.blur(); onSearch(); }}><MagnifyingGlassIcon size={21}/><input ref={input} aria-label="搜索关键词" type="search" enterKeyHint="search" autoComplete="off" placeholder="歌曲、视频或用户昵称" value={query} onChange={event => onQuery(event.target.value)}/>{query && <Button variant="plain" type="button" aria-label="清空搜索关键词" onClick={() => { onQuery(''); input.current?.focus(); }}><XIcon size={18}/></Button>}<Button variant="plain" type="submit" aria-label="搜索">搜索</Button></form></header>
+    <div className="mobile-search-tools"><Button variant="ghost"  onClick={onLink}><LinkIcon size={20}/>粘贴链接</Button></div>
     <div className="mobile-search-content">{children}</div>
   </main>;
 }

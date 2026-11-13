@@ -209,10 +209,10 @@ export function useWorkspacePlayback({
   };
   async function choosePartMode(mode: PartPlaybackMode) {
     if (!popup?.track || !popup.anchorId || playback.currentTrackId() !== popup.anchorId) return false;
-    if (mode === 'all' && !playback.expandParts(popup.anchorId, popup.parts ?? [])) return false;
+    if (mode === 'all' && !playback.expandParts(popup.anchorId, popup.parts ?? [], popup.track.partsGroupTitle ?? popup.track.title)) return false;
     rememberPartMode(popup.track.ref.id, mode);
     setPopup(null);
-    flash(mode === 'all' ? '已加入整组，按分 P 顺序播放' : '已记住：这个视频播放本 P');
+    flash(mode === 'all' ? '已加入整组，沿用当前播放模式' : '已记住：这个视频播放本 P');
     return true;
   }
   async function trackAction(
@@ -244,7 +244,7 @@ export function useWorkspacePlayback({
     try {
       const entry = await partsStore.read(t.ref, controller.signal);
       controller.signal.throwIfAborted();
-      const resolved = { ...t, ...entry },
+      const resolved = { ...t, ...entry, ...(entry.parts && entry.parts.length > 1 ? {partsGroupTitle:t.partsGroupTitle ?? t.title} : {}) },
         parts = entry.parts ?? [entry],
         multiple = t.ref.provider === 'bilibili' && parts.length > 1;
       setCanonical((old) => ({ ...old, [key(t.ref)]: entry.ref }));
@@ -267,8 +267,8 @@ export function useWorkspacePlayback({
       const anchorId = playback.currentTrackId();
       if (entryContext === 'video' && multiple && anchorId) {
         const preference = preferenceRef.current[t.ref.id];
-        if (preference === 'all' && playback.expandParts(anchorId, parts)) {
-          if (!desktop) flash('按分 P 顺序播放');
+        if (preference === 'all' && playback.expandParts(anchorId, parts, resolved.partsGroupTitle)) {
+          if (!desktop) flash('已加入整组，沿用当前播放模式');
           return true;
         }
         if (desktop && preference !== 'single') {

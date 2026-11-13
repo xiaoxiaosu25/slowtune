@@ -1,3 +1,4 @@
+import { Button } from '../../ui/Button';
 import { SourceTabs, ErrorFeedback } from '../components/WorkspaceControls';
 import { renderTrackCovers, renderTrackList } from '../components/TrackList';
 import { SongLibraryWorkspace } from '../../SongLibraryPage';
@@ -51,9 +52,9 @@ export function DiscoverPage() {
                   {discoverBusy && (
                     <div className="loading">
                       正在获取 B站推荐…{' '}
-                      <button className="btn btn-ghost" onClick={cancelDiscovery}>
+                      <Button variant="ghost"  onClick={cancelDiscovery}>
                         取消
-                      </button>
+                      </Button>
                     </div>
                   )}
                   {!!discoverError && (

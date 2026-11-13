@@ -99,7 +99,7 @@ export function useWorkspaceNavigation({
   const [versionsOpen, setVersionsOpen] = useState(false);
   const versionsVisible = desktop && page === 'playing' && versionsOpen;
   const desktopLyricsOpen = desktop && page === 'playing' && desktopLyrics;
-  useDesktopWindowMode(desktopLyricsOpen ? 'immersive' : 'standard');
+  useDesktopWindowMode(desktop && page === 'playing' ? 'immersive' : 'standard');
   const lyricToggleOrigin = useRef<HTMLElement | null>(null);
   const closeDesktopLyrics = () => {
     setDesktopLyrics(false);
