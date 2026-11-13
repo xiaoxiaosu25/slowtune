@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/xiaoxiaosu25/slowtune/releases/download/v0.1.33/SlowTune-0.1.33-windows-x64.zip"><strong>下载 Windows x64</strong></a> ·
+  <a href="https://github.com/xiaoxiaosu25/slowtune/releases/download/v0.1.34/SlowTune-0.1.34-windows-x64.zip"><strong>下载 Windows x64</strong></a> ·
   <a href="https://github.com/xiaoxiaosu25/slowtune/releases">所有版本与更新记录</a> ·
   <a href="#界面预览">界面预览</a> ·
   <a href="#功能">功能</a> ·
@@ -74,7 +74,7 @@
 
 ## 下载 Windows 版
 
-1. [下载 Windows x64 ZIP](https://github.com/xiaoxiaosu25/slowtune/releases/download/v0.1.33/SlowTune-0.1.33-windows-x64.zip)；其他版本及更新说明见 [Releases](https://github.com/xiaoxiaosu25/slowtune/releases)。
+1. [下载 Windows x64 ZIP](https://github.com/xiaoxiaosu25/slowtune/releases/download/v0.1.34/SlowTune-0.1.34-windows-x64.zip)；其他版本及更新说明见 [Releases](https://github.com/xiaoxiaosu25/slowtune/releases)。
 2. 将 `SlowTune-<版本>-windows-x64.zip` 完整解压到当前用户可写的目录。
 3. 双击 `SlowTune.exe`，欢迎页结束后即可进入，无需另装 Node.js。
 
