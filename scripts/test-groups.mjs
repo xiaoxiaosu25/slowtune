@@ -6,7 +6,7 @@ export const testGroups = {
   core: [
     'documentation', 'desktop-lyric-source', 'browser-config', 'workspace-paths', 'vendor',
     'lyric-timing', 'audio-quality', 'audio-selection', 'audio-bridge', 'song-library', 'song-library-sync', 'recommendation',
-    'desktop-continuity', 'desktop-playback-performance', 'playback-diagnostics', 'playback-delivery-policy', 'desktop-library-copy',
+    'desktop-continuity', 'desktop-playback-performance', 'playback-diagnostics', 'playback-delivery-policy', 'chart-playback', 'chart-playback-queue', 'desktop-library-copy',
     'song-library-worker', 'desktop-storage', 'desktop-state', 'desktop-profile',
     'search-playback', 'desktop-lyric-match', 'desktop-media-policy', 'desktop-youtube-reuse',
     'lyrics', 'desktop-lyrics-progress', 'playlist-cover', 'multipart', 'queue-groups',

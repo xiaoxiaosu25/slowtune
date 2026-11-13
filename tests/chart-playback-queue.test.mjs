@@ -17,7 +17,7 @@ const mockUrl='data:text/javascript,'+encodeURIComponent(`
   export class StudioPlayer {constructor(){return context().player;}}
   export class MusicPlayerBridge {constructor(){return context().bridge;}}
   export class BestAudioBridge {constructor(){return context().bridge;}}
-  export {retainVerifiedAudio} from ${JSON.stringify(new URL('../src/audio-quality.ts',import.meta.url).href)};
+  export {checkAudioDelivery,retainVerifiedAudio} from ${JSON.stringify(new URL('../src/audio-quality.ts',import.meta.url).href)};
   export class PlaybackAudioAnalysis {dispose(){}}
   export class MediaSessionController {activate(){} updateMetadata(){} destroy(){}}
   export class SleepTimerController extends EventTarget {
