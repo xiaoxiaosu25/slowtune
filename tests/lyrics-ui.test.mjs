@@ -86,7 +86,8 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   assert.equal(await page.locator('.bottom-lyrics').count(), 0);
   assert.equal(await page.locator('.playing-art-switch').getAttribute('data-visual-mode'), 'vinyl');
   await visual(page, 'lyrics');
-  const panel = page.getByRole('region', { name: '当前版本歌词', exact: true });
+  // Modal layers hide this reader from accessibility navigation while its media clock keeps scrolling.
+  const panel = page.getByRole('region', { name: '当前版本歌词', exact: true, includeHidden: true });
   await panel.getByRole('button', { name: '第一行', exact: true }).waitFor();
   assert.equal(await page.locator('.bottom-lyrics').count(), 0);
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
@@ -113,6 +114,7 @@ test('direct mobile lyrics isolate versions, share the media clock and preserve 
   assert.equal(lyrics.read(ref).document.id, '123');
   assert.equal(await page.locator('.vinyl-record').count(), 0, 'lyrics replace the cover slot');
   await page.getByRole('button', { name: '更多播放选项', exact: true }).click();
+  assert.equal(await page.getByRole('region', { name: '当前版本歌词', exact: true }).count(), 0, 'the modal sheet hides background lyrics from accessibility navigation');
   await panel.getByLabel('歌词正文').dispatchEvent('scroll');
   assert.equal(await page.getByRole('button', { name: '歌词设置', exact: true }).isVisible(), true, 'lyric auto-scroll leaves a stationary playback menu open');
   await page.evaluate(() => document.dispatchEvent(new Event('scroll')));
